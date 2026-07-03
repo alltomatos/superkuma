@@ -2,7 +2,7 @@ const fs = require("fs");
 const fsAsync = fs.promises;
 const { R } = require("redbean-node");
 const { setSetting, setting } = require("./util-server");
-const { log, sleep, isDev } = require("../src/util");
+const { log, sleep } = require("../src/util");
 const knex = require("knex");
 const path = require("path");
 const { EmbeddedMariaDB } = require("./embedded-mariadb");
@@ -11,8 +11,10 @@ const { Settings } = require("./settings");
 const { UptimeCalculator } = require("./uptime-calculator");
 const dayjs = require("dayjs");
 const { SimpleMigrationServer } = require("./utils/simple-migration-server");
-const KumaColumnCompiler = require("./utils/knex/lib/dialects/mysql2/schema/mysql2-columncompiler");
 const SqlString = require("sqlstring");
+const { initDataDir, getDevDataDir, getCurrentGitBranch } = require("./database/paths");
+const { patchMysql2ColumnCompiler } = require("./database/dialect");
+const { patchList } = require("./database/legacy-patches");
 
 /**
  * Database & App Data Folder
@@ -68,52 +70,7 @@ class Database {
      *      { parents: []}: Need parents before add it
      *  @deprecated
      */
-    static patchList = {
-        "patch-setting-value-type.sql": true,
-        "patch-improve-performance.sql": true,
-        "patch-2fa.sql": true,
-        "patch-add-retry-interval-monitor.sql": true,
-        "patch-incident-table.sql": true,
-        "patch-group-table.sql": true,
-        "patch-monitor-push_token.sql": true,
-        "patch-http-monitor-method-body-and-headers.sql": true,
-        "patch-2fa-invalidate-used-token.sql": true,
-        "patch-notification_sent_history.sql": true,
-        "patch-monitor-basic-auth.sql": true,
-        "patch-add-docker-columns.sql": true,
-        "patch-status-page.sql": true,
-        "patch-proxy.sql": true,
-        "patch-monitor-expiry-notification.sql": true,
-        "patch-status-page-footer-css.sql": true,
-        "patch-added-mqtt-monitor.sql": true,
-        "patch-add-clickable-status-page-link.sql": true,
-        "patch-add-sqlserver-monitor.sql": true,
-        "patch-add-other-auth.sql": { parents: ["patch-monitor-basic-auth.sql"] },
-        "patch-grpc-monitor.sql": true,
-        "patch-add-radius-monitor.sql": true,
-        "patch-monitor-add-resend-interval.sql": true,
-        "patch-ping-packet-size.sql": true,
-        "patch-maintenance-table2.sql": true,
-        "patch-add-gamedig-monitor.sql": true,
-        "patch-add-google-analytics-status-page-tag.sql": true,
-        "patch-http-body-encoding.sql": true,
-        "patch-add-description-monitor.sql": true,
-        "patch-api-key-table.sql": true,
-        "patch-monitor-tls.sql": true,
-        "patch-maintenance-cron.sql": true,
-        "patch-add-parent-monitor.sql": true,
-        "patch-add-invert-keyword.sql": true,
-        "patch-added-json-query.sql": true,
-        "patch-added-kafka-producer.sql": true,
-        "patch-add-certificate-expiry-status-page.sql": true,
-        "patch-monitor-oauth-cc.sql": true,
-        "patch-add-timeout-monitor.sql": true,
-        "patch-add-gamedig-given-port.sql": true,
-        "patch-notification-config.sql": true,
-        "patch-fix-kafka-producer-booleans.sql": true,
-        "patch-timeout.sql": true,
-        "patch-monitor-tls-info-add-fk.sql": true, // The last file so far converted to a knex migration file
-    };
+    static patchList = patchList;
 
     /**
      * The final version should be 10 after merged tag feature
@@ -133,32 +90,7 @@ class Database {
      * @returns {void}
      */
     static initDataDir(args) {
-        // Data Directory (must be end with "/")
-        Database.dataDir = process.env.DATA_DIR || args["data-dir"] || Database.getDevDataDir() || "./data/";
-
-        Database.sqlitePath = path.join(Database.dataDir, "kuma.db");
-        if (!fs.existsSync(Database.dataDir)) {
-            fs.mkdirSync(Database.dataDir, { recursive: true });
-        }
-
-        Database.uploadDir = path.join(Database.dataDir, "upload/");
-
-        if (!fs.existsSync(Database.uploadDir)) {
-            fs.mkdirSync(Database.uploadDir, { recursive: true });
-        }
-
-        // Create screenshot dir
-        Database.screenshotDir = path.join(Database.dataDir, "screenshots/");
-        if (!fs.existsSync(Database.screenshotDir)) {
-            fs.mkdirSync(Database.screenshotDir, { recursive: true });
-        }
-
-        Database.dockerTLSDir = path.join(Database.dataDir, "docker-tls/");
-        if (!fs.existsSync(Database.dockerTLSDir)) {
-            fs.mkdirSync(Database.dockerTLSDir, { recursive: true });
-        }
-
-        log.info("server", `Data Dir: ${Database.dataDir}`);
+        initDataDir(args, Database);
     }
 
     /**
@@ -168,18 +100,7 @@ class Database {
      * @returns {string} The dev data dir, empty string if not in dev mode or in master branch
      */
     static getDevDataDir() {
-        if (isDev) {
-            const gitBranch = this.getCurrentGitBranch();
-
-            // HEAD means detached head. Don't handle this case, becasuse it is not common.
-            if (gitBranch !== "" && gitBranch !== "master" && gitBranch !== "HEAD") {
-                log.info("server", `Using development data directory for branch ${gitBranch}`);
-                return path.join("./data/dev-data/", gitBranch, "/");
-            } else {
-                log.debug("server", "Do not use development data directory because it is master branch");
-            }
-        }
-        return "";
+        return getDevDataDir();
     }
 
     /**
@@ -187,13 +108,7 @@ class Database {
      * @returns {string} The current git branch name, or empty string if it cannot be determined
      */
     static getCurrentGitBranch() {
-        try {
-            const { execSync } = require("child_process");
-            // Reference: https://stackoverflow.com/questions/6245570/how-do-i-get-the-current-branch-name-in-git
-            return execSync("git rev-parse --abbrev-ref HEAD").toString().trim();
-        } catch (e) {
-            return "";
-        }
+        return getCurrentGitBranch();
     }
 
     /**
@@ -236,12 +151,7 @@ class Database {
      */
     static async connect(testMode = false, autoloadModels = true, noLog = false) {
         // Patch "mysql2" knex client
-        // Workaround: Tried extending the ColumnCompiler class, but it didn't work for unknown reasons, so I override the function via prototype
-        const { getDialectByNameOrAlias } = require("knex/lib/dialects");
-        const mysql2 = getDialectByNameOrAlias("mysql2");
-        mysql2.prototype.columnCompiler = function () {
-            return new KumaColumnCompiler(this, ...arguments);
-        };
+        patchMysql2ColumnCompiler();
 
         const acquireConnectionTimeout = 120 * 1000;
         let dbConfig;
