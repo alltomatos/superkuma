@@ -23,10 +23,10 @@
 | 3 | `GAP-003` | Arquitetura | P2 | Monólitos god-object (monitor.js 2069, server.js 2018, EditMonitor.vue 4356, util-server.js 1066…) | T2 | 🟡 queued |
 | 4 | `GAP-004` | Arquitetura | P2 | Sem camada de validação de entrada (parsing manual em sockets/routers) | T2 | 🟡 queued |
 | 5 | `GAP-005` | Performance | P3 | Import eager de 24 monitor-types + 96 providers; tabelas `stat_*` sem model | T2 | 🟡 queued |
-| 6 | `GAP-006` | Testes | P4 | Cobertura ~14%; `monitor.js` e models sem teste unitário direto | T2 | 🟡 queued |
+| 6 | `GAP-006` | Testes | P4 | Cobertura ~14%; `monitor.js` e models sem teste unitário direto | T2 | 🟢 avançado (TASK-020/105: +19 model +10 http +64 submódulos +3 e2e) |
 | 7 | `GAP-007` | Higiene | P4 | Backend sem tipos (só JSDoc); 108 patches SQL legados; CLAUDE/AGENTS haviam sido esvaziados | T1 | 🟢 partial |
 | 8 | `GAP-008` | Segurança | P1-low | timing-enum no login; `verifyAPIKey` sem `user_id`; `setup` sem rate-limit | T2 | 🟡 queued |
-| 9 | `GAP-009` | Testes | P4 | E2E não cobre `maxRedirects` (segue redirect sem limite silenciosamente) nem inversão de keyword-match no monitor HTTP — achado por mutation-check independente durante TASK-120, não introduzido pelo refactor | T2 | 🟡 queued |
+| 9 | `GAP-009` | Testes | P4 | E2E não cobre `maxRedirects` nem inversão de keyword-match no monitor HTTP | T2 | ✅ closed — `test-http.js` (10 testes), 2 mutation-checks independentes confirmaram detecção real. commit 57fcff7a |
 
 ---
 
@@ -158,7 +158,8 @@
   skill: /tdd
   gap_ref: GAP-006
   depends_on: [TASK-100, TASK-110, TASK-120]
-  status: in_progress   # Workflow wf_71d7c8ef-79a. Fase 1: test-http.js fechando GAP-009 (maxRedirects/keyword-inversion). Fase 2: submódulos util-server/database sem teste direto
+  status: done   # +74 testes novos (10 http.js fechando GAP-009, 31 tls, 20 misc, 13 database submodules). Suíte não-Docker: 185->259. 2 mutation-checks independentes por etapa. commits 57fcff7a + 8ac0ea1e
+  concluido_em: "2026-07-03"
 
 - id: TASK-030
   desc: "EPIC-3: introduzir validação (zod) em socket-handlers e routers"
@@ -191,6 +192,8 @@
 | 9 | 2026-07-03 | GAP-003 | TASK-120: extrai http/keyword/json-query de monitor.js -> monitor-types/http.js (2069→1805) | Preserva quirk tlsInfo sombreado + cache oauthAccessToken. 184/184 backend + 26/26 e2e. commit d35248a0 |
 | 10 | 2026-07-03 | GAP-003 | TASK-150: split EditMonitor.vue (4356→4016), 3 subcomponentes só nas seções com cobertura E2E real | 26/26 e2e, mutation-check independente (auth_user) confirmou detecção real. commit d58c7832 |
 | 11 | 2026-07-03 | — | Fix cosmético: comentário desatualizado em http.js ("bean.ping"→"heartbeat.ping"), achado pelo verificador do TASK-120 | T1 trivial |
+| 12 | 2026-07-03 | GAP-009 | TASK-020 fase 1: `test-http.js` (10 testes) fecha GAP-009 | maxRedirects + keyword-inversion cobertos, 2 mutation-checks independentes confirmaram detecção. commit 57fcff7a |
+| 13 | 2026-07-03 | GAP-006 | TASK-020 fase 2: 64 testes novos p/ submódulos util-server(tls,misc)/database sem cobertura direta | Suíte não-Docker 194→259. mutation-check independente (checkStatusCode) confirmou. commit 8ac0ea1e |
 
 ---
 

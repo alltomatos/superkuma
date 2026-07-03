@@ -42,8 +42,10 @@ DAG executada, ordenada por risco (menor → maior) — todas verificadas por ag
 ### EPIC-3 — Camada de validação de entrada (P2 · T2 · 🟡)
 Introduzir validação de payloads de socket/HTTP (ex: zod) para eliminar parsing manual disperso.
 
-### EPIC-4 — Robustez de testes (P4 · T2 · 🟡)
+### EPIC-4 — Robustez de testes (P4 · T2 · 🟡) — ✅ CONCLUÍDA (2026-07-03)
 Cobrir o núcleo hoje sem testes diretos (`monitor.js`, models), elevar baseline via `/tdd`.
+- +74 testes: `test-http.js` (10, fecha GAP-009: maxRedirects + keyword-inversion), `test-util-server-tls.js` (31), `test-util-server-misc.js` (20), `test-database-submodules.js` (13).
+- Suíte não-Docker: **185 → 259 testes**, todos verdes. commits `57fcff7a` + `8ac0ea1e`.
 
 ### EPIC-5 — Higiene e performance (P3/P4 · T1-T2 · 🟢)
 Lazy-load de monitor-types/providers, model para tabelas `stat_*`, limpeza de patches SQL legados, tipagem progressiva.
@@ -53,9 +55,9 @@ Lazy-load de monitor-types/providers, model para tabelas `stat_*`, limpeza de pa
 ## Ordem sugerida (atualizada 2026-07-03)
 
 1. ✅ **Governança + documentação de domínio** (CONTEXT.md, ADRs) — concluída.
-2. ▶️ **EPIC-2 — quebra de monólitos** (decisão do usuário: refactor ANTES de testes novos). Extração mecânica pura, ordenada por risco (ver tabela acima), da mais segura para a mais arriscada.
-3. **EPIC-4 — testes** do que foi extraído (agora em unidades pequenas e testáveis).
-4. **EPIC-3 — validação** (zod) sobre a estrutura já limpa.
+2. ✅ **EPIC-2 — quebra de monólitos** — concluída.
+3. ✅ **EPIC-4 — testes** do que foi extraído — concluída.
+4. ▶️ **EPIC-3 — validação** (zod) sobre a estrutura já limpa — próxima.
 5. **EPIC-1 — cifragem de segredos**: adiada por [ADR-0007](docs/adr/0007-defer-secret-encryption.md).
 
 > Refactor sem testes novos (decisão do usuário) → a salvaguarda é: **extração mecânica pura + suíte existente + lint + build como gate**, em worktree isolada. Os alvos 🔴 sem rede (`monitor.js`, `EditMonitor.vue`) exigem decisão explícita de salvaguarda antes de executar.
