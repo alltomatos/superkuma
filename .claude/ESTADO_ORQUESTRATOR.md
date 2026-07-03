@@ -87,26 +87,71 @@
 ### Pendentes (código — AGUARDANDO "GO" por item)
 
 ```yaml
+# EPIC-2 — quebra de monólitos (PRIORIDADE ATUAL: refactor antes de testes novos)
+# Salvaguarda: extração mecânica pura + suíte existente + lint/build como gate, em worktree.
+
+- id: TASK-100
+  desc: "Split util-server.js (1066) -> server/util-server/ (network, tls/crypto, format) + barrel re-export"
+  gap_ref: GAP-003
+  risco: BAIXO
+  depends_on: []
+  status: ready   # <== próximo alvo recomendado (worktree)
+
+- id: TASK-140
+  desc: "uptime-calculator.js (891): separar persistência da agregação"
+  gap_ref: GAP-003
+  risco: MEDIO
+  depends_on: [TASK-100]
+  status: blocked
+
+- id: TASK-130
+  desc: "database.js (1018): connection / migration / dialect"
+  gap_ref: GAP-003
+  risco: MEDIO
+  depends_on: [TASK-100]
+  status: blocked
+
+- id: TASK-110
+  desc: "server.js (2018): mover socket handlers embutidos -> server/socket-handlers/"
+  gap_ref: GAP-003
+  risco: MEDIO
+  depends_on: [TASK-100]
+  status: blocked
+
+- id: TASK-120
+  desc: "monitor.js (2069): extrair check HTTP -> monitor-types/http.js (ADR-0002)"
+  gap_ref: GAP-003
+  risco: ALTO   # sem rede direta -> exige decisao de salvaguarda
+  depends_on: [TASK-110]
+  status: needs_human_go
+
+- id: TASK-150
+  desc: "EditMonitor.vue (4356): subcomponentes por tipo de monitor"
+  gap_ref: GAP-003
+  risco: ALTO   # so E2E -> exige decisao de salvaguarda
+  depends_on: []
+  status: needs_human_go
+
+- id: TASK-160
+  desc: "src/mixins/socket.js (894): dividir em composables"
+  gap_ref: GAP-003
+  risco: MEDIO
+  depends_on: []
+  status: blocked
+
 - id: TASK-020
-  desc: "EPIC-4: testes unitários para monitor.js (serialização toJSON, determineStatus)"
+  desc: "EPIC-4: testes unitários para as unidades extraídas (monitor.js, util-server, etc.)"
   skill: /tdd
   gap_ref: GAP-006
-  depends_on: [TASK-010]
-  status: ready   # destravada — baseline verde
+  depends_on: [TASK-100, TASK-110, TASK-120]   # reordenado: testes DEPOIS do refactor (decisão do usuário)
+  status: blocked
 
 - id: TASK-030
   desc: "EPIC-3: introduzir validação (zod) em socket-handlers e routers"
   skill: /improve-codebase-architecture
   gap_ref: GAP-004
-  depends_on: [TASK-010]
-  status: ready   # destravada — baseline verde
-
-- id: TASK-040
-  desc: "EPIC-2: extrair lógica de check por protocolo de monitor.js para monitor-types/"
-  skill: /improve-codebase-architecture
-  gap_ref: GAP-003
-  depends_on: [TASK-020]
-  status: blocked   # worktree dedicada (refactor pesado)
+  depends_on: [TASK-110]
+  status: blocked
 
 - id: TASK-090
   desc: "EPIC-1: cifrar segredos at rest + migration + mascaramento API"
