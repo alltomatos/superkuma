@@ -7,6 +7,10 @@ const apicache = require("../modules/apicache");
 const APIKey = require("../model/api_key");
 const { Settings } = require("../settings");
 const { sendAPIKeyList } = require("../client");
+const { z } = require("zod");
+const { validate } = require("../validation");
+
+const keyIDSchema = z.number().int().positive();
 
 /**
  * Handlers for API keys
@@ -70,6 +74,7 @@ module.exports.apiKeySocketHandler = (socket) => {
     socket.on("deleteAPIKey", async (keyID, callback) => {
         try {
             checkLogin(socket);
+            keyID = validate(keyIDSchema, keyID);
 
             log.debug("apikeys", `Deleted API Key: ${keyID} User ID: ${socket.userID}`);
 
@@ -95,6 +100,7 @@ module.exports.apiKeySocketHandler = (socket) => {
     socket.on("disableAPIKey", async (keyID, callback) => {
         try {
             checkLogin(socket);
+            keyID = validate(keyIDSchema, keyID);
 
             log.debug("apikeys", `Disabled Key: ${keyID} User ID: ${socket.userID}`);
 
@@ -120,6 +126,7 @@ module.exports.apiKeySocketHandler = (socket) => {
     socket.on("enableAPIKey", async (keyID, callback) => {
         try {
             checkLogin(socket);
+            keyID = validate(keyIDSchema, keyID);
 
             log.debug("apikeys", `Enabled Key: ${keyID} User ID: ${socket.userID}`);
 

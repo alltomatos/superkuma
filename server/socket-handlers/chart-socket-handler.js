@@ -1,6 +1,13 @@
 const { checkLogin } = require("../util-server");
 const { UptimeCalculator } = require("../uptime-calculator");
 const { log } = require("../../src/util");
+const { z } = require("zod");
+const { validate } = require("../validation");
+
+const monitorIDSchema = z.number().int().positive();
+// Bounded to a year in hours (8760) so the frontend's existing period
+// options (recent/3h/6h/24h/1w, i.e. up to 168) are never rejected.
+const periodSchema = z.number().int().min(0).max(8760);
 
 module.exports.chartSocketHandler = (socket) => {
     socket.on("getMonitorChartData", async (monitorID, period, callback) => {
@@ -12,6 +19,9 @@ module.exports.chartSocketHandler = (socket) => {
             if (period == null) {
                 throw new Error("Invalid period.");
             }
+
+            monitorID = validate(monitorIDSchema, monitorID);
+            period = validate(periodSchema, period);
 
             let uptimeCalculator = await UptimeCalculator.getUptimeCalculator(monitorID);
 

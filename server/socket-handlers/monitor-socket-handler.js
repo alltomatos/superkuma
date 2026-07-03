@@ -4,6 +4,11 @@ const { log } = require("../../src/util");
 const Monitor = require("../model/monitor");
 const Database = require("../database");
 const apicache = require("../modules/apicache");
+const { z } = require("zod");
+const { validate } = require("../validation");
+
+const monitorTagIDSchema = z.number().int().positive();
+const monitorTagValueSchema = z.string().max(500).nullish();
 
 /**
  * Handlers for monitor CRUD/control and tags
@@ -582,6 +587,9 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
     socket.on("addMonitorTag", async (tagID, monitorID, value, callback) => {
         try {
             checkLogin(socket);
+            tagID = validate(monitorTagIDSchema, tagID);
+            monitorID = validate(monitorTagIDSchema, monitorID);
+            value = validate(monitorTagValueSchema, value);
 
             await R.exec("INSERT INTO monitor_tag (tag_id, monitor_id, value) VALUES (?, ?, ?)", [
                 tagID,
@@ -607,6 +615,9 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
     socket.on("editMonitorTag", async (tagID, monitorID, value, callback) => {
         try {
             checkLogin(socket);
+            tagID = validate(monitorTagIDSchema, tagID);
+            monitorID = validate(monitorTagIDSchema, monitorID);
+            value = validate(monitorTagValueSchema, value);
 
             await R.exec("UPDATE monitor_tag SET value = ? WHERE tag_id = ? AND monitor_id = ?", [
                 value,
@@ -632,6 +643,9 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
     socket.on("deleteMonitorTag", async (tagID, monitorID, value, callback) => {
         try {
             checkLogin(socket);
+            tagID = validate(monitorTagIDSchema, tagID);
+            monitorID = validate(monitorTagIDSchema, monitorID);
+            value = validate(monitorTagValueSchema, value);
 
             await R.exec("DELETE FROM monitor_tag WHERE tag_id = ? AND monitor_id = ? AND value = ?", [
                 tagID,

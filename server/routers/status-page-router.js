@@ -7,21 +7,60 @@ const { R } = require("redbean-node");
 const { badgeConstants } = require("../../src/util");
 const { makeBadge } = require("badge-maker");
 const { UptimeCalculator } = require("../uptime-calculator");
+const { z } = require("zod");
+const { validate } = require("../validation");
 
 let router = express.Router();
 
 let cache = apicache.middleware;
 const server = UptimeKumaServer.getInstance();
 
+// Status page slugs are always lower-cased before being looked up, so only
+// lowercase letters, digits and hyphens are ever valid.
+const slugSchema = z.string().regex(/^[a-z0-9-]+$/);
+
+/**
+ * Is the given slug a well-formed status page slug?
+ * @param {string} slug Slug to check (already lower-cased)
+ * @returns {boolean} True if the slug matches the expected format
+ */
+function isValidSlug(slug) {
+    // "index.html" is a special case: express substitutes it for an empty
+    // ":slug" param (e.g. requesting "/status/" with a trailing slash), and
+    // StatusPage.handleStatusPageResponse() maps it to the "default" page.
+    if (slug === "index.html") {
+        return true;
+    }
+
+    try {
+        validate(slugSchema, slug);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 router.get("/status/:slug", cache("5 minutes"), async (request, response) => {
     let slug = request.params.slug;
     slug = slug.toLowerCase();
+
+    if (!isValidSlug(slug)) {
+        response.status(404).send(server.indexHTML);
+        return;
+    }
+
     await StatusPage.handleStatusPageResponse(response, server.indexHTML, slug);
 });
 
 router.get("/status/:slug/rss", cache("5 minutes"), async (request, response) => {
     let slug = request.params.slug;
     slug = slug.toLowerCase();
+
+    if (!isValidSlug(slug)) {
+        response.status(404).send(server.indexHTML);
+        return;
+    }
+
     await StatusPage.handleStatusPageRSSResponse(response, slug, request);
 });
 
@@ -42,6 +81,11 @@ router.get("/api/status-page/:slug", cache("5 minutes"), async (request, respons
     slug = slug.toLowerCase();
 
     try {
+        if (!isValidSlug(slug)) {
+            sendHttpError(response, "Status Page Not Found");
+            return null;
+        }
+
         // Get Status Page
         let statusPage = await R.findOne("status_page", " slug = ? ", [slug]);
 
@@ -70,6 +114,12 @@ router.get("/api/status-page/heartbeat/:slug", cache("1 minutes"), async (reques
 
         let slug = request.params.slug;
         slug = slug.toLowerCase();
+
+        if (!isValidSlug(slug)) {
+            sendHttpError(response, "Status Page Not Found");
+            return;
+        }
+
         let statusPageID = await StatusPage.slugToID(slug);
 
         let monitorIDList = await R.getCol(
@@ -116,6 +166,11 @@ router.get("/api/status-page/:slug/manifest.json", cache("1440 minutes"), async 
     slug = slug.toLowerCase();
 
     try {
+        if (!isValidSlug(slug)) {
+            sendHttpError(response, "Not Found");
+            return;
+        }
+
         // Get Status Page
         let statusPage = await R.findOne("status_page", " slug = ? ", [slug]);
 
@@ -148,6 +203,12 @@ router.get("/api/status-page/:slug/incident-history", cache("5 minutes"), async 
     try {
         let slug = request.params.slug;
         slug = slug.toLowerCase();
+
+        if (!isValidSlug(slug)) {
+            sendHttpError(response, "Status Page Not Found");
+            return;
+        }
+
         let statusPageID = await StatusPage.slugToID(slug);
 
         if (!statusPageID) {
@@ -171,7 +232,6 @@ router.get("/api/status-page/:slug/badge", cache("5 minutes"), async (request, r
     allowDevAllOrigin(response);
     let slug = request.params.slug;
     slug = slug.toLowerCase();
-    const statusPageID = await StatusPage.slugToID(slug);
     const {
         label,
         upColor = badgeConstants.defaultUpColor,
@@ -182,6 +242,13 @@ router.get("/api/status-page/:slug/badge", cache("5 minutes"), async (request, r
     } = request.query;
 
     try {
+        if (!isValidSlug(slug)) {
+            sendHttpError(response, "Status Page Not Found");
+            return;
+        }
+
+        const statusPageID = await StatusPage.slugToID(slug);
+
         let monitorIDList = await R.getCol(
             `
             SELECT monitor_group.monitor_id FROM monitor_group, \`group\`
