@@ -157,8 +157,8 @@
   desc: "EPIC-4: testes unitários para as unidades extraídas (monitor.js, util-server, etc.)"
   skill: /tdd
   gap_ref: GAP-006
-  depends_on: [TASK-100, TASK-110, TASK-120]   # reordenado: testes DEPOIS do refactor (decisão do usuário)
-  status: blocked
+  depends_on: [TASK-100, TASK-110, TASK-120]
+  status: in_progress   # Workflow wf_71d7c8ef-79a. Fase 1: test-http.js fechando GAP-009 (maxRedirects/keyword-inversion). Fase 2: submódulos util-server/database sem teste direto
 
 - id: TASK-030
   desc: "EPIC-3: introduzir validação (zod) em socket-handlers e routers"
