@@ -187,11 +187,11 @@
   concluido_em: "2026-07-03"
 
 - id: TASK-F1
-  desc: "F1 Receptor Master (MVP): generalizar /api/push p/ instance_id+agent_monitor_id, espelhar monitores"
+  desc: "F1 Receptor Master (MVP): registro de remote_instance + endpoint /api/federation/heartbeat + espelhamento idempotente de monitores (type=push). Inclui migration adicional monitor.remote_monitor_id (gap achado no design da F1)"
   ref: ADR-0008
   risco: T2
   depends_on: [TASK-F0]
-  status: ready   # destravada
+  status: in_progress   # Workflow wf_205e1648-478
 
 - id: TASK-F2
   desc: "F2 Forwarder Agent (MVP): hook no beat() de monitor.js + config master/token; ponta-a-ponta REST"
@@ -233,11 +233,11 @@
   concluido_em: "2026-07-03"
 
 - id: TASK-M1
-  desc: "M1: UptimeCalculator grava/rola tier mensal; clear-old-data.js honra retenção em camadas. Rede: test-uptime-calculator.js (18 casos)"
+  desc: "M1: UptimeCalculator grava/rola tier mensal (bucket calendar-aware, NÃO intervalo fixo); clear-old-data.js honra retenção em camadas. Rede: test-uptime-calculator.js (18 casos + novos)"
   ref: ADR-0009
   risco: T2
   depends_on: [TASK-M0]
-  status: ready   # destravada
+  status: in_progress   # Workflow wf_205e1648-478, roda após F1 verificar
 
 - id: TASK-M2
   desc: "M2: UI de relatório de SLA por remote_instance, exportável"
