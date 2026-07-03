@@ -162,11 +162,11 @@
   concluido_em: "2026-07-03"
 
 - id: TASK-030
-  desc: "EPIC-3: introduzir validação (zod) em socket-handlers e routers"
+  desc: "EPIC-3: introduzir validação (zod). Fase 1: api-key/tags/chart/slug. Fase 2: proxy/docker/remote-browser/cloudflared. FORA DE ESCOPO deliberado: monitor add/editMonitor (union discriminada 24+ tipos) e status-page save/incident — maior complexidade/risco, adiados p/ EPIC-3b"
   skill: /improve-codebase-architecture
   gap_ref: GAP-004
   depends_on: [TASK-110]
-  status: blocked
+  status: in_progress   # Workflow wf_5ea3ee70-0ab
 
 - id: TASK-090
   desc: "EPIC-1: cifrar segredos at rest + migration + mascaramento API"
