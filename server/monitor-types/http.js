@@ -16,7 +16,7 @@ class HttpMonitorType extends MonitorType {
      * @inheritdoc
      */
     async check(monitor, heartbeat, _server) {
-        // Do not do any queries/high loading things before the "bean.ping"
+        // Do not do any queries/high loading things before the "heartbeat.ping"
         let startTime = dayjs().valueOf();
 
         // HTTP basic auth

@@ -26,6 +26,7 @@
 | 6 | `GAP-006` | Testes | P4 | Cobertura ~14%; `monitor.js` e models sem teste unitário direto | T2 | 🟡 queued |
 | 7 | `GAP-007` | Higiene | P4 | Backend sem tipos (só JSDoc); 108 patches SQL legados; CLAUDE/AGENTS haviam sido esvaziados | T1 | 🟢 partial |
 | 8 | `GAP-008` | Segurança | P1-low | timing-enum no login; `verifyAPIKey` sem `user_id`; `setup` sem rate-limit | T2 | 🟡 queued |
+| 9 | `GAP-009` | Testes | P4 | E2E não cobre `maxRedirects` (segue redirect sem limite silenciosamente) nem inversão de keyword-match no monitor HTTP — achado por mutation-check independente durante TASK-120, não introduzido pelo refactor | T2 | 🟡 queued |
 
 ---
 
@@ -134,14 +135,16 @@
   gap_ref: GAP-003
   risco: ALTO
   depends_on: [TASK-110, TASK-105]
-  status: in_progress   # Workflow wf_d1af8439-76b — escopo restrito ao bloco http/keyword/json-query (linhas ~469-723); preserva quirk do tlsInfo sombreado e cache de oauthAccessToken
+  status: done   # 2069->1805 (novo http.js, 278 LOC). Verificado: quirks (tlsInfo sombreado, cache oauthAccessToken) preservados, dispatch unificado c/ os 24 tipos. 184/184 backend + 26/26 e2e + mutation-check (maxRedirects) independente. commit d35248a0
+  concluido_em: "2026-07-03"
 
 - id: TASK-150
   desc: "EditMonitor.vue (4356): subcomponentes por tipo de monitor"
   gap_ref: GAP-003
   risco: ALTO
   depends_on: [TASK-105, TASK-120]
-  status: blocked   # roda no mesmo workflow, só após TASK-120 verificar
+  status: done   # 4356->4016. Extraiu HttpOptionsFields.vue(302)/TcpPortFields.vue(86)/PushUrlField.vue(70) — só as seções com cobertura E2E real (escopo disciplinado). 26/26 e2e + mutation-check independente. commit d58c7832
+  concluido_em: "2026-07-03"
 
 - id: TASK-160
   desc: "src/mixins/socket.js (894): dividir em composables"
@@ -185,6 +188,9 @@
 | 6 | 2026-07-03 | GAP-003 | TASK-110: split server.js (2018→1324) via workflow c/ verificador adversarial | 86/86 eventos socket + 33 checkLogin preservados, lint 0 err, commit 05f93195 |
 | 7 | 2026-07-03 | — | Consolidação final EPIC-2 (fase segura): suíte completa 166/166, lint 0 err | Rede de segurança íntegra após 4 refactors sequenciais |
 | 8 | 2026-07-03 | GAP-003 | TASK-105: 19 testes characterization backend (monitor.js) + 3 novos E2E (EditMonitor.vue) | Mutation-check independente do verificador confirmou detecção real de regressão em ambos. commits 65ac2586 + 6928ba3a |
+| 9 | 2026-07-03 | GAP-003 | TASK-120: extrai http/keyword/json-query de monitor.js -> monitor-types/http.js (2069→1805) | Preserva quirk tlsInfo sombreado + cache oauthAccessToken. 184/184 backend + 26/26 e2e. commit d35248a0 |
+| 10 | 2026-07-03 | GAP-003 | TASK-150: split EditMonitor.vue (4356→4016), 3 subcomponentes só nas seções com cobertura E2E real | 26/26 e2e, mutation-check independente (auth_user) confirmou detecção real. commit d58c7832 |
+| 11 | 2026-07-03 | — | Fix cosmético: comentário desatualizado em http.js ("bean.ping"→"heartbeat.ping"), achado pelo verificador do TASK-120 | T1 trivial |
 
 ---
 

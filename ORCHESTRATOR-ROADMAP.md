@@ -20,21 +20,24 @@ Padronizar e endurecer o fork sem quebrar comportamento, priorizando **seguranç
 Cifrar credenciais at rest (monitor/notificação/JWT secret), mascarar em respostas de API, e dar expiração/invalidação aos tokens JWT.
 - Depende de decisão humana (mudança de schema + migration + auth).
 
-### EPIC-2 — Quebra de monólitos (P2 · T2 · 🟡) — **PRIORIDADE ATUAL**
+### EPIC-2 — Quebra de monólitos (P2 · T2 · 🟡) — ✅ CONCLUÍDA (2026-07-03)
 Objetivo: reduzir arquivos gigantes por **extração mecânica pura** (mover código + re-export, SEM mudança de comportamento). Rede de segurança = suíte existente + `npm run lint`. Refactor pesado → **worktree dedicada**.
 
-DAG ordenada por risco (menor → maior):
+DAG executada, ordenada por risco (menor → maior) — todas verificadas por agente independente com mutation-check:
 
-| ID | Alvo (LOC) | Extração | Risco | Rede de segurança |
-|---|---|---|---|---|
-| TASK-100 | `util-server.js` (1066) | → `server/util-server/` (network, tls/crypto, format) + barrel | 🟢 BAIXO | 5 testes (rodam sem Docker) + lint |
-| TASK-140 | `uptime-calculator.js` (891) | separar persistência da agregação | 🟡 MÉDIO | `test-uptime-calculator.js` (500 LOC) |
-| TASK-130 | `database.js` (1018) | connection / migration / dialect | 🟡 MÉDIO | testes de migration (exigem Docker) |
-| TASK-110 | `server.js` (2018) | mover socket handlers embutidos → `server/socket-handlers/` | 🟡 MÉDIO | boot + suíte |
-| TASK-120 | `monitor.js` (2069) | extrair check HTTP → `monitor-types/http.js` (ADR-0002) | 🔴 ALTO | **sem rede direta** → decidir salvaguarda |
-| TASK-160 | `src/mixins/socket.js` (894) | dividir em composables | 🟡 MÉDIO | build frontend |
-| TASK-150 | `EditMonitor.vue` (4356) | subcomponentes por tipo de monitor | 🔴 ALTO | E2E `monitor-form.spec` (app rodando) |
-| TASK-170 | `StatusPage/Details/HeartbeatBar/MonitorList` | extrair seções/lógica | 🟡 MÉDIO | E2E `status-page.spec` |
+| ID | Alvo | Antes → Depois | Status |
+|---|---|---|---|
+| TASK-100 | `util-server.js` | 1066 → 24 (7 submódulos + barrel) | ✅ commit fd6778ca |
+| TASK-140 | `uptime-calculator.js` | 891 → 804 (time-bucket.js, stat-bean-repository.js) | ✅ commit 9c4c117d |
+| TASK-130 | `database.js` | 1018 → 928 (paths.js, legacy-patches.js, dialect.js) | ✅ commit 2e875cab |
+| TASK-110 | `server.js` | 2018 → 1324 (monitor-socket-handler.js, 721 LOC) | ✅ commit 05f93195 |
+| TASK-105 | rede de caracterização | +19 testes backend (monitor.js) +3 E2E (EditMonitor.vue) | ✅ commits 65ac2586 + 6928ba3a |
+| TASK-120 | `monitor.js` | 2069 → 1805 (extrai http/keyword/json-query → `monitor-types/http.js`, 278 LOC, ADR-0002) | ✅ commit d35248a0 |
+| TASK-150 | `EditMonitor.vue` | 4356 → 4016 (HttpOptionsFields/TcpPortFields/PushUrlField.vue — só seções com E2E real) | ✅ commit d58c7832 |
+
+**Fora de escopo desta rodada** (não atacados — candidatos a uma EPIC-2b futura, menor prioridade): `src/mixins/socket.js` (894, dividir em composables) e `StatusPage.vue`/`Details.vue`/`HeartbeatBar.vue`/`MonitorList.vue` (extrair seções). `ping`/`push`/`docker`/`radius`/`kafka-producer` também continuam inline em `monitor.js` (só http/keyword/json-query foi extraído, por escopo deliberadamente restrito).
+
+**Achado durante TASK-120** (mutation-check independente, não é regressão desta refatoração): a suíte E2E não cobre `maxRedirects` nem inversão de keyword-match no monitor HTTP — registrado como GAP-009.
 
 ### EPIC-3 — Camada de validação de entrada (P2 · T2 · 🟡)
 Introduzir validação de payloads de socket/HTTP (ex: zod) para eliminar parsing manual disperso.
