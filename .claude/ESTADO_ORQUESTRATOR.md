@@ -60,31 +60,40 @@
   desc: "Criar ORCHESTRATOR-ROADMAP.md + ESTADO_ORQUESTRATOR.md"
   status: done
   concluido_em: "2026-07-03"
+
+- id: TASK-010
+  desc: "Baseline: lint + tsc + test-backend"
+  gap_ref: GAP-006
+  status: done
+  concluido_em: "2026-07-03"
 ```
+
+### Baseline (TASK-010 — 2026-07-03)
+
+| Comando | Resultado | Nota |
+|---|---|---|
+| `npm run lint:js` | ✅ PASS (exit 0) | 0 errors, 72 warnings (selectors CSS não-usados, JSDoc) |
+| `npm run tsc` | ❌ FAIL (exit 2) | **Toolchain**, não código: `typescript ~4.4.4` não parseia `.d.ts` do `@types/node@22`. Não está no pipeline `npm test`. Pré-existente → GAP-007. |
+| `test-backend` (subset s/ Docker, 23 arq.) | ✅ PASS **166/166** | Docker daemon down → 8 arquivos com testcontainers pulados (DB monitors + migration + snmp) |
+
+> Rede de segurança verde estabelecida para os testes unitários puros. Para rodar os 8 de container, subir o Docker Desktop.
 
 ### Pendentes (código — AGUARDANDO "GO" por item)
 
 ```yaml
-- id: TASK-010
-  desc: "Baseline: rodar npm run lint + npm run tsc + npm run test-backend e registrar estado verde/vermelho"
-  skill: /diagnose (se vermelho)
-  gap_ref: GAP-006
-  depends_on: []
-  status: pending_approval   # T1/T2 — seguro, recomendado começar por aqui
-
 - id: TASK-020
   desc: "EPIC-4: testes unitários para monitor.js (serialização toJSON, determineStatus)"
   skill: /tdd
   gap_ref: GAP-006
   depends_on: [TASK-010]
-  status: blocked
+  status: ready   # destravada — baseline verde
 
 - id: TASK-030
   desc: "EPIC-3: introduzir validação (zod) em socket-handlers e routers"
   skill: /improve-codebase-architecture
   gap_ref: GAP-004
   depends_on: [TASK-010]
-  status: blocked
+  status: ready   # destravada — baseline verde
 
 - id: TASK-040
   desc: "EPIC-2: extrair lógica de check por protocolo de monitor.js para monitor-types/"
