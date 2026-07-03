@@ -2,10 +2,19 @@ const { checkLogin, setSetting, setting, doubleCheckPassword } = require("../uti
 const { CloudflaredTunnel } = require("node-cloudflared-tunnel");
 const { UptimeKumaServer } = require("../uptime-kuma-server");
 const { log } = require("../../src/util");
+const { z } = require("zod");
+const { validate } = require("../validation");
 const io = UptimeKumaServer.getInstance().io;
 
 const prefix = "cloudflared_";
 const cloudflared = new CloudflaredTunnel();
+
+// Cloudflared tunnel tokens are base64-encoded JSON blobs; 5000 chars is
+// generously above real-world token sizes. Token remains optional here --
+// the "start" handler already treats a falsy/non-string token as "no token"
+// (see the `if (token && typeof token === "string")` guard below), so this
+// schema must not make it required.
+const cloudflaredTokenSchema = z.string().max(5000).nullish();
 
 /**
  * Change running state
@@ -57,6 +66,7 @@ module.exports.cloudflaredSocketHandler = (socket) => {
     socket.on(prefix + "start", async (token) => {
         try {
             checkLogin(socket);
+            token = validate(cloudflaredTokenSchema, token);
             if (token && typeof token === "string") {
                 await setSetting("cloudflaredTunnelToken", token);
                 cloudflared.token = token;
