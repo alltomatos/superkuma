@@ -18,7 +18,7 @@
 
 | # | ID | Dimensão | Sev | Descritivo | Tier | Status |
 |---|----|----------|-----|------------|------|--------|
-| 1 | `GAP-001` | Segurança | P1 | Segredos em texto plano at rest (creds de monitor/notificação, JWT secret) | T3 | 🔴 open |
+| 1 | `GAP-001` | Segurança | P1 | Segredos em texto plano at rest (creds de monitor/notificação, JWT secret) | T3 | 🔵 deferred → ADR-0007 |
 | 2 | `GAP-002` | Segurança | P1 | JWT sem expiração; troca de senha não invalida tokens | T3 | 🔴 open |
 | 3 | `GAP-003` | Arquitetura | P2 | Monólitos god-object (monitor.js 2069, server.js 2018, EditMonitor.vue 4356, util-server.js 1066…) | T2 | 🟡 queued |
 | 4 | `GAP-004` | Arquitetura | P2 | Sem camada de validação de entrada (parsing manual em sockets/routers) | T2 | 🟡 queued |
@@ -66,6 +66,12 @@
   gap_ref: GAP-006
   status: done
   concluido_em: "2026-07-03"
+
+- id: TASK-050
+  desc: "Documentação de domínio: CONTEXT.md + docs/adr/ (7 ADRs fundacionais + template)"
+  skill: /grill-with-docs
+  status: done
+  concluido_em: "2026-07-03"
 ```
 
 ### Baseline (TASK-010 — 2026-07-03)
@@ -106,7 +112,7 @@
   desc: "EPIC-1: cifrar segredos at rest + migration + mascaramento API"
   gap_ref: GAP-001
   depends_on: [TASK-010]
-  status: needs_human_go   # T3 BLOQUEANTE — schema + auth
+  status: deferred   # decisão registrada em docs/adr/0007-defer-secret-encryption.md — reavaliar se multi-tenant/compliance
 ```
 
 ---
