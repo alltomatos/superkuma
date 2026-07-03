@@ -107,18 +107,20 @@
   concluido_em: "2026-07-03"
 
 - id: TASK-130
-  desc: "database.js (1018): connection / migration / dialect"
+  desc: "database.js (1018): extraiu paths.js/legacy-patches.js/dialect.js"
   gap_ref: GAP-003
   risco: MEDIO
   depends_on: [TASK-100]
-  status: ready   # obs: gate de migration exige Docker (down) — net mais fraca agora
+  status: done   # 1018->928. Verificado por agente independente: escopo ok, lint 0, test-domain 16/16 (via mock-testdb), smoke ok. commit 2e875cab
+  concluido_em: "2026-07-03"
 
 - id: TASK-110
-  desc: "server.js (2018): mover socket handlers embutidos -> server/socket-handlers/"
+  desc: "server.js (2018): extraiu monitor CRUD/tags -> socket-handlers/monitor-socket-handler.js"
   gap_ref: GAP-003
   risco: MEDIO
   depends_on: [TASK-100]
-  status: ready
+  status: done   # 2018->1324 (novo handler 721 LOC). Verificado por agente independente: 86/86 eventos socket idênticos, 33 checkLogin() preservados, 10 handlers pré-existentes intactos, boot smoke ok, lint 0. commit 05f93195
+  concluido_em: "2026-07-03"
 
 - id: TASK-120
   desc: "monitor.js (2069): extrair check HTTP -> monitor-types/http.js (ADR-0002)"
@@ -171,6 +173,10 @@
 | 1 | 2026-07-03 | GAP-007 | Restaurar CLAUDE.md/AGENTS.md ao commit | 2370 bytes cada, `git status` limpo nesses arquivos |
 | 2 | 2026-07-03 | — | Provisionar governança (.claude/, docs/agents/, roadmap) | Aditivo, sem tocar em código-fonte |
 | 3 | 2026-07-03 | GAP-003 | TASK-100: split util-server.js (1066→24) em 7 submódulos | Export idêntico, lint 0 err, testes verdes, commit fd6778ca |
+| 4 | 2026-07-03 | GAP-003 | TASK-140: split uptime-calculator.js (891→804) | 18/18 testes, lint 0 err, commit 9c4c117d |
+| 5 | 2026-07-03 | GAP-003 | TASK-130: split database.js (1018→928) via workflow c/ verificador adversarial | test-domain 16/16, lint 0 err, commit 2e875cab |
+| 6 | 2026-07-03 | GAP-003 | TASK-110: split server.js (2018→1324) via workflow c/ verificador adversarial | 86/86 eventos socket + 33 checkLogin preservados, lint 0 err, commit 05f93195 |
+| 7 | 2026-07-03 | — | Consolidação final EPIC-2 (fase segura): suíte completa 166/166, lint 0 err | Rede de segurança íntegra após 4 refactors sequenciais |
 
 ---
 
