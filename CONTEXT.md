@@ -57,3 +57,17 @@ Uptime Kuma é uma aplicação self-hosted de **monitoramento de disponibilidade
 - ORM runtime: **redbean-node** (`R.find`, `R.dispense`, `R.exec`). Migrations: **Knex** (`db/knex_migrations/`).
 - Engines: SQLite (default), MariaDB, MySQL, Postgres.
 - ⚠️ Credenciais de monitor/notificação e o JWT secret ficam **em texto plano** no DB — trade-off conhecido; ver [ADR-0007](docs/adr/0007-defer-secret-encryption.md).
+
+---
+
+## Federação (Master-Agent) — em planejamento
+
+> Feature nova; design em [ADR-0008](docs/adr/0008-master-agent-federation.md) + [PRD](docs/prd/master-agent.md).
+
+- **Instância** — uma instalação do Uptime Kuma. Tem um **papel (role)**: `standalone` (default), `agent`, ou `master`.
+- **Agent** — instância no cliente que monitora local e encaminha status ao Master.
+- **Master** — instância central (do provedor) que agrega o status de N Agents; pode também monitorar local (**híbrido**).
+- **`instance_id`** — identificador único de uma instância Agent perante o Master.
+- **Remote Instance** — no Master, o registro de um Agent conhecido (`remote_instance`).
+- **Monitor remoto** — no Master, um `monitor` com `remote_instance_id` preenchido (NULL = monitor local), alimentado externamente como um monitor `push`.
+- **Keepalive de instância** — sinal de vida do Agent; seu silêncio = "agente caiu" (distinto de "serviço caiu").

@@ -174,6 +174,51 @@
   gap_ref: GAP-001
   depends_on: [TASK-010]
   status: deferred   # decisão registrada em docs/adr/0007-defer-secret-encryption.md — reavaliar se multi-tenant/compliance
+
+# Feature: Master-Agent (Federação) — T3, design em ADR-0008 + docs/prd/master-agent.md
+# Decisões do usuário: transporte faseado REST->socket.io; notificação configurável; Master híbrido.
+
+- id: TASK-F0
+  desc: "F0 Fundação: migration remote_instance + monitor.remote_instance_id + model remote_instance.js + setting federation.role"
+  ref: ADR-0008
+  risco: T3
+  depends_on: []
+  status: needs_human_go   # próxima da feature; sem comportamento visível ainda
+
+- id: TASK-F1
+  desc: "F1 Receptor Master (MVP): generalizar /api/push p/ instance_id+agent_monitor_id, espelhar monitores"
+  ref: ADR-0008
+  risco: T2
+  depends_on: [TASK-F0]
+  status: blocked
+
+- id: TASK-F2
+  desc: "F2 Forwarder Agent (MVP): hook no beat() de monitor.js + config master/token; ponta-a-ponta REST"
+  ref: ADR-0008
+  risco: T2
+  depends_on: [TASK-F1]
+  status: blocked
+
+- id: TASK-F3
+  desc: "F3 UI unificada: badge de instância + agrupamento no dashboard + página de config (Federação)"
+  ref: ADR-0008
+  risco: T2
+  depends_on: [TASK-F2]
+  status: blocked
+
+- id: TASK-F4
+  desc: "F4 Federação Socket.io (v2): server/federation/agent-client.js persistente + keepalive + detecção 'agente caiu'"
+  ref: ADR-0008
+  risco: T3
+  depends_on: [TASK-F2]
+  status: blocked
+
+- id: TASK-F5
+  desc: "F5 Robustez: buffering offline, versionamento de protocolo, notificação configurável (master/agent/both), sync rename/delete"
+  ref: ADR-0008
+  risco: T2
+  depends_on: [TASK-F3, TASK-F4]
+  status: blocked
 ```
 
 ---

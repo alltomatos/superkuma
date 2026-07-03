@@ -57,6 +57,26 @@ Lazy-load de monitor-types/providers, model para tabelas `stat_*`, limpeza de pa
 
 ---
 
+## 🌐 Feature: Master-Agent (Federação) — em planejamento (T3)
+
+> Design: [ADR-0008](docs/adr/0008-master-agent-federation.md) · [PRD](docs/prd/master-agent.md).
+> Decisões do usuário (2026-07-03): transporte **faseado (REST MVP → Socket.io v2)**; notificação **configurável (master/agent/both)**; Master **híbrido** (agrega + monitora local).
+
+Modelo Master-Agent para agregar N instâncias de clientes num painel central com notificação imediata. Insight central: monitor remoto = linha `monitor` com `remote_instance_id`, alimentado como `push` → reusa todo o pipeline existente.
+
+| Epic | Entrega | Tier | Status |
+|---|---|---|---|
+| **F0** Fundação | migration `remote_instance` + `monitor.remote_instance_id` + model + setting `federation.role` | T3 | 📋 aguardando "Go" |
+| **F1** Receptor Master (MVP) | `/api/push` generalizado (`instance_id`+`agent_monitor_id`); espelha monitores | T2 | ⏸ bloqueada por F0 |
+| **F2** Forwarder Agent (MVP) | hook no `beat()` + config master/token; ponta-a-ponta REST | T2 | ⏸ bloqueada por F1 |
+| **F3** UI unificada | badge de instância, agrupamento no dashboard, página de config | T2 | ⏸ bloqueada por F2 |
+| **F4** Federação Socket.io (v2) | `agent-client.js` persistente + keepalive + detecção "agente caiu" | T3 | ⏸ bloqueada por F2 |
+| **F5** Robustez | buffering offline, versionamento de protocolo, notificação configurável, sync rename/delete | T2 | ⏸ bloqueada por F3/F4 |
+
+Salvaguarda transversal: o modo `standalone` (default) deve permanecer **sem regressão** — suítes backend (259) e E2E (26) como gate em toda fase.
+
+---
+
 ## Ordem sugerida (atualizada 2026-07-03)
 
 1. ✅ **Governança + documentação de domínio** (CONTEXT.md, ADRs) — concluída.
