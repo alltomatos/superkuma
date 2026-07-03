@@ -253,18 +253,7 @@
                             </div>
 
                             <!-- Push URL -->
-                            <div v-if="monitor.type === 'push'" class="my-3">
-                                <label for="push-url" class="form-label">{{ $t("PushUrl") }}</label>
-                                <CopyableInput id="push-url" v-model="pushURL" type="url" disabled="disabled" />
-                                <div class="form-text">
-                                    {{ $t("needPushEvery", [monitor.interval]) }}
-                                    <br />
-                                    {{ $t("pushOptionalParams", ["status, msg, ping"]) }}
-                                </div>
-                                <button class="btn btn-primary" type="button" @click="resetToken">
-                                    {{ $t("Reset Token") }}
-                                </button>
-                            </div>
+                            <PushUrlField :monitor="monitor" :base-url="$root.baseURL" />
 
                             <!-- Keyword -->
                             <div v-if="monitor.type === 'keyword' || monitor.type === 'grpc-keyword'" class="my-3">
@@ -473,39 +462,7 @@
 
                             <!-- Hostname -->
                             <!-- TCP Port / Ping / DNS / Steam / MQTT / Radius / Tailscale Ping / SNMP / SMTP / SIP Options only -->
-                            <div
-                                v-if="
-                                    monitor.type === 'port' ||
-                                    monitor.type === 'ping' ||
-                                    monitor.type === 'dns' ||
-                                    monitor.type === 'steam' ||
-                                    monitor.type === 'gamedig' ||
-                                    monitor.type === 'mqtt' ||
-                                    monitor.type === 'radius' ||
-                                    monitor.type === 'tailscale-ping' ||
-                                    monitor.type === 'smtp' ||
-                                    monitor.type === 'snmp' ||
-                                    monitor.type === 'sip-options'
-                                "
-                                class="my-3"
-                            >
-                                <label for="hostname" class="form-label">{{ $t("Hostname") }}</label>
-                                <input
-                                    id="hostname"
-                                    v-model="monitor.hostname"
-                                    type="text"
-                                    class="form-control"
-                                    required
-                                    data-testid="hostname-input"
-                                />
-                                <div v-if="monitor.type === 'mqtt'" class="form-text">
-                                    <i18n-t tag="p" keypath="mqttHostnameTip">
-                                        <template #hostnameFormat>
-                                            <code>[mqtt,mqtts,ws,wss]://hostname</code>
-                                        </template>
-                                    </i18n-t>
-                                </div>
-                            </div>
+                            <TcpPortFields :monitor="monitor" />
 
                             <!-- Globalping -->
                             <template v-if="monitor.type === 'globalping'">
@@ -684,37 +641,6 @@
                                     </select>
                                 </div>
                             </template>
-
-                            <!-- Port -->
-                            <!-- For TCP Port / Steam / MQTT / Radius Type / SNMP / SIP Options -->
-                            <div
-                                v-if="
-                                    monitor.type === 'port' ||
-                                    monitor.type === 'steam' ||
-                                    monitor.type === 'gamedig' ||
-                                    monitor.type === 'mqtt' ||
-                                    monitor.type === 'radius' ||
-                                    monitor.type === 'smtp' ||
-                                    monitor.type === 'snmp' ||
-                                    monitor.type === 'sip-options' ||
-                                    (monitor.type === 'globalping' &&
-                                        monitor.subtype === 'ping' &&
-                                        monitor.protocol === 'TCP')
-                                "
-                                class="my-3"
-                            >
-                                <label for="port" class="form-label">{{ $t("Port") }}</label>
-                                <input
-                                    id="port"
-                                    v-model="monitor.port"
-                                    type="number"
-                                    class="form-control"
-                                    required
-                                    min="0"
-                                    max="65535"
-                                    step="1"
-                                />
-                            </div>
 
                             <!-- Gamedig Token -->
                             <div v-if="monitor.type === 'gamedig'" class="my-3">
@@ -2432,273 +2358,11 @@
                             </template>
 
                             <!-- HTTP Options -->
-                            <template
-                                v-if="
-                                    monitor.type === 'http' ||
-                                    monitor.type === 'keyword' ||
-                                    monitor.type === 'json-query'
-                                "
-                            >
-                                <h2 class="mt-5 mb-2">{{ $t("HTTP Options") }}</h2>
-
-                                <!-- Method -->
-                                <div class="my-3">
-                                    <label for="method" class="form-label">{{ $t("Method") }}</label>
-                                    <select id="method" v-model="monitor.method" class="form-select">
-                                        <option value="GET">GET</option>
-                                        <option value="POST">POST</option>
-                                        <option value="PUT">PUT</option>
-                                        <option value="PATCH">PATCH</option>
-                                        <option value="DELETE">DELETE</option>
-                                        <option value="HEAD">HEAD</option>
-                                        <option value="OPTIONS">OPTIONS</option>
-                                    </select>
-                                </div>
-
-                                <!-- Encoding -->
-                                <div class="my-3">
-                                    <label for="httpBodyEncoding" class="form-label">{{ $t("Body Encoding") }}</label>
-                                    <select
-                                        id="httpBodyEncoding"
-                                        v-model="monitor.httpBodyEncoding"
-                                        class="form-select"
-                                    >
-                                        <option value="json">JSON</option>
-                                        <option value="form">x-www-form-urlencoded</option>
-                                        <option value="xml">XML</option>
-                                    </select>
-                                </div>
-
-                                <!-- Body -->
-                                <div class="my-3">
-                                    <label for="body" class="form-label">{{ $t("Body") }}</label>
-                                    <textarea
-                                        id="body"
-                                        v-model="monitor.body"
-                                        class="form-control"
-                                        :placeholder="bodyPlaceholder"
-                                    ></textarea>
-                                </div>
-
-                                <!-- Headers -->
-                                <div class="my-3">
-                                    <label for="headers" class="form-label">{{ $t("Headers") }}</label>
-                                    <textarea
-                                        id="headers"
-                                        v-model="monitor.headers"
-                                        class="form-control"
-                                        :placeholder="headersPlaceholder"
-                                    ></textarea>
-                                </div>
-
-                                <!-- HTTP Auth -->
-                                <h4 class="mt-5 mb-2">{{ $t("Authentication") }}</h4>
-
-                                <!-- Method -->
-                                <div class="my-3">
-                                    <label for="method" class="form-label">{{ $t("Method") }}</label>
-                                    <select id="method" v-model="monitor.authMethod" class="form-select">
-                                        <option :value="null">
-                                            {{ $t("None") }}
-                                        </option>
-                                        <option value="basic">
-                                            {{ $t("HTTP Basic Auth") }}
-                                        </option>
-                                        <option value="bearer">
-                                            {{ $t("Bearer Token") }}
-                                        </option>
-                                        <option value="oauth2-cc">
-                                            {{ $t("OAuth2: Client Credentials") }}
-                                        </option>
-                                        <option value="ntlm">NTLM</option>
-                                        <option value="mtls">mTLS</option>
-                                    </select>
-                                </div>
-                                <template v-if="monitor.authMethod && monitor.authMethod !== null">
-                                    <template v-if="monitor.authMethod === 'mtls'">
-                                        <div class="my-3">
-                                            <label for="tls-cert" class="form-label">
-                                                {{ $t("mtls-auth-server-cert-label") }}
-                                            </label>
-                                            <textarea
-                                                id="tls-cert"
-                                                v-model="monitor.tlsCert"
-                                                class="form-control"
-                                                :placeholder="$t('mtls-auth-server-cert-placeholder')"
-                                                required
-                                            ></textarea>
-                                        </div>
-                                        <div class="my-3">
-                                            <label for="tls-key" class="form-label">
-                                                {{ $t("mtls-auth-server-key-label") }}
-                                            </label>
-                                            <textarea
-                                                id="tls-key"
-                                                v-model="monitor.tlsKey"
-                                                class="form-control"
-                                                :placeholder="$t('mtls-auth-server-key-placeholder')"
-                                                required
-                                            ></textarea>
-                                        </div>
-                                        <div class="my-3">
-                                            <label for="tls-ca" class="form-label">
-                                                {{ $t("mtls-auth-server-ca-label") }}
-                                            </label>
-                                            <textarea
-                                                id="tls-ca"
-                                                v-model="monitor.tlsCa"
-                                                class="form-control"
-                                                :placeholder="$t('mtls-auth-server-ca-placeholder')"
-                                            ></textarea>
-                                        </div>
-                                    </template>
-                                    <template v-else-if="monitor.authMethod === 'bearer'">
-                                        <div class="my-3">
-                                            <label for="bearer-token" class="form-label">{{ $t("Token") }}</label>
-                                            <HiddenInput
-                                                id="bearer-token"
-                                                v-model="monitor.bearer_token"
-                                                autocomplete="new-password"
-                                                :placeholder="$t('Token')"
-                                            />
-                                        </div>
-                                    </template>
-                                    <template v-else-if="monitor.authMethod === 'oauth2-cc'">
-                                        <div class="my-3">
-                                            <label for="oauth_auth_method" class="form-label">
-                                                {{ $t("Authentication Method") }}
-                                            </label>
-                                            <select
-                                                id="oauth_auth_method"
-                                                v-model="monitor.oauth_auth_method"
-                                                class="form-select"
-                                            >
-                                                <option value="client_secret_basic">
-                                                    {{ $t("Authorization Header") }}
-                                                </option>
-                                                <option value="client_secret_post">
-                                                    {{ $t("Form Data Body") }}
-                                                </option>
-                                            </select>
-                                        </div>
-                                        <div class="my-3">
-                                            <label for="oauth_token_url" class="form-label">
-                                                {{ $t("OAuth Token URL") }}
-                                            </label>
-                                            <input
-                                                id="oauth_token_url"
-                                                v-model="monitor.oauth_token_url"
-                                                type="text"
-                                                class="form-control"
-                                                :placeholder="$t('OAuth Token URL')"
-                                                required
-                                            />
-                                        </div>
-                                        <div class="my-3">
-                                            <label for="oauth_client_id" class="form-label">
-                                                {{ $t("Client ID") }}
-                                            </label>
-                                            <input
-                                                id="oauth_client_id"
-                                                v-model="monitor.oauth_client_id"
-                                                type="text"
-                                                class="form-control"
-                                                :placeholder="$t('Client ID')"
-                                                required
-                                            />
-                                        </div>
-                                        <template
-                                            v-if="
-                                                monitor.oauth_auth_method === 'client_secret_post' ||
-                                                monitor.oauth_auth_method === 'client_secret_basic'
-                                            "
-                                        >
-                                            <div class="my-3">
-                                                <label for="oauth_client_secret" class="form-label">
-                                                    {{ $t("Client Secret") }}
-                                                </label>
-                                                <HiddenInput
-                                                    id="oauth_client_secret"
-                                                    v-model="monitor.oauth_client_secret"
-                                                    :placeholder="$t('Client Secret')"
-                                                    :required="true"
-                                                />
-                                            </div>
-                                            <div class="my-3">
-                                                <label for="oauth_scopes" class="form-label">
-                                                    {{ $t("OAuth Scope") }}
-                                                </label>
-                                                <input
-                                                    id="oauth_scopes"
-                                                    v-model="monitor.oauth_scopes"
-                                                    type="text"
-                                                    class="form-control"
-                                                    :placeholder="$t('Optional: Space separated list of scopes')"
-                                                />
-                                            </div>
-                                            <div class="my-3">
-                                                <label for="oauth_audience" class="form-label">
-                                                    {{ $t("OAuth Audience") }}
-                                                </label>
-                                                <input
-                                                    id="oauth_audience"
-                                                    v-model="monitor.oauth_audience"
-                                                    type="text"
-                                                    class="form-control"
-                                                    :placeholder="$t('Optional: The audience to request the JWT for')"
-                                                />
-                                            </div>
-                                        </template>
-                                    </template>
-                                    <template v-else>
-                                        <div class="my-3">
-                                            <label for="basicauth-user" class="form-label">{{ $t("Username") }}</label>
-                                            <input
-                                                id="basicauth-user"
-                                                v-model="monitor.basic_auth_user"
-                                                type="text"
-                                                class="form-control"
-                                                :placeholder="$t('Username')"
-                                            />
-                                        </div>
-
-                                        <div class="my-3">
-                                            <label for="basicauth-pass" class="form-label">{{ $t("Password") }}</label>
-                                            <HiddenInput
-                                                id="basicauth-pass"
-                                                v-model="monitor.basic_auth_pass"
-                                                autocomplete="new-password"
-                                                :placeholder="$t('Password')"
-                                            />
-                                        </div>
-                                        <template v-if="monitor.authMethod === 'ntlm'">
-                                            <div class="my-3">
-                                                <label for="ntlm-domain" class="form-label">{{ $t("Domain") }}</label>
-                                                <input
-                                                    id="ntlm-domain"
-                                                    v-model="monitor.authDomain"
-                                                    type="text"
-                                                    class="form-control"
-                                                    :placeholder="$t('Domain')"
-                                                />
-                                            </div>
-
-                                            <div class="my-3">
-                                                <label for="ntlm-workstation" class="form-label">
-                                                    {{ $t("Workstation") }}
-                                                </label>
-                                                <input
-                                                    id="ntlm-workstation"
-                                                    v-model="monitor.authWorkstation"
-                                                    type="text"
-                                                    class="form-control"
-                                                    :placeholder="$t('Workstation')"
-                                                />
-                                            </div>
-                                        </template>
-                                    </template>
-                                </template>
-                            </template>
+                            <HttpOptionsFields
+                                :monitor="monitor"
+                                :body-placeholder="bodyPlaceholder"
+                                :headers-placeholder="headersPlaceholder"
+                            />
 
                             <!-- Globalping HTTP Options -->
                             <template v-if="monitor.type === 'globalping' && monitor.subtype === 'http'">
@@ -3101,7 +2765,6 @@
 import VueMultiselect from "vue-multiselect";
 import { useToast } from "vue-toastification";
 import ActionSelect from "../components/ActionSelect.vue";
-import CopyableInput from "../components/CopyableInput.vue";
 import CreateGroupDialog from "../components/CreateGroupDialog.vue";
 import Confirm from "../components/Confirm.vue";
 import NotificationDialog from "../components/NotificationDialog.vue";
@@ -3121,6 +2784,9 @@ import isFQDN from "validator/lib/isFQDN";
 import isIP from "validator/lib/isIP";
 import HiddenInput from "../components/HiddenInput.vue";
 import EditMonitorConditions from "../components/EditMonitorConditions.vue";
+import PushUrlField from "../components/monitor-form/PushUrlField.vue";
+import TcpPortFields from "../components/monitor-form/TcpPortFields.vue";
+import HttpOptionsFields from "../components/monitor-form/HttpOptionsFields.vue";
 
 const toast = useToast();
 
@@ -3203,7 +2869,6 @@ export default {
         HiddenInput,
         ActionSelect,
         ProxyDialog,
-        CopyableInput,
         CreateGroupDialog,
         Confirm,
         NotificationDialog,
@@ -3212,6 +2877,9 @@ export default {
         TagsManager,
         VueMultiselect,
         EditMonitorConditions,
+        PushUrlField,
+        TcpPortFields,
+        HttpOptionsFields,
     },
 
     data() {
@@ -3335,10 +3003,6 @@ export default {
 
         isEdit() {
             return this.$route.path.startsWith("/edit");
-        },
-
-        pushURL() {
-            return this.$root.baseURL + "/api/push/" + this.monitor.pushToken + "?status=up&msg=OK&ping=";
         },
 
         protoServicePlaceholder() {
@@ -4072,10 +3736,6 @@ message HealthCheckResponse {
             }
 
             return true;
-        },
-
-        resetToken() {
-            this.monitor.pushToken = genSecret(pushTokenLength);
         },
 
         handleIntervalConfirm() {
