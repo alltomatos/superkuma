@@ -135,4 +135,89 @@ test.describe("Monitor Form", () => {
 
         await screenshot(testInfo, page);
     });
+
+    test("tcp port monitor reaches up and persists hostname/port", async ({ page }, testInfo) => {
+        await page.goto("./add");
+        await login(page);
+        await selectMonitorType(page, "port");
+
+        const friendlyName = "Example TCP Port";
+        await page.getByTestId("friendly-name-input").fill(friendlyName);
+        await page.getByLabel("Hostname").fill("1.1.1.1");
+        await page.getByLabel("Port").fill("53");
+
+        await screenshot(testInfo, page);
+        await page.getByTestId("save-button").click();
+        await page.waitForURL("/dashboard/*");
+
+        await expect(page.getByTestId("monitor-status")).toHaveText("up", { ignoreCase: true });
+
+        await page.getByRole("link", { name: "Edit" }).click();
+        await page.waitForURL("/edit/*");
+
+        await expect(page.getByTestId("hostname-input")).toHaveValue("1.1.1.1");
+        await expect(page.getByLabel("Port")).toHaveValue("53");
+
+        await screenshot(testInfo, page);
+    });
+
+    test("push monitor generates and persists a push token/url", async ({ page }, testInfo) => {
+        await page.goto("./add");
+        await login(page);
+        await selectMonitorType(page, "push");
+
+        const friendlyName = "Example Push Monitor";
+        await page.getByTestId("friendly-name-input").fill(friendlyName);
+
+        // Selecting the push type immediately generates a pushToken client-side,
+        // which is reflected in the (disabled) Push URL field.
+        const pushUrlInput = page.getByLabel("Push URL");
+        await expect(pushUrlInput).toBeVisible();
+
+        const createdPushUrl = await pushUrlInput.inputValue();
+        expect(createdPushUrl).toMatch(/^https?:\/\/.+\/api\/push\/[A-Za-z0-9]{32}\?status=up&msg=OK&ping=$/);
+
+        await screenshot(testInfo, page);
+        await page.getByTestId("save-button").click();
+        await page.waitForURL("/dashboard/*");
+
+        await page.getByRole("link", { name: "Edit" }).click();
+        await page.waitForURL("/edit/*");
+
+        await expect(page.getByLabel("Push URL")).toHaveValue(createdPushUrl);
+
+        await screenshot(testInfo, page);
+    });
+
+    test("http basic auth username persists across edit", async ({ page }, testInfo) => {
+        await page.goto("./add");
+        await login(page);
+        await selectMonitorType(page, "http");
+
+        const friendlyName = "Example HTTP Basic Auth";
+        await page.getByTestId("friendly-name-input").fill(friendlyName);
+        await page.getByTestId("url-input").fill("https://www.example.com/");
+
+        // There are two <select id="method"> elements on this form for the "http" type:
+        // the HTTP request Method (first, under "HTTP Options") and the Authentication
+        // Method (second, under "Authentication"). Both share the id="method" markup
+        // (a pre-existing characteristic of the current template), so disambiguate by
+        // DOM order rather than by id/label alone.
+        const authMethodSelect = page.locator("#method").last();
+        await authMethodSelect.selectOption("basic");
+
+        await page.getByLabel("Username").fill("e2e-user");
+
+        await screenshot(testInfo, page);
+        await page.getByTestId("save-button").click();
+        await page.waitForURL("/dashboard/*");
+
+        await page.getByRole("link", { name: "Edit" }).click();
+        await page.waitForURL("/edit/*");
+
+        await expect(page.locator("#method").last()).toHaveValue("basic");
+        await expect(page.getByLabel("Username")).toHaveValue("e2e-user");
+
+        await screenshot(testInfo, page);
+    });
 });
