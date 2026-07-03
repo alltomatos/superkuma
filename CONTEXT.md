@@ -71,3 +71,10 @@ Uptime Kuma é uma aplicação self-hosted de **monitoramento de disponibilidade
 - **Remote Instance** — no Master, o registro de um Agent conhecido (`remote_instance`).
 - **Monitor remoto** — no Master, um `monitor` com `remote_instance_id` preenchido (NULL = monitor local), alimentado externamente como um monitor `push`.
 - **Keepalive de instância** — sinal de vida do Agent; seu silêncio = "agente caiu" (distinto de "serviço caiu").
+
+### Histórico de métricas (Master) — [ADR-0009](docs/adr/0009-master-long-term-metrics-history.md)
+
+- **Retenção em camadas** — cada nível de dado tem sua política: `heartbeat` (curto) < `stat_minutely` (24h) < `stat_hourly` (30d) < `stat_daily` < `stat_monthly` (longo).
+- **`stat_monthly`** — novo tier de agregação para histórico multi-ano barato (SLA).
+- **Relatório de SLA por cliente** — uptime/latência de longo prazo por `remote_instance` (join `stat_* → monitor → remote_instance`).
+- No Master, **MariaDB é recomendado** (SQLite só para standalone pequeno).

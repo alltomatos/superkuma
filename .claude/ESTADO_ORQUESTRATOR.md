@@ -219,6 +219,30 @@
   risco: T2
   depends_on: [TASK-F3, TASK-F4]
   status: blocked
+
+# Trilha: Histórico de métricas de longo prazo — ADR-0009 (usuário: métricas, escala média, design-first)
+# Fundação executa F0 + M0 JUNTAS (uma migration por concern, mesma fatia). MariaDB recomendado no Master.
+
+- id: TASK-M0
+  desc: "M0 Fundação métricas: models para stat_* (fecha GAP-005) + tabela stat_monthly + settings de retenção em camadas"
+  ref: ADR-0009
+  risco: T3
+  depends_on: []
+  status: needs_human_go   # roda junto com TASK-F0 na Fase Fundação
+
+- id: TASK-M1
+  desc: "M1: UptimeCalculator grava/rola tier mensal; clear-old-data.js honra retenção em camadas. Rede: test-uptime-calculator.js (18 casos)"
+  ref: ADR-0009
+  risco: T2
+  depends_on: [TASK-M0]
+  status: blocked
+
+- id: TASK-M2
+  desc: "M2: UI de relatório de SLA por remote_instance, exportável"
+  ref: ADR-0009
+  risco: T2
+  depends_on: [TASK-M1, TASK-F3]
+  status: blocked
 ```
 
 ---

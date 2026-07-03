@@ -75,6 +75,19 @@ Modelo Master-Agent para agregar N instâncias de clientes num painel central co
 
 Salvaguarda transversal: o modo `standalone` (default) deve permanecer **sem regressão** — suítes backend (259) e E2E (26) como gate em toda fase.
 
+### 📈 Trilha paralela: Histórico de métricas de longo prazo (EPIC-M)
+
+> Design: [ADR-0009](docs/adr/0009-master-long-term-metrics-history.md). Decisões do usuário: foco em **histórico de métricas** (não event-log), escala **média**, **desenhar antes da fundação**.
+> Objetivo: relatório de SLA por cliente com histórico multi-ano barato, reusando a fundação da F0 (join `stat_* → monitor → remote_instance`).
+
+| Epic | Entrega | Tier | Status |
+|---|---|---|---|
+| **M0** Fundação métricas | models para `stat_*` (fecha GAP-005) + tabela `stat_monthly` + settings de retenção em camadas | T3 | 📋 aguardando "Go" |
+| **M1** Agregação mensal + retenção | `UptimeCalculator` grava/rola o tier mensal; job de limpeza honra as camadas | T2 | ⏸ bloqueada por M0 |
+| **M2** Relatório de SLA por cliente | UI de relatório por `remote_instance`, exportável | T2 | ⏸ bloqueada por M1 + F3 |
+
+**Sequenciamento acordado:** a **Fase Fundação** executa **F0 + M0 juntas** (uma migration por concern, landando na mesma fatia), pois tocamos o schema uma vez e M0 depende de MariaDB/estrutura que a F0 também assume. MariaDB passa a ser **recomendado no Master**.
+
 ---
 
 ## Ordem sugerida (atualizada 2026-07-03)
