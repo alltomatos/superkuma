@@ -103,7 +103,8 @@
   gap_ref: GAP-003
   risco: MEDIO
   depends_on: [TASK-100]
-  status: ready   # <== próximo (melhor rede de teste: test-uptime-calculator sem Docker)
+  status: done   # 891->804 (extração conservadora: time-bucket.js + stat-bean-repository.js). 18/18 testes, lint 0 err. commit 9c4c117d
+  concluido_em: "2026-07-03"
 
 - id: TASK-130
   desc: "database.js (1018): connection / migration / dialect"
