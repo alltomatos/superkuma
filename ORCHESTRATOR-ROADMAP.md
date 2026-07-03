@@ -66,8 +66,8 @@ Modelo Master-Agent para agregar N instâncias de clientes num painel central co
 
 | Epic | Entrega | Tier | Status |
 |---|---|---|---|
-| **F0** Fundação | migration `remote_instance` + `monitor.remote_instance_id` + model + setting `federation.role` | T3 | 📋 aguardando "Go" |
-| **F1** Receptor Master (MVP) | `/api/push` generalizado (`instance_id`+`agent_monitor_id`); espelha monitores | T2 | ⏸ bloqueada por F0 |
+| **F0** Fundação | migration `remote_instance` + `monitor.remote_instance_id` + model + setting `federation.role` | T3 | ✅ concluída — commit `9641dbc3` |
+| **F1** Receptor Master (MVP) | `/api/push` generalizado (`instance_id`+`agent_monitor_id`); espelha monitores | T2 | ▶️ destravada |
 | **F2** Forwarder Agent (MVP) | hook no `beat()` + config master/token; ponta-a-ponta REST | T2 | ⏸ bloqueada por F1 |
 | **F3** UI unificada | badge de instância, agrupamento no dashboard, página de config | T2 | ⏸ bloqueada por F2 |
 | **F4** Federação Socket.io (v2) | `agent-client.js` persistente + keepalive + detecção "agente caiu" | T3 | ⏸ bloqueada por F2 |
@@ -82,8 +82,8 @@ Salvaguarda transversal: o modo `standalone` (default) deve permanecer **sem reg
 
 | Epic | Entrega | Tier | Status |
 |---|---|---|---|
-| **M0** Fundação métricas | models para `stat_*` (fecha GAP-005) + tabela `stat_monthly` + settings de retenção em camadas | T3 | 📋 aguardando "Go" |
-| **M1** Agregação mensal + retenção | `UptimeCalculator` grava/rola o tier mensal; job de limpeza honra as camadas | T2 | ⏸ bloqueada por M0 |
+| **M0** Fundação métricas | models para `stat_*` (fecha GAP-005) + tabela `stat_monthly` + settings de retenção em camadas | T3 | ✅ concluída — commit `9641dbc3` |
+| **M1** Agregação mensal + retenção | `UptimeCalculator` grava/rola o tier mensal; job de limpeza honra as camadas | T2 | ▶️ destravada |
 | **M2** Relatório de SLA por cliente | UI de relatório por `remote_instance`, exportável | T2 | ⏸ bloqueada por M1 + F3 |
 
 **Sequenciamento acordado:** a **Fase Fundação** executa **F0 + M0 juntas** (uma migration por concern, landando na mesma fatia), pois tocamos o schema uma vez e M0 depende de MariaDB/estrutura que a F0 também assume. MariaDB passa a ser **recomendado no Master**.

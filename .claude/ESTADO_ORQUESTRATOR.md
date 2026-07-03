@@ -183,14 +183,15 @@
   ref: ADR-0008
   risco: T3
   depends_on: []
-  status: needs_human_go   # próxima da feature; sem comportamento visível ainda
+  status: done   # remote_instance table + monitor.remote_instance_id (ON DELETE SET NULL). server/federation/constants.js (FEDERATION_ROLES, ainda não wired). Zero wiring confirmado via grep. commit 9641dbc3
+  concluido_em: "2026-07-03"
 
 - id: TASK-F1
   desc: "F1 Receptor Master (MVP): generalizar /api/push p/ instance_id+agent_monitor_id, espelhar monitores"
   ref: ADR-0008
   risco: T2
   depends_on: [TASK-F0]
-  status: blocked
+  status: ready   # destravada
 
 - id: TASK-F2
   desc: "F2 Forwarder Agent (MVP): hook no beat() de monitor.js + config master/token; ponta-a-ponta REST"
@@ -228,14 +229,15 @@
   ref: ADR-0009
   risco: T3
   depends_on: []
-  status: needs_human_go   # roda junto com TASK-F0 na Fase Fundação
+  status: done   # tabela stat_monthly (schema final de stat_hourly replicado) + models StatMinutely/Hourly/Daily/Monthly. uptime-calculator.js NÃO tocado (zero wiring). commit 9641dbc3
+  concluido_em: "2026-07-03"
 
 - id: TASK-M1
   desc: "M1: UptimeCalculator grava/rola tier mensal; clear-old-data.js honra retenção em camadas. Rede: test-uptime-calculator.js (18 casos)"
   ref: ADR-0009
   risco: T2
   depends_on: [TASK-M0]
-  status: blocked
+  status: ready   # destravada
 
 - id: TASK-M2
   desc: "M2: UI de relatório de SLA por remote_instance, exportável"
@@ -266,6 +268,7 @@
 | 13 | 2026-07-03 | GAP-006 | TASK-020 fase 2: 64 testes novos p/ submódulos util-server(tls,misc)/database sem cobertura direta | Suíte não-Docker 194→259. mutation-check independente (checkStatusCode) confirmou. commit 8ac0ea1e |
 | 14 | 2026-07-03 | GAP-004 | TASK-030 fase 1: zod + validação keyID/tagID/monitorID/period/slug | Testes de rejeição (payload malformado) e aceitação (payload real da UI) independentes. commit 67d7e6d7 |
 | 15 | 2026-07-03 | GAP-004 | TASK-030 fase 2: validação proxy/docker/remote-browser/cloudflared | Verificador confirmou schemas contra fonte real (SUPPORTED_PROXY_PROTOCOLS, dialogs Vue) e que url aceita ws:// (não quebra remote-browser real). commit 76717066 |
+| 16 | 2026-07-03 | ADR-0008/0009 | TASK-F0+M0: fundação schema Master-Agent (remote_instance, ON DELETE SET NULL) + histórico de métricas (stat_monthly) | Primeira mudança real de schema da sessão. 2 tentativas de delegação falharam (agente só relatou "vou aguardar" sem executar); executado diretamente. Achado e corrigido: toJSON() usava convenção underscore de tag.js (retornava undefined nesta versão do redbean-node) — trocado p/ convenção sem underscore de api_key.js/monitor.js. 265/265 backend + 26/26 e2e + zero-wiring grep vazio. Ambiente teve bastante flakiness de processo/porta (limpo com PowerShell). commit 9641dbc3 |
 
 ---
 
