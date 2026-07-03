@@ -110,6 +110,9 @@ class UptimeKumaServer {
         }
 
         // Set Monitor Types
+        UptimeKumaServer.monitorTypeList["http"] = new HttpMonitorType();
+        UptimeKumaServer.monitorTypeList["keyword"] = new HttpMonitorType();
+        UptimeKumaServer.monitorTypeList["json-query"] = new HttpMonitorType();
         UptimeKumaServer.monitorTypeList["real-browser"] = new RealBrowserMonitorType();
         UptimeKumaServer.monitorTypeList["tailscale-ping"] = new TailscalePing();
         UptimeKumaServer.monitorTypeList["websocket-upgrade"] = new WebSocketMonitorType();
@@ -563,6 +566,7 @@ module.exports = {
 };
 
 // Must be at the end to avoid circular dependencies
+const { HttpMonitorType } = require("./monitor-types/http");
 const { RealBrowserMonitorType } = require("./monitor-types/real-browser-monitor-type");
 const { TailscalePing } = require("./monitor-types/tailscale-ping");
 const { WebSocketMonitorType } = require("./monitor-types/websocket-upgrade");
