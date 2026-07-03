@@ -126,21 +126,22 @@
   desc: "Rede primeiro: testes de caracterização para monitor.js (toJSON/toPublicJSON) e EditMonitor.vue (E2E por tipo), com mutation-check obrigatório"
   gap_ref: GAP-003
   depends_on: []
-  status: in_progress   # via Workflow wf_60700241-a4a — sequencial: backend -> verify -> e2e -> verify
+  status: done   # via Workflow wf_60700241-a4a. backend: 19 testes (commit 65ac2586). e2e: +3 tipos, 26/26 suite (commit 6928ba3a). Ambos com mutation-check independente do verificador (não só do executor) confirmando que os testes têm dentes.
+  concluido_em: "2026-07-03"
 
 - id: TASK-120
   desc: "monitor.js (2069): extrair check HTTP -> monitor-types/http.js (ADR-0002)"
   gap_ref: GAP-003
   risco: ALTO
   depends_on: [TASK-110, TASK-105]
-  status: blocked   # destrava quando TASK-105 (rede backend) verificar
+  status: ready   # destravada — rede backend real e verificada (19 testes, mutation-check ok)
 
 - id: TASK-150
   desc: "EditMonitor.vue (4356): subcomponentes por tipo de monitor"
   gap_ref: GAP-003
   risco: ALTO
   depends_on: [TASK-105]
-  status: blocked   # destrava quando TASK-105 (rede e2e) verificar
+  status: ready   # destravada — rede E2E real e verificada (26 testes, mutation-check ok)
 
 - id: TASK-160
   desc: "src/mixins/socket.js (894): dividir em composables"
@@ -183,6 +184,7 @@
 | 5 | 2026-07-03 | GAP-003 | TASK-130: split database.js (1018→928) via workflow c/ verificador adversarial | test-domain 16/16, lint 0 err, commit 2e875cab |
 | 6 | 2026-07-03 | GAP-003 | TASK-110: split server.js (2018→1324) via workflow c/ verificador adversarial | 86/86 eventos socket + 33 checkLogin preservados, lint 0 err, commit 05f93195 |
 | 7 | 2026-07-03 | — | Consolidação final EPIC-2 (fase segura): suíte completa 166/166, lint 0 err | Rede de segurança íntegra após 4 refactors sequenciais |
+| 8 | 2026-07-03 | GAP-003 | TASK-105: 19 testes characterization backend (monitor.js) + 3 novos E2E (EditMonitor.vue) | Mutation-check independente do verificador confirmou detecção real de regressão em ambos. commits 65ac2586 + 6928ba3a |
 
 ---
 
