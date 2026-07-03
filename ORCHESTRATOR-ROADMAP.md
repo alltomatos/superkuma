@@ -39,8 +39,13 @@ DAG executada, ordenada por risco (menor → maior) — todas verificadas por ag
 
 **Achado durante TASK-120** (mutation-check independente, não é regressão desta refatoração): a suíte E2E não cobre `maxRedirects` nem inversão de keyword-match no monitor HTTP — registrado como GAP-009.
 
-### EPIC-3 — Camada de validação de entrada (P2 · T2 · 🟡)
-Introduzir validação de payloads de socket/HTTP (ex: zod) para eliminar parsing manual disperso.
+### EPIC-3 — Camada de validação de entrada (P2 · T2 · 🟡) — ✅ CONCLUÍDA (2026-07-03, escopo parcial deliberado)
+Introduzir validação de payloads de socket/HTTP (zod) para eliminar parsing manual disperso.
+- **Fase 1** (baixo risco, mecânico): `zod` instalado + `server/validation.js` (helper compartilhado) + `api-key` (keyID), tags de monitor (tagID/monitorID/value), `chart` (period), slug de status-page (7 rotas). commit `67d7e6d7`.
+- **Fase 2** (médio risco, objetos pequenos): `proxy` (protocol lido de `Proxy.SUPPORTED_PROXY_PROTOCOLS`, não hardcoded), `docker` (socket|tcp, schema mais leve pro botão "Test"), `remote-browser` (url — confirmado que `z.string().url()` aceita `ws://`, não só http/https), `cloudflared` (token). commit `76717066`.
+- **Fora de escopo, deliberado:** `monitor.add`/`editMonitor` (união discriminada de 24+ tipos, 40+ campos) e `status-page` `saveStatusPage`/`postIncident` — os itens de maior severidade no mapa de risco, mas também os mais complexos; validar mal ali arrisca rejeitar configs legítimas de tipos obscuros. Candidatos a uma **EPIC-3b** futura, com mais tempo dedicado ao mapeamento por tipo de monitor.
+- Nota de precisão: os handlers desta rodada já usavam queries parametrizadas — o ganho é defesa em profundidade (rejeição precoce e clara), não correção de uma injeção de SQL ativa.
+- Verificação: cada fase testou tanto **rejeição** (payload malformado) quanto **aceitação** (payload realista extraído dos componentes Vue reais) — para não deixar passar nem uma validação fraca demais nem uma rígida demais.
 
 ### EPIC-4 — Robustez de testes (P4 · T2 · 🟡) — ✅ CONCLUÍDA (2026-07-03)
 Cobrir o núcleo hoje sem testes diretos (`monitor.js`, models), elevar baseline via `/tdd`.
@@ -57,7 +62,7 @@ Lazy-load de monitor-types/providers, model para tabelas `stat_*`, limpeza de pa
 1. ✅ **Governança + documentação de domínio** (CONTEXT.md, ADRs) — concluída.
 2. ✅ **EPIC-2 — quebra de monólitos** — concluída.
 3. ✅ **EPIC-4 — testes** do que foi extraído — concluída.
-4. ▶️ **EPIC-3 — validação** (zod) sobre a estrutura já limpa — próxima.
-5. **EPIC-1 — cifragem de segredos**: adiada por [ADR-0007](docs/adr/0007-defer-secret-encryption.md).
+4. ✅ **EPIC-3 — validação** (zod) — concluída (escopo parcial deliberado; ver EPIC-3b acima).
+5. ⏸ **EPIC-1 — cifragem de segredos**: adiada por [ADR-0007](docs/adr/0007-defer-secret-encryption.md). É a única Epic do roadmap original que resta.
 
 > Refactor sem testes novos (decisão do usuário) → a salvaguarda é: **extração mecânica pura + suíte existente + lint + build como gate**, em worktree isolada. Os alvos 🔴 sem rede (`monitor.js`, `EditMonitor.vue`) exigem decisão explícita de salvaguarda antes de executar.
