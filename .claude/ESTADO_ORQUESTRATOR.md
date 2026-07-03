@@ -134,14 +134,14 @@
   gap_ref: GAP-003
   risco: ALTO
   depends_on: [TASK-110, TASK-105]
-  status: ready   # destravada — rede backend real e verificada (19 testes, mutation-check ok)
+  status: in_progress   # Workflow wf_d1af8439-76b — escopo restrito ao bloco http/keyword/json-query (linhas ~469-723); preserva quirk do tlsInfo sombreado e cache de oauthAccessToken
 
 - id: TASK-150
   desc: "EditMonitor.vue (4356): subcomponentes por tipo de monitor"
   gap_ref: GAP-003
   risco: ALTO
-  depends_on: [TASK-105]
-  status: ready   # destravada — rede E2E real e verificada (26 testes, mutation-check ok)
+  depends_on: [TASK-105, TASK-120]
+  status: blocked   # roda no mesmo workflow, só após TASK-120 verificar
 
 - id: TASK-160
   desc: "src/mixins/socket.js (894): dividir em composables"
