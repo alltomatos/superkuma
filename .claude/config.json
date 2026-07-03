@@ -1,0 +1,36 @@
+{
+    "project": "uptime-kuma",
+    "fork": "alltomatos/uptime-kuma",
+    "upstream": "louislam/uptime-kuma",
+    "stack": {
+        "frontend": "Vue 3 + Vite",
+        "backend": "Node.js + Express + Socket.io",
+        "orm": "redbean-node + Knex",
+        "databases": ["sqlite", "mariadb", "mysql", "postgres"]
+    },
+    "orchestrator": {
+        "version": 2,
+        "stateFile": ".claude/ESTADO_ORQUESTRATOR.md",
+        "roadmap": "ORCHESTRATOR-ROADMAP.md",
+        "docsAgents": "docs/agents/"
+    },
+    "policy": {
+        "upstreamAiSlopPolicy": "CLAUDE.md / AGENTS.md (mantenedores) — respeitar SEMPRE",
+        "noUpstreamPR": true,
+        "rule": "Este e um fork privado. Nenhum PR gerado por agente vai para louislam/uptime-kuma. Mudancas grandes exigem revisao humana + teste manual antes de qualquer push. Nunca submeter codigo gerado + descricao de LLM sem revisao."
+    },
+    "standards": {
+        "lint": "npm run lint",
+        "format": "npm run fmt",
+        "typecheck": "npm run tsc",
+        "testBackend": "npm run test-backend",
+        "testE2E": "npm run test-e2e",
+        "commitConvention": "Conventional Commits",
+        "branchConvention": "tipo/descricao-curta"
+    },
+    "tiers": {
+        "T1": "Fast path: lint/format/typo/docs. Execucao atomica direta.",
+        "T2": "Batch: testes, refactor localizado sem breaking change, ADRs.",
+        "T3": "Bloqueante: schema DB, autenticacao, mudanca de arquitetura macro. PARA e pede aprovacao."
+    }
+}

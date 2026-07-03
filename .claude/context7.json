@@ -1,0 +1,33 @@
+{
+    "$comment": "Manifesto Context7 — bibliotecas-chave para lookup de documentacao autoritativa (evita alucinacao de API). Gerado a partir de package.json.",
+    "libraries": {
+        "backend": [
+            "express",
+            "socket.io",
+            "knex",
+            "redbean-node",
+            "axios",
+            "dayjs",
+            "croner",
+            "jsonwebtoken",
+            "nodemailer",
+            "redis",
+            "mongodb",
+            "mqtt",
+            "mysql2",
+            "pg",
+            "mssql",
+            "ws",
+            "playwright-core",
+            "prom-client"
+        ],
+        "frontend": [
+            "vue",
+            "vue-router",
+            "vue-i18n",
+            "vite",
+            "chart.js",
+            "bootstrap"
+        ]
+    }
+}
