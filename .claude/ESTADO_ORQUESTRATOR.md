@@ -122,19 +122,25 @@
   status: done   # 2018->1324 (novo handler 721 LOC). Verificado por agente independente: 86/86 eventos socket idênticos, 33 checkLogin() preservados, 10 handlers pré-existentes intactos, boot smoke ok, lint 0. commit 05f93195
   concluido_em: "2026-07-03"
 
+- id: TASK-105
+  desc: "Rede primeiro: testes de caracterização para monitor.js (toJSON/toPublicJSON) e EditMonitor.vue (E2E por tipo), com mutation-check obrigatório"
+  gap_ref: GAP-003
+  depends_on: []
+  status: in_progress   # via Workflow wf_60700241-a4a — sequencial: backend -> verify -> e2e -> verify
+
 - id: TASK-120
   desc: "monitor.js (2069): extrair check HTTP -> monitor-types/http.js (ADR-0002)"
   gap_ref: GAP-003
-  risco: ALTO   # sem rede direta -> exige decisao de salvaguarda
-  depends_on: [TASK-110]
-  status: needs_human_go
+  risco: ALTO
+  depends_on: [TASK-110, TASK-105]
+  status: blocked   # destrava quando TASK-105 (rede backend) verificar
 
 - id: TASK-150
   desc: "EditMonitor.vue (4356): subcomponentes por tipo de monitor"
   gap_ref: GAP-003
-  risco: ALTO   # so E2E -> exige decisao de salvaguarda
-  depends_on: []
-  status: needs_human_go
+  risco: ALTO
+  depends_on: [TASK-105]
+  status: blocked   # destrava quando TASK-105 (rede e2e) verificar
 
 - id: TASK-160
   desc: "src/mixins/socket.js (894): dividir em composables"
@@ -183,4 +189,5 @@
 ## Pendências / Notas
 
 - `package-lock.json` tem alteração local não relacionada (remoção de campos `libc` em deps opcionais do rollup) — provável artefato de `npm install`. Não revertido; decidir se restaura.
-- Próximo "Go" recomendado: **TASK-010** (baseline verde de lint/tsc/testes) antes de qualquer refactor.
+- **Descoberta (2026-07-03):** `npm run build` funciona neste ambiente (gera `dist/`) e o E2E Playwright é **totalmente viável** — após `npx playwright install chromium` (browser estava desatualizado: 1228 instalado vs 1084 esperado pelo playwright 1.39), suíte completa rodou **23/23 em 2.1min**. Isso eleva a confiança na rede de segurança do frontend para além de "só teórica".
+- `check()` HTTP **não existe como método isolado** em `monitor.js` — a lógica fica embutida numa closure `beat()` dentro de `start(io)` (confirma o gap do ADR-0002). Por isso a caracterização de monitor.js foca em `toJSON`/`toPublicJSON` (isoláveis) em vez de tentar unit-testar o check em si.
