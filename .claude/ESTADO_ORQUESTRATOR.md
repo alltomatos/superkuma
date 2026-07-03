@@ -91,32 +91,33 @@
 # Salvaguarda: extração mecânica pura + suíte existente + lint/build como gate, em worktree.
 
 - id: TASK-100
-  desc: "Split util-server.js (1066) -> server/util-server/ (network, tls/crypto, format) + barrel re-export"
+  desc: "Split util-server.js (1066) -> server/util-server/ (7 submódulos) + barrel"
   gap_ref: GAP-003
   risco: BAIXO
   depends_on: []
-  status: ready   # <== próximo alvo recomendado (worktree)
+  status: done   # 1066->24 LOC. Export idêntico, lint 0 err, testes verdes. commit fd6778ca
+  concluido_em: "2026-07-03"
 
 - id: TASK-140
   desc: "uptime-calculator.js (891): separar persistência da agregação"
   gap_ref: GAP-003
   risco: MEDIO
   depends_on: [TASK-100]
-  status: blocked
+  status: ready   # <== próximo (melhor rede de teste: test-uptime-calculator sem Docker)
 
 - id: TASK-130
   desc: "database.js (1018): connection / migration / dialect"
   gap_ref: GAP-003
   risco: MEDIO
   depends_on: [TASK-100]
-  status: blocked
+  status: ready   # obs: gate de migration exige Docker (down) — net mais fraca agora
 
 - id: TASK-110
   desc: "server.js (2018): mover socket handlers embutidos -> server/socket-handlers/"
   gap_ref: GAP-003
   risco: MEDIO
   depends_on: [TASK-100]
-  status: blocked
+  status: ready
 
 - id: TASK-120
   desc: "monitor.js (2069): extrair check HTTP -> monitor-types/http.js (ADR-0002)"
@@ -168,6 +169,7 @@
 |---|------|-----|------|-----------|
 | 1 | 2026-07-03 | GAP-007 | Restaurar CLAUDE.md/AGENTS.md ao commit | 2370 bytes cada, `git status` limpo nesses arquivos |
 | 2 | 2026-07-03 | — | Provisionar governança (.claude/, docs/agents/, roadmap) | Aditivo, sem tocar em código-fonte |
+| 3 | 2026-07-03 | GAP-003 | TASK-100: split util-server.js (1066→24) em 7 submódulos | Export idêntico, lint 0 err, testes verdes, commit fd6778ca |
 
 ---
 
