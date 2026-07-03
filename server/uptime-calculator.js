@@ -3,6 +3,8 @@ const { UP, MAINTENANCE, DOWN, PENDING } = require("../src/util");
 const { LimitQueue } = require("./utils/limit-queue");
 const { log } = require("../src/util");
 const { R } = require("redbean-node");
+const { minutelyKey, hourlyKey, dailyKey, secondsPerBucket } = require("./uptime-calculator/time-bucket");
+const { findOrDispenseStatBean } = require("./uptime-calculator/stat-bean-repository");
 
 /**
  * Calculates the uptime of a monitor.
@@ -379,19 +381,7 @@ class UptimeCalculator {
      * @returns {Promise<import("redbean-node").Bean>} stat_daily bean
      */
     async getDailyStatBean(timestamp) {
-        if (this.lastDailyStatBean && this.lastDailyStatBean.timestamp === timestamp) {
-            return this.lastDailyStatBean;
-        }
-
-        let bean = await R.findOne("stat_daily", " monitor_id = ? AND timestamp = ?", [this.monitorID, timestamp]);
-
-        if (!bean) {
-            bean = R.dispense("stat_daily");
-            bean.monitor_id = this.monitorID;
-            bean.timestamp = timestamp;
-        }
-
-        this.lastDailyStatBean = bean;
+        this.lastDailyStatBean = await findOrDispenseStatBean("stat_daily", this.monitorID, timestamp, this.lastDailyStatBean);
         return this.lastDailyStatBean;
     }
 
@@ -401,19 +391,7 @@ class UptimeCalculator {
      * @returns {Promise<import("redbean-node").Bean>} stat_hourly bean
      */
     async getHourlyStatBean(timestamp) {
-        if (this.lastHourlyStatBean && this.lastHourlyStatBean.timestamp === timestamp) {
-            return this.lastHourlyStatBean;
-        }
-
-        let bean = await R.findOne("stat_hourly", " monitor_id = ? AND timestamp = ?", [this.monitorID, timestamp]);
-
-        if (!bean) {
-            bean = R.dispense("stat_hourly");
-            bean.monitor_id = this.monitorID;
-            bean.timestamp = timestamp;
-        }
-
-        this.lastHourlyStatBean = bean;
+        this.lastHourlyStatBean = await findOrDispenseStatBean("stat_hourly", this.monitorID, timestamp, this.lastHourlyStatBean);
         return this.lastHourlyStatBean;
     }
 
@@ -423,19 +401,7 @@ class UptimeCalculator {
      * @returns {Promise<import("redbean-node").Bean>} stat_minutely bean
      */
     async getMinutelyStatBean(timestamp) {
-        if (this.lastMinutelyStatBean && this.lastMinutelyStatBean.timestamp === timestamp) {
-            return this.lastMinutelyStatBean;
-        }
-
-        let bean = await R.findOne("stat_minutely", " monitor_id = ? AND timestamp = ?", [this.monitorID, timestamp]);
-
-        if (!bean) {
-            bean = R.dispense("stat_minutely");
-            bean.monitor_id = this.monitorID;
-            bean.timestamp = timestamp;
-        }
-
-        this.lastMinutelyStatBean = bean;
+        this.lastMinutelyStatBean = await findOrDispenseStatBean("stat_minutely", this.monitorID, timestamp, this.lastMinutelyStatBean);
         return this.lastMinutelyStatBean;
     }
 
@@ -446,11 +412,8 @@ class UptimeCalculator {
      * @returns {number} Timestamp
      */
     getMinutelyKey(date, createIfMissing = true) {
-        // Truncate value to minutes (e.g. 2021-01-01 12:34:56 -> 2021-01-01 12:34:00)
-        date = date.startOf("minute");
-
-        // Convert to timestamp in second
-        let divisionKey = date.unix();
+        // Truncate value to minutes and convert to timestamp in second
+        let divisionKey = minutelyKey(date);
 
         if (createIfMissing && !(divisionKey in this.minutelyUptimeDataList)) {
             this.minutelyUptimeDataList.push(divisionKey, {
@@ -472,11 +435,8 @@ class UptimeCalculator {
      * @returns {number} Timestamp
      */
     getHourlyKey(date, createIfMissing = true) {
-        // Truncate value to hours (e.g. 2021-01-01 12:34:56 -> 2021-01-01 12:00:00)
-        date = date.startOf("hour");
-
-        // Convert to timestamp in second
-        let divisionKey = date.unix();
+        // Truncate value to hours and convert to timestamp in second
+        let divisionKey = hourlyKey(date);
 
         if (createIfMissing && !(divisionKey in this.hourlyUptimeDataList)) {
             this.hourlyUptimeDataList.push(divisionKey, {
@@ -498,13 +458,11 @@ class UptimeCalculator {
      * @returns {number} Timestamp
      */
     getDailyKey(date, createIfMissing = true) {
-        // Truncate value to start of day (e.g. 2021-01-01 12:34:56 -> 2021-01-01 00:00:00)
-        // Considering if the user keep changing could affect the calculation, so use UTC time to avoid this problem.
-        date = date.utc().startOf("day");
-        let dailyKey = date.unix();
+        // Truncate value to start of day (UTC) and convert to timestamp in second
+        let dayKey = dailyKey(date);
 
-        if (createIfMissing && !this.dailyUptimeDataList[dailyKey]) {
-            this.dailyUptimeDataList.push(dailyKey, {
+        if (createIfMissing && !this.dailyUptimeDataList[dayKey]) {
+            this.dailyUptimeDataList.push(dayKey, {
                 up: 0,
                 down: 0,
                 avgPing: 0,
@@ -513,7 +471,7 @@ class UptimeCalculator {
             });
         }
 
-        return dailyKey;
+        return dayKey;
     }
 
     /**
@@ -579,22 +537,12 @@ class UptimeCalculator {
         };
 
         let totalPing = 0;
-        let endTimestamp;
+
+        // Number of seconds spanned by a single bucket of this type
+        const bucketSeconds = secondsPerBucket(type);
 
         // Get the earliest timestamp of the required period based on the type
-        switch (type) {
-            case "day":
-                endTimestamp = key - 86400 * (num - 1);
-                break;
-            case "hour":
-                endTimestamp = key - 3600 * (num - 1);
-                break;
-            case "minute":
-                endTimestamp = key - 60 * (num - 1);
-                break;
-            default:
-                throw new Error("Invalid type");
-        }
+        let endTimestamp = key - bucketSeconds * (num - 1);
 
         // Sum up all data in the specified time range
         while (key >= endTimestamp) {
@@ -621,19 +569,7 @@ class UptimeCalculator {
             }
 
             // Set key to the previous time period
-            switch (type) {
-                case "day":
-                    key -= 86400;
-                    break;
-                case "hour":
-                    key -= 3600;
-                    break;
-                case "minute":
-                    key -= 60;
-                    break;
-                default:
-                    throw new Error("Invalid type");
-            }
+            key -= bucketSeconds;
         }
 
         let uptimeData = new UptimeDataResult();
@@ -707,22 +643,11 @@ class UptimeCalculator {
 
         let result = [];
 
-        let endTimestamp;
+        // Number of seconds spanned by a single bucket of this type
+        const bucketSeconds = secondsPerBucket(type);
 
         // Get the earliest timestamp of the required period based on the type
-        switch (type) {
-            case "day":
-                endTimestamp = key - 86400 * (num - 1);
-                break;
-            case "hour":
-                endTimestamp = key - 3600 * (num - 1);
-                break;
-            case "minute":
-                endTimestamp = key - 60 * (num - 1);
-                break;
-            default:
-                throw new Error("Invalid type");
-        }
+        let endTimestamp = key - bucketSeconds * (num - 1);
 
         // Get datapoints in the specified time range
         while (key >= endTimestamp) {
@@ -748,19 +673,7 @@ class UptimeCalculator {
             }
 
             // Set key to the previous time period
-            switch (type) {
-                case "day":
-                    key -= 86400;
-                    break;
-                case "hour":
-                    key -= 3600;
-                    break;
-                case "minute":
-                    key -= 60;
-                    break;
-                default:
-                    throw new Error("Invalid type");
-            }
+            key -= bucketSeconds;
         }
 
         return result;
