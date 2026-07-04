@@ -360,5 +360,10 @@ Os três gaps achados até agora eram itens que EU não tinha atribuído explici
   status: done   # CLAUDE.md, CONTEXT.md, ORCHESTRATOR-ROADMAP.md (títulos), docs/agents/domain.md, docs/agents/issue-tracker.md (repo próprio), docs/prd/master-agent.md, docs/adr/0002 (fix pontual já feito no SK4), 0007/0008/0009 -- todos descrevendo o sistema ATUAL, renomeados p/ SuperKuma. Preservado de propósito: citações ao upstream real `louislam/uptime-kuma` (CLAUDE.md linha 35, issue-tracker.md linha 18, README.md Motivation) e a narrativa histórica desta própria seção do rebrand (que necessariamente cita "Uptime Kuma" ao descrever o que está sendo renomeado). Este arquivo (ESTADO_ORQUESTRATOR.md) e ORCHESTRATOR-ROADMAP.md tiveram só os títulos/campos de estado-vivo corrigidos, não a narrativa histórica.
 ```
 
-### Passo final (após TASK-SK8)
-Gate de verificação completo → `gh repo rename superkuma` → atualizar remotes nas outras 2 worktrees (`ci-setup`, `rbac`).
+- id: TASK-SK9
+  desc: "Varredura final cross-stage (case-insensitive uptime[- ]?kuma em todo o repo) + gate de verificação completo, antes do rename real no GitHub."
+  depends_on: [TASK-SK8]
+  status: done   # achou uma 5a variante de casing (bark.js: "uptime kuma" minúsculo com espaço) + uptimeKumaEntryPage (variável interna em server.js) + comentários em database.js/migrations/README + título de teste e2e. Confirmado exaustivamente: tudo mais remanescente é exceção justificada (URLs de terceiros reais, citações a issues/PRs upstream, @louislam/* escopo npm real, UptimeKumaBot conta real, os 3 guards Docker-publish, as 2 chaves i18n preservadas). lint 0 erros, testes-alvo passando, build ok, e2e 29/29. commit 49fbde89
+
+### Passo final (após TASK-SK9)
+`gh repo rename superkuma` → atualizar remotes nas outras 2 worktrees (`ci-setup`, `rbac`).
