@@ -372,7 +372,8 @@ class StatusPage extends BeanModel {
             result[item.id] = await item.toJSON();
         }
 
-        io.to(socket.userID).emit("statusPageList", result);
+        const { roomFor } = require("../security/rooms");
+        io.to(roomFor(socket.userID, socket.actor && socket.actor.activeTeamId)).emit("statusPageList", result);
         return list;
     }
 

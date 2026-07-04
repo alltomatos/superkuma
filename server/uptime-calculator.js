@@ -451,7 +451,12 @@ class UptimeCalculator {
      * @returns {Promise<import("redbean-node").Bean>} stat_daily bean
      */
     async getDailyStatBean(timestamp) {
-        this.lastDailyStatBean = await findOrDispenseStatBean("stat_daily", this.monitorID, timestamp, this.lastDailyStatBean);
+        this.lastDailyStatBean = await findOrDispenseStatBean(
+            "stat_daily",
+            this.monitorID,
+            timestamp,
+            this.lastDailyStatBean
+        );
         return this.lastDailyStatBean;
     }
 
@@ -461,7 +466,12 @@ class UptimeCalculator {
      * @returns {Promise<import("redbean-node").Bean>} stat_hourly bean
      */
     async getHourlyStatBean(timestamp) {
-        this.lastHourlyStatBean = await findOrDispenseStatBean("stat_hourly", this.monitorID, timestamp, this.lastHourlyStatBean);
+        this.lastHourlyStatBean = await findOrDispenseStatBean(
+            "stat_hourly",
+            this.monitorID,
+            timestamp,
+            this.lastHourlyStatBean
+        );
         return this.lastHourlyStatBean;
     }
 
@@ -471,7 +481,12 @@ class UptimeCalculator {
      * @returns {Promise<import("redbean-node").Bean>} stat_minutely bean
      */
     async getMinutelyStatBean(timestamp) {
-        this.lastMinutelyStatBean = await findOrDispenseStatBean("stat_minutely", this.monitorID, timestamp, this.lastMinutelyStatBean);
+        this.lastMinutelyStatBean = await findOrDispenseStatBean(
+            "stat_minutely",
+            this.monitorID,
+            timestamp,
+            this.lastMinutelyStatBean
+        );
         return this.lastMinutelyStatBean;
     }
 
@@ -481,7 +496,12 @@ class UptimeCalculator {
      * @returns {Promise<import("redbean-node").Bean>} stat_monthly bean
      */
     async getMonthlyStatBean(timestamp) {
-        this.lastMonthlyStatBean = await findOrDispenseStatBean("stat_monthly", this.monitorID, timestamp, this.lastMonthlyStatBean);
+        this.lastMonthlyStatBean = await findOrDispenseStatBean(
+            "stat_monthly",
+            this.monitorID,
+            timestamp,
+            this.lastMonthlyStatBean
+        );
         return this.lastMonthlyStatBean;
     }
 

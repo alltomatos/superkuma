@@ -4,6 +4,8 @@ const { R } = require("redbean-node");
 const apicache = require("../modules/apicache");
 const { SuperKumaServer } = require("../superkuma-server");
 const Maintenance = require("../model/maintenance");
+const { requireResource } = require("../security/authz");
+const { teamIdLoader } = require("../security/team-id-loaders");
 const server = SuperKumaServer.getInstance();
 
 /**
@@ -78,6 +80,8 @@ module.exports.maintenanceSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
+            await requireResource(socket.actor, "maintenance:update", "maintenance", maintenanceID, teamIdLoader);
+
             await R.exec("DELETE FROM monitor_maintenance WHERE maintenance_id = ?", [maintenanceID]);
 
             for await (const monitor of monitors) {
@@ -110,6 +114,8 @@ module.exports.maintenanceSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
+            await requireResource(socket.actor, "maintenance:update", "maintenance", maintenanceID, teamIdLoader);
+
             await R.exec("DELETE FROM maintenance_status_page WHERE maintenance_id = ?", [maintenanceID]);
 
             for await (const statusPage of statusPages) {
@@ -140,6 +146,8 @@ module.exports.maintenanceSocketHandler = (socket) => {
     socket.on("getMaintenance", async (maintenanceID, callback) => {
         try {
             checkLogin(socket);
+
+            await requireResource(socket.actor, "maintenance:read", "maintenance", maintenanceID, teamIdLoader);
 
             log.debug("maintenance", `Get Maintenance: ${maintenanceID} User ID: ${socket.userID}`);
 
@@ -177,6 +185,8 @@ module.exports.maintenanceSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
+            await requireResource(socket.actor, "maintenance:read", "maintenance", maintenanceID, teamIdLoader);
+
             log.debug("maintenance", `Get Monitors for Maintenance: ${maintenanceID} User ID: ${socket.userID}`);
 
             let monitors = await R.getAll(
@@ -201,6 +211,8 @@ module.exports.maintenanceSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
+            await requireResource(socket.actor, "maintenance:read", "maintenance", maintenanceID, teamIdLoader);
+
             log.debug("maintenance", `Get Status Pages for Maintenance: ${maintenanceID} User ID: ${socket.userID}`);
 
             let statusPages = await R.getAll(
@@ -224,6 +236,8 @@ module.exports.maintenanceSocketHandler = (socket) => {
     socket.on("deleteMaintenance", async (maintenanceID, callback) => {
         try {
             checkLogin(socket);
+
+            await requireResource(socket.actor, "maintenance:delete", "maintenance", maintenanceID, teamIdLoader);
 
             log.debug("maintenance", `Delete Maintenance: ${maintenanceID} User ID: ${socket.userID}`);
 

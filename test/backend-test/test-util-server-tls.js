@@ -187,7 +187,7 @@ describe("format.js: filterAndJoin()", () => {
     });
 
     test("returns empty string when all parts are falsy", () => {
-        assert.strictEqual(filterAndJoin([ "", null, undefined ], ","), "");
+        assert.strictEqual(filterAndJoin(["", null, undefined], ","), "");
     });
 });
 

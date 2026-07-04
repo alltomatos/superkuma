@@ -52,7 +52,16 @@
         class="my-3"
     >
         <label for="port" class="form-label">{{ $t("Port") }}</label>
-        <input id="port" v-model="model.port" type="number" class="form-control" required min="0" max="65535" step="1" />
+        <input
+            id="port"
+            v-model="model.port"
+            type="number"
+            class="form-control"
+            required
+            min="0"
+            max="65535"
+            step="1"
+        />
     </div>
 </template>
 

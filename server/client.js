@@ -9,6 +9,8 @@ const io = server.io;
 const { setting } = require("./util-server");
 const checkVersion = require("./check-version");
 const Database = require("./database");
+const { scopeFilter } = require("./security/authz");
+const { roomFor } = require("./security/rooms");
 
 /**
  * Send list of notification providers to client
@@ -19,7 +21,8 @@ async function sendNotificationList(socket) {
     const timeLogger = new TimeLogger();
 
     let result = [];
-    let list = await R.find("notification", " user_id = ? ", [socket.userID]);
+    const filter = scopeFilter(socket.actor);
+    let list = await R.find("notification", filter.clause, filter.params);
 
     for (let bean of list) {
         let notificationObject = bean.export();
@@ -28,7 +31,7 @@ async function sendNotificationList(socket) {
         result.push(notificationObject);
     }
 
-    io.to(socket.userID).emit("notificationList", result);
+    io.to(roomFor(socket.userID, socket.actor && socket.actor.activeTeamId)).emit("notificationList", result);
 
     timeLogger.print("Send Notification List");
 
@@ -57,7 +60,12 @@ async function sendHeartbeatList(socket, monitorID, toUser = false, overwrite = 
     let result = list.reverse();
 
     if (toUser) {
-        io.to(socket.userID).emit("heartbeatList", monitorID, result, overwrite);
+        io.to(roomFor(socket.userID, socket.actor && socket.actor.activeTeamId)).emit(
+            "heartbeatList",
+            monitorID,
+            result,
+            overwrite
+        );
     } else {
         socket.emit("heartbeatList", monitorID, result, overwrite);
     }
@@ -90,7 +98,12 @@ async function sendImportantHeartbeatList(socket, monitorID, toUser = false, ove
     const result = list.map((bean) => bean.toJSON());
 
     if (toUser) {
-        io.to(socket.userID).emit("importantHeartbeatList", monitorID, result, overwrite);
+        io.to(roomFor(socket.userID, socket.actor && socket.actor.activeTeamId)).emit(
+            "importantHeartbeatList",
+            monitorID,
+            result,
+            overwrite
+        );
     } else {
         socket.emit("importantHeartbeatList", monitorID, result, overwrite);
     }
@@ -104,8 +117,9 @@ async function sendImportantHeartbeatList(socket, monitorID, toUser = false, ove
 async function sendProxyList(socket) {
     const timeLogger = new TimeLogger();
 
-    const list = await R.find("proxy", " user_id = ? ", [socket.userID]);
-    io.to(socket.userID).emit(
+    const filter = scopeFilter(socket.actor);
+    const list = await R.find("proxy", filter.clause, filter.params);
+    io.to(roomFor(socket.userID, socket.actor && socket.actor.activeTeamId)).emit(
         "proxyList",
         list.map((bean) => bean.export())
     );
@@ -124,13 +138,14 @@ async function sendAPIKeyList(socket) {
     const timeLogger = new TimeLogger();
 
     let result = [];
-    const list = await R.find("api_key", "user_id=?", [socket.userID]);
+    const filter = scopeFilter(socket.actor);
+    const list = await R.find("api_key", filter.clause, filter.params);
 
     for (let bean of list) {
         result.push(bean.toPublicJSON());
     }
 
-    io.to(socket.userID).emit("apiKeyList", result);
+    io.to(roomFor(socket.userID, socket.actor && socket.actor.activeTeamId)).emit("apiKeyList", result);
     timeLogger.print("Sent API Key List");
 
     return list;
@@ -159,6 +174,14 @@ async function sendInfo(socket, hideVersion = false) {
         };
     }
 
+    // Dark-launch (ADR-0010 P2): expose the current user + their teams/permissions
+    // so the frontend can render role-gated UI. Server-side remains the boundary.
+    if (socket.permissionPayload) {
+        info.currentUser = socket.permissionPayload.currentUser;
+        info.teams = socket.permissionPayload.teams;
+        info.activeTeamId = socket.permissionPayload.activeTeamId;
+    }
+
     socket.emit("info", info);
 }
 
@@ -171,13 +194,14 @@ async function sendDockerHostList(socket) {
     const timeLogger = new TimeLogger();
 
     let result = [];
-    let list = await R.find("docker_host", " user_id = ? ", [socket.userID]);
+    const filter = scopeFilter(socket.actor);
+    let list = await R.find("docker_host", filter.clause, filter.params);
 
     for (let bean of list) {
         result.push(bean.toJSON());
     }
 
-    io.to(socket.userID).emit("dockerHostList", result);
+    io.to(roomFor(socket.userID, socket.actor && socket.actor.activeTeamId)).emit("dockerHostList", result);
 
     timeLogger.print("Send Docker Host List");
 
@@ -193,13 +217,14 @@ async function sendRemoteBrowserList(socket) {
     const timeLogger = new TimeLogger();
 
     let result = [];
-    let list = await R.find("remote_browser", " user_id = ? ", [socket.userID]);
+    const filter = scopeFilter(socket.actor);
+    let list = await R.find("remote_browser", filter.clause, filter.params);
 
     for (let bean of list) {
         result.push(bean.toJSON());
     }
 
-    io.to(socket.userID).emit("remoteBrowserList", result);
+    io.to(roomFor(socket.userID, socket.actor && socket.actor.activeTeamId)).emit("remoteBrowserList", result);
 
     timeLogger.print("Send Remote Browser List");
 
@@ -232,7 +257,10 @@ async function sendMonitorTypeList(socket) {
         ];
     });
 
-    io.to(socket.userID).emit("monitorTypeList", Object.fromEntries(result));
+    io.to(roomFor(socket.userID, socket.actor && socket.actor.activeTeamId)).emit(
+        "monitorTypeList",
+        Object.fromEntries(result)
+    );
 }
 
 module.exports = {

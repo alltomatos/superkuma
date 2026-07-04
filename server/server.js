@@ -136,6 +136,9 @@ const {
 log.debug("server", "Importing Notification");
 const { Notification } = require("./notification");
 Notification.init();
+
+const { requireResource } = require("./security/authz");
+const { teamIdLoader } = require("./security/team-id-loaders");
 log.debug("server", "Importing Web-Push");
 const webpush = require("web-push");
 
@@ -146,7 +149,7 @@ log.debug("server", "Importing Background Jobs");
 const { initBackgroundJobs, stopBackgroundJobs } = require("./jobs");
 const { loginRateLimiter, twoFaRateLimiter } = require("./rate-limiter");
 
-const { apiAuth } = require("./auth");
+const { apiAuth, attachActor, requireSuperadmin } = require("./auth");
 const { login } = require("./auth");
 const passwordHash = require("./password-hash");
 
@@ -353,7 +356,12 @@ let needSetup = false;
 
     // Prometheus API metrics  /metrics
     // With Basic Auth using the first user's username/password
-    app.get("/metrics", apiAuth, prometheusAPIMetrics());
+    // ADR-0010 D9: gated to super admins only. Metrics are process-wide
+    // singletons (not team-scoped), so any authenticated user seeing them
+    // would see every team's data -- until a per-team metrics registry
+    // exists, restrict to the one role that is already meant to see
+    // everything.
+    app.get("/metrics", apiAuth, attachActor, requireSuperadmin, prometheusAPIMetrics());
 
     app.use(
         "/",
@@ -421,6 +429,11 @@ let needSetup = false;
                         throw new Error("The token is invalid due to password change or old token");
                     }
 
+                    // Grandfather tokens issued before token_version existed as v0 (ADR-0010 R6).
+                    if ((decoded.tv ?? 0) !== (user.token_version ?? 0)) {
+                        throw new Error("The token has been revoked");
+                    }
+
                     log.debug("auth", "afterLogin");
                     await afterLogin(socket, user);
                     log.debug("auth", "afterLogin ok");
@@ -482,7 +495,7 @@ let needSetup = false;
 
                     callback({
                         ok: true,
-                        token: User.createJWT(user, server.jwtSecret),
+                        token: await User.createSignedToken(user, server.jwtSecret),
                     });
                 }
 
@@ -509,7 +522,7 @@ let needSetup = false;
 
                         callback({
                             ok: true,
-                            token: User.createJWT(user, server.jwtSecret),
+                            token: await User.createSignedToken(user, server.jwtSecret),
                         });
                     } else {
                         log.warn("auth", `Invalid token provided for user ${data.username}. IP=${clientIP}`);
@@ -763,7 +776,7 @@ let needSetup = false;
 
                 callback({
                     ok: true,
-                    token: User.createJWT(user, server.jwtSecret),
+                    token: await User.createSignedToken(user, server.jwtSecret),
                     msg: "successAuthChangePassword",
                     msgi18n: true,
                 });
@@ -817,11 +830,30 @@ let needSetup = false;
                     server.disconnectAllSocketClients(socket.userID, socket.id);
                 }
 
+                // ADR-0010 P4: refuse to enable RBAC enforcement if no active
+                // superadmin exists -- otherwise nobody could act with global
+                // admin authority once the dark-launch bypass is turned off.
+                if (data.rbacEnforced) {
+                    const { hasActiveSuperadmin } = require("./security/actor-repository");
+                    if (!(await hasActiveSuperadmin())) {
+                        throw new Error("Cannot enable RBAC enforcement: no active superadmin exists.");
+                    }
+                }
+
                 const previousChromeExecutable = await Settings.get("chromeExecutable");
                 const previousNSCDStatus = await Settings.get("nscd");
 
                 await setSettings("general", data);
                 server.entryPage = data.entryPage;
+
+                // ADR-0010 P4: apply the enforcement flag immediately, like the
+                // other settings below. Only when the field is actually present
+                // in the payload -- forms that don't know about this key yet
+                // must not silently reset an already-enabled flag back to OFF.
+                if (Object.prototype.hasOwnProperty.call(data, "rbacEnforced")) {
+                    const { setEnforcementEnabled } = require("./security/authz");
+                    setEnforcementEnabled(data.rbacEnforced);
+                }
 
                 // Also need to apply timezone globally
                 if (data.serverTimezone) {
@@ -864,7 +896,12 @@ let needSetup = false;
             try {
                 checkLogin(socket);
 
-                let notificationBean = await Notification.save(notification, notificationID, socket.userID);
+                let notificationBean = await Notification.save(
+                    notification,
+                    notificationID,
+                    socket.userID,
+                    socket.actor
+                );
                 await sendNotificationList(socket);
 
                 callback({
@@ -885,7 +922,7 @@ let needSetup = false;
             try {
                 checkLogin(socket);
 
-                await Notification.delete(notificationID, socket.userID);
+                await Notification.delete(notificationID, socket.userID, socket.actor);
                 await sendNotificationList(socket);
 
                 callback({
@@ -959,6 +996,7 @@ let needSetup = false;
         socket.on("clearEvents", async (monitorID, callback) => {
             try {
                 checkLogin(socket);
+                await requireResource(socket.actor, "monitor:manage_state", "monitor", monitorID, teamIdLoader);
 
                 log.info("manage", `Clear Events Monitor: ${monitorID} User ID: ${socket.userID}`);
 
@@ -978,6 +1016,7 @@ let needSetup = false;
         socket.on("clearHeartbeats", async (monitorID, callback) => {
             try {
                 checkLogin(socket);
+                await requireResource(socket.actor, "monitor:manage_state", "monitor", monitorID, teamIdLoader);
 
                 log.info("manage", `Clear Heartbeats Monitor: ${monitorID} User ID: ${socket.userID}`);
 
@@ -1058,7 +1097,9 @@ let needSetup = false;
         log.debug("auth", "check auto login");
         if (await setting("disableAuth")) {
             log.info("auth", "Disabled Auth: auto login to admin");
-            await afterLogin(socket, await R.findOne("user"));
+            // Deterministic auto-login (ADR-0010 R12): lowest-id active user
+            // (which the backfill made the super admin), not a plan-dependent row.
+            await afterLogin(socket, await R.findOne("user", " active = 1 ORDER BY id ASC "));
             socket.emit("autoLogin");
         } else {
             socket.emit("loginRequired");
@@ -1096,13 +1137,21 @@ let needSetup = false;
  * @param {number} monitorID ID of monitor to update
  * @param {number[]} notificationIDList List of new notification
  * providers to add
+ * @param {object} actor The RBAC actor performing the update (optional; when
+ * given, each linked notification is validated to belong to the actor's team
+ * before being linked -- a no-op while enforcement is OFF). Closes the
+ * cross-tenant hole where a client could link a monitor to a notification it
+ * does not own (ADR-0010 §4.4).
  * @returns {Promise<void>}
  */
-async function updateMonitorNotification(monitorID, notificationIDList) {
+async function updateMonitorNotification(monitorID, notificationIDList, actor) {
     await R.exec("DELETE FROM monitor_notification WHERE monitor_id = ? ", [monitorID]);
 
     for (let notificationID in notificationIDList) {
         if (notificationIDList[notificationID]) {
+            if (actor) {
+                await requireResource(actor, "notification:read", "notification", notificationID, teamIdLoader);
+            }
             let relation = R.dispense("monitor_notification");
             relation.monitor_id = monitorID;
             relation.notification_id = notificationID;
@@ -1135,7 +1184,29 @@ async function checkOwner(userID, monitorID) {
  */
 async function afterLogin(socket, user) {
     socket.userID = user.id;
-    socket.join(user.id);
+
+    // Dark-launch (ADR-0010 P2): attach the RBAC actor + permission payload.
+    // Must never break login while enforcement is OFF.
+    try {
+        const { buildActorForUser, buildPermissionPayload } = require("./security/actor-repository");
+        socket.actor = await buildActorForUser(user);
+        socket.permissionPayload = await buildPermissionPayload(user, socket.actor);
+    } catch (e) {
+        // Fall back to a minimal actor carrying the correct userId (never null)
+        // so scopeFilter()'s OFF-path -- which reads actor.userId directly,
+        // matching legacy "WHERE user_id = ?" queries -- keeps working exactly
+        // as before. Empty memberships also make this actor fail closed (deny
+        // everything) if enforcement is ever ON, the safe default for an error.
+        const { buildActor } = require("./security/authz");
+        socket.actor = buildActor({ userId: user.id, isSuperadmin: false }, []);
+        socket.permissionPayload = null;
+        log.warn("auth", "RBAC actor build skipped (dark-launch): " + e.message);
+    }
+
+    // ADR-0010 P4: join the room AFTER the actor is resolved, since roomFor()
+    // needs socket.actor.activeTeamId to route correctly once enforcement is ON.
+    const { roomFor } = require("./security/rooms");
+    socket.join(roomFor(user.id, socket.actor.activeTeamId));
 
     let monitorList = await server.sendMonitorList(socket);
     await Promise.allSettled([

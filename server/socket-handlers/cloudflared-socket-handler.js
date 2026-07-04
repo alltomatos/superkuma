@@ -4,6 +4,7 @@ const { SuperKumaServer } = require("../superkuma-server");
 const { log } = require("../../src/util");
 const { z } = require("zod");
 const { validate } = require("../validation");
+const { roomFor } = require("../security/rooms");
 const io = SuperKumaServer.getInstance().io;
 
 const prefix = "cloudflared_";
@@ -46,9 +47,10 @@ module.exports.cloudflaredSocketHandler = (socket) => {
         try {
             checkLogin(socket);
             socket.join("cloudflared");
-            io.to(socket.userID).emit(prefix + "installed", cloudflared.checkInstalled());
-            io.to(socket.userID).emit(prefix + "running", cloudflared.running);
-            io.to(socket.userID).emit(prefix + "token", await setting("cloudflaredTunnelToken"));
+            const room = roomFor(socket.userID, socket.actor && socket.actor.activeTeamId);
+            io.to(room).emit(prefix + "installed", cloudflared.checkInstalled());
+            io.to(room).emit(prefix + "running", cloudflared.running);
+            io.to(room).emit(prefix + "token", await setting("cloudflaredTunnelToken"));
         } catch (error) {
             log.error("cloudflared", "Error in join handler: " + error.message);
         }

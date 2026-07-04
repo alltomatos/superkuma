@@ -6,9 +6,36 @@ const Database = require("../database");
 const apicache = require("../modules/apicache");
 const { z } = require("zod");
 const { validate } = require("../validation");
+const { requireResource } = require("../security/authz");
+const { teamIdLoader } = require("../security/team-id-loaders");
 
 const monitorTagIDSchema = z.number().int().positive();
 const monitorTagValueSchema = z.string().max(500).nullish();
+
+/**
+ * Authorize the cross-resource ids a client-supplied monitor payload may
+ * reference (ADR-0010 §4.4). Each field is resolved against its own resource
+ * type via requireResource, which is a no-op while enforcement is OFF. Only
+ * fields present and non-null/undefined on the payload are checked.
+ * @param {object} actor The acting actor (socket.actor).
+ * @param {object} monitor The client-supplied monitor payload.
+ * @returns {Promise<void>}
+ * @throws {ForbiddenError} If the actor may not read one of the linked resources.
+ */
+async function validateMonitorLinkedResources(actor, monitor) {
+    if (monitor.docker_host !== undefined && monitor.docker_host !== null) {
+        await requireResource(actor, "docker_host:read", "docker_host", monitor.docker_host, teamIdLoader);
+    }
+    if (monitor.proxyId !== undefined && monitor.proxyId !== null) {
+        await requireResource(actor, "proxy:read", "proxy", monitor.proxyId, teamIdLoader);
+    }
+    if (monitor.remote_browser !== undefined && monitor.remote_browser !== null) {
+        await requireResource(actor, "remote_browser:read", "remote_browser", monitor.remote_browser, teamIdLoader);
+    }
+    if (monitor.parent !== undefined && monitor.parent !== null) {
+        await requireResource(actor, "monitor:read", "monitor", monitor.parent, teamIdLoader);
+    }
+}
 
 /**
  * Handlers for monitor CRUD/control and tags
@@ -28,6 +55,7 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
     socket.on("add", async (monitor, callback) => {
         try {
             checkLogin(socket);
+            await validateMonitorLinkedResources(socket.actor, monitor);
             let bean = R.dispense("monitor");
 
             let notificationIDList = monitor.notificationIDList;
@@ -110,6 +138,8 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
             if (bean.user_id !== socket.userID) {
                 throw new Error("Permission denied.");
             }
+
+            await validateMonitorLinkedResources(socket.actor, monitor);
 
             // Check if Parent is Descendant (would cause endless loop)
             if (monitor.parent !== null) {
@@ -292,6 +322,7 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
     socket.on("getMonitor", async (monitorID, callback) => {
         try {
             checkLogin(socket);
+            await requireResource(socket.actor, "monitor:read", "monitor", monitorID, teamIdLoader);
 
             log.info("monitor", `Get Monitor: ${monitorID} User ID: ${socket.userID}`);
 
@@ -334,6 +365,7 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
     socket.on("getMonitorBeats", async (monitorID, period, callback) => {
         try {
             checkLogin(socket);
+            await requireResource(socket.actor, "monitor:read", "monitor", monitorID, teamIdLoader);
 
             log.info("monitor", `Get Monitor Beats: ${monitorID} User ID: ${socket.userID}`);
 
@@ -414,6 +446,7 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
             }
 
             checkLogin(socket);
+            await requireResource(socket.actor, "monitor:delete", "monitor", monitorID, teamIdLoader);
 
             const startTime = Date.now();
 
@@ -537,6 +570,7 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
     socket.on("editTag", async (tag, callback) => {
         try {
             checkLogin(socket);
+            await requireResource(socket.actor, "tag:manage", "tag", tag.id, teamIdLoader);
 
             let bean = await R.findOne("tag", " id = ? ", [tag.id]);
             if (bean == null) {
@@ -568,6 +602,7 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
     socket.on("deleteTag", async (tagID, callback) => {
         try {
             checkLogin(socket);
+            await requireResource(socket.actor, "tag:manage", "tag", tagID, teamIdLoader);
 
             await R.exec("DELETE FROM tag WHERE id = ? ", [tagID]);
 
@@ -587,6 +622,7 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
     socket.on("addMonitorTag", async (tagID, monitorID, value, callback) => {
         try {
             checkLogin(socket);
+            await requireResource(socket.actor, "monitor:update", "monitor", monitorID, teamIdLoader);
             tagID = validate(monitorTagIDSchema, tagID);
             monitorID = validate(monitorTagIDSchema, monitorID);
             value = validate(monitorTagValueSchema, value);
@@ -615,6 +651,7 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
     socket.on("editMonitorTag", async (tagID, monitorID, value, callback) => {
         try {
             checkLogin(socket);
+            await requireResource(socket.actor, "monitor:update", "monitor", monitorID, teamIdLoader);
             tagID = validate(monitorTagIDSchema, tagID);
             monitorID = validate(monitorTagIDSchema, monitorID);
             value = validate(monitorTagValueSchema, value);
@@ -643,6 +680,7 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
     socket.on("deleteMonitorTag", async (tagID, monitorID, value, callback) => {
         try {
             checkLogin(socket);
+            await requireResource(socket.actor, "monitor:update", "monitor", monitorID, teamIdLoader);
             tagID = validate(monitorTagIDSchema, tagID);
             monitorID = validate(monitorTagIDSchema, monitorID);
             value = validate(monitorTagValueSchema, value);

@@ -6,6 +6,8 @@ const { debug } = require("../src/util");
 const { SuperKumaServer } = require("./superkuma-server");
 const { CookieJar } = require("tough-cookie");
 const { createCookieAgent } = require("http-cookie-agent/http");
+const { requireResource } = require("./security/authz");
+const { teamIdLoader } = require("./security/team-id-loaders");
 
 class Proxy {
     static SUPPORTED_PROXY_PROTOCOLS = ["http", "https", "socks", "socks5", "socks5h", "socks4"];
@@ -15,12 +17,15 @@ class Proxy {
      * @param {object} proxy Proxy to store
      * @param {number} proxyID ID of proxy to update
      * @param {number} userID ID of user the proxy belongs to
+     * @param {import("./security/authz").Actor} actor RBAC actor performing the action (dark-launch; no-op while enforcement is off)
      * @returns {Promise<Bean>} Updated proxy
      */
-    static async save(proxy, proxyID, userID) {
+    static async save(proxy, proxyID, userID, actor) {
         let bean;
 
         if (proxyID) {
+            await requireResource(actor, "proxy:manage", "proxy", proxyID, teamIdLoader);
+
             bean = await R.findOne("proxy", " id = ? AND user_id = ? ", [proxyID, userID]);
 
             if (!bean) {
@@ -65,9 +70,14 @@ class Proxy {
      * Deletes proxy with given id and removes it from monitors
      * @param {number} proxyID ID of proxy to delete
      * @param {number} userID ID of proxy owner
+     * @param {import("./security/authz").Actor} actor RBAC actor performing the action (dark-launch; no-op while enforcement is off)
      * @returns {Promise<void>}
      */
-    static async delete(proxyID, userID) {
+    static async delete(proxyID, userID, actor) {
+        if (proxyID) {
+            await requireResource(actor, "proxy:manage", "proxy", proxyID, teamIdLoader);
+        }
+
         const bean = await R.findOne("proxy", " id = ? AND user_id = ? ", [proxyID, userID]);
 
         if (!bean) {

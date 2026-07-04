@@ -35,7 +35,7 @@ module.exports.proxySocketHandler = (socket) => {
             checkLogin(socket);
             proxy = validate(proxySchema, proxy);
 
-            const proxyBean = await Proxy.save(proxy, proxyID, socket.userID);
+            const proxyBean = await Proxy.save(proxy, proxyID, socket.userID, socket.actor);
             await sendProxyList(socket);
 
             if (proxy.applyExisting) {
@@ -61,7 +61,7 @@ module.exports.proxySocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
-            await Proxy.delete(proxyID, socket.userID);
+            await Proxy.delete(proxyID, socket.userID, socket.actor);
             await sendProxyList(socket);
             await Proxy.reloadProxy();
 
