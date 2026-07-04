@@ -203,3 +203,75 @@ exports.apiAuth = async function (req, res, next) {
         next();
     }
 };
+
+/**
+ * Resolve an RBAC actor for the current HTTP request and attach it as
+ * `req.actor` (ADR-0010 phase P4). Must run AFTER `apiAuth`/`basicAuth` have
+ * already authenticated the request -- it mirrors the exact same auth
+ * strategy (disableAuth / API key / basic auth) to determine WHO was just
+ * authenticated, since express-basic-auth's authorizer callback has no access
+ * to `req` to attach anything directly.
+ *
+ * Under `disableAuth`, there is no per-request credential to re-verify, so the
+ * actor is resolved deterministically from the same lowest-id active user
+ * that socket.js's own auto-login path uses (ADR-0010 R12) -- keeping
+ * `disableAuth` installs working exactly as before for anything gated by
+ * `req.actor` (e.g. the `/metrics` endpoint).
+ *
+ * Never throws: on any resolution failure, `req.actor` is left `null` so
+ * downstream gates fail closed.
+ * @param {express.Request} req Express request object
+ * @param {express.Response} res Express response object
+ * @param {express.NextFunction} next Next handler in chain
+ * @returns {Promise<void>}
+ */
+exports.attachActor = async function (req, res, next) {
+    req.actor = null;
+    try {
+        const { buildActorForUser, buildActorForApiKey } = require("./security/actor-repository");
+
+        if (await Settings.get("disableAuth")) {
+            const user = await R.findOne("user", " active = 1 ORDER BY id ASC ");
+            if (user) {
+                req.actor = await buildActorForUser(user);
+            }
+        } else if (req.auth && typeof req.auth.user === "string" && typeof req.auth.pass === "string") {
+            const usingAPIKeys = await Settings.get("apiKeysEnabled");
+            if (usingAPIKeys) {
+                const keyBean = await verifyAPIKey(req.auth.pass);
+                if (keyBean) {
+                    req.actor = await buildActorForApiKey(keyBean);
+                }
+            } else {
+                const user = await exports.login(req.auth.user, req.auth.pass);
+                if (user) {
+                    req.actor = await buildActorForUser(user);
+                }
+            }
+        }
+    } catch (e) {
+        log.warn("auth", "attachActor: failed to resolve an actor, leaving req.actor null: " + e.message);
+    }
+    next();
+};
+
+/**
+ * Reject the request unless the resolved req.actor (attached by attachActor,
+ * which must run earlier in the middleware chain) is a super admin
+ * (ADR-0010 D9 -- e.g. the /metrics endpoint, whose data is process-wide and
+ * not team-scoped).
+ * @param {express.Request} req Express request object
+ * @param {express.Response} res Express response object
+ * @param {express.NextFunction} next Next handler in chain
+ * @returns {void}
+ */
+exports.requireSuperadmin = function (req, res, next) {
+    if (req.actor && req.actor.isSuperadmin) {
+        next();
+    } else {
+        res.status(403).json({
+            ok: false,
+            msg: "Super admin required.",
+        });
+    }
+};

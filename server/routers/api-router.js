@@ -619,17 +619,29 @@ function determineStatus(status, previousHeartbeat, maxretries, isUpsideDown, be
 }
 
 /**
- * Check whether a monitor is publc
+ * Check whether a monitor is public
+ *
+ * A monitor is public only via a public group belonging to a status page
+ * OWNED BY THE SAME TEAM as the monitor itself (ADR-0010 R8). Without the
+ * status_page.team_id = monitor.team_id match, a low-privilege user could
+ * attach another team's monitor to their own public status page and leak its
+ * uptime/ping/cert data via /api/badge. For any install with a single team
+ * (every install today, since there is no UI yet to create a second team)
+ * this join is always satisfied and the check is behaviourally unchanged.
  * @param {number} monitorID - Monitor id
  * @returns {Promise<boolean>} true if the monitor is public, otherwise false
  */
 async function isMonitorPublic(monitorID) {
     let publicMonitor = await R.getRow(
         `
-            SELECT monitor_group.monitor_id FROM monitor_group, \`group\`
-            WHERE monitor_group.group_id = \`group\`.id
-            AND monitor_group.monitor_id = ?
-            AND public = 1
+            SELECT monitor_group.monitor_id
+            FROM monitor_group
+            JOIN \`group\` ON monitor_group.group_id = \`group\`.id
+            JOIN status_page ON \`group\`.status_page_id = status_page.id
+            JOIN monitor ON monitor.id = monitor_group.monitor_id
+            WHERE monitor_group.monitor_id = ?
+            AND \`group\`.public = 1
+            AND status_page.team_id = monitor.team_id
         `,
         [monitorID]
     );

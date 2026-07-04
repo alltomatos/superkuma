@@ -149,7 +149,7 @@ log.debug("server", "Importing Background Jobs");
 const { initBackgroundJobs, stopBackgroundJobs } = require("./jobs");
 const { loginRateLimiter, twoFaRateLimiter } = require("./rate-limiter");
 
-const { apiAuth } = require("./auth");
+const { apiAuth, attachActor, requireSuperadmin } = require("./auth");
 const { login } = require("./auth");
 const passwordHash = require("./password-hash");
 
@@ -356,7 +356,12 @@ let needSetup = false;
 
     // Prometheus API metrics  /metrics
     // With Basic Auth using the first user's username/password
-    app.get("/metrics", apiAuth, prometheusAPIMetrics());
+    // ADR-0010 D9: gated to super admins only. Metrics are process-wide
+    // singletons (not team-scoped), so any authenticated user seeing them
+    // would see every team's data -- until a per-team metrics registry
+    // exists, restrict to the one role that is already meant to see
+    // everything.
+    app.get("/metrics", apiAuth, attachActor, requireSuperadmin, prometheusAPIMetrics());
 
     app.use(
         "/",
