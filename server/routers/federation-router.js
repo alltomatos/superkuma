@@ -77,6 +77,10 @@ async function findOrCreateMirroredMonitor(remoteInstance, agentMonitorId, name)
     bean.remote_instance_id = remoteInstance.id;
     bean.remote_monitor_id = agentMonitorId;
     bean.user_id = remoteInstance.user_id;
+    // ADR-0010 R7: without this, every mirrored monitor is born with
+    // team_id=NULL -- a cross-tenant-invisible orphan created on every single
+    // heartbeat from every agent, not just at migration time.
+    bean.team_id = remoteInstance.team_id;
     bean.active = true;
     bean.interval = DEFAULT_INTERVAL;
     bean.retryInterval = DEFAULT_RETRY_INTERVAL;

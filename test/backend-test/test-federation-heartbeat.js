@@ -29,12 +29,14 @@ const testDb = new TestDB("./data/test-federation-heartbeat");
  * so socket handler logic can be invoked directly, without a real socket.io
  * connection.
  * @param {number} userID Fake logged-in user id to attach to the mock socket
- * @returns {{userID: number, on: Function, trigger: Function}} Mock socket
+ * @param {object} actor Optional RBAC actor to attach as socket.actor
+ * @returns {{userID: number, actor: object|undefined, on: Function, trigger: Function}} Mock socket
  */
-function createMockSocket(userID) {
+function createMockSocket(userID, actor) {
     const handlers = {};
     return {
         userID,
+        actor,
         on(event, handler) {
             handlers[event] = handler;
         },
@@ -62,10 +64,11 @@ function createMockSocket(userID) {
  * @param {number} userID User id to register the instance under
  * @param {string} instanceId Agent-chosen unique instance identifier
  * @param {string} name Human-readable instance name
+ * @param {object} actor Optional RBAC actor to attach to the registering socket
  * @returns {Promise<{token: string, remoteInstanceID: number}>} Registration result
  */
-async function registerRemoteInstance(userID, instanceId, name) {
-    const socket = createMockSocket(userID);
+async function registerRemoteInstance(userID, instanceId, name, actor) {
+    const socket = createMockSocket(userID, actor);
     remoteInstanceSocketHandler(socket);
 
     const result = await socket.trigger("addRemoteInstance", {
@@ -413,7 +416,13 @@ describe("Federation Heartbeat (F1)", () => {
     test("getRemoteInstanceList returns instances for the user without leaking token_hash", async () => {
         await registerRemoteInstance(userID, "instance-list", "Agent List");
 
-        const socket = createMockSocket(userID);
+        // In production socket.actor is never bare undefined -- afterLogin
+        // always attaches at least a minimal actor (ADR-0010 P3 fix), even on
+        // an actor-build error. A memberships-less actor still carries the
+        // correct userId, which is all scopeFilter's OFF-path needs to match
+        // the legacy "WHERE user_id = ?" behaviour.
+        const { buildActor } = require("../../server/security/authz");
+        const socket = createMockSocket(userID, buildActor({ userId: userID, isSuperadmin: false }, []));
         remoteInstanceSocketHandler(socket);
 
         const result = await socket.trigger("getRemoteInstanceList");
@@ -461,5 +470,101 @@ describe("Federation Heartbeat (F1)", () => {
         const monitorAfter = await R.findOne("monitor", " id = ? ", [monitorId]);
         assert.ok(monitorAfter, "mirrored monitor row should survive");
         assert.strictEqual(monitorAfter.remote_instance_id, null, "remote_instance_id should be reset to NULL");
+    });
+
+    // -------------------------------------------------------------------
+    // ADR-0010 R7: a remote_instance (and every monitor it later mirrors)
+    // must inherit the registering actor's team_id, not be born as a
+    // cross-tenant-invisible orphan (team_id=NULL).
+    // -------------------------------------------------------------------
+    describe("R7: remote_instance and mirrored monitors inherit team_id", () => {
+        let teamId;
+        let teamActor;
+
+        before(async () => {
+            const { buildActor } = require("../../server/security/authz");
+
+            const teamBean = R.dispense("team");
+            teamBean.name = "Federation Team";
+            teamBean.slug = "federation-r7-team";
+            teamBean.is_system = false;
+            teamBean.active = true;
+            teamId = await R.store(teamBean);
+
+            const ownerRole = await R.knex("role").whereNull("team_id").andWhere("slug", "owner").first();
+            const membershipBean = R.dispense("team_user");
+            membershipBean.team_id = teamId;
+            membershipBean.user_id = userID;
+            membershipBean.role_id = ownerRole.id;
+            await R.store(membershipBean);
+
+            teamActor = buildActor({ userId: userID, isSuperadmin: false }, [{ teamId, roleSlug: "owner" }], teamId);
+        });
+
+        test("addRemoteInstance sets team_id from the registering actor's activeTeamId", async () => {
+            const { remoteInstanceID } = await registerRemoteInstance(
+                userID,
+                "instance-r7-team",
+                "Agent R7",
+                teamActor
+            );
+
+            const remoteInstance = await R.findOne("remote_instance", " id = ? ", [remoteInstanceID]);
+            assert.strictEqual(remoteInstance.team_id, teamId);
+        });
+
+        test("addRemoteInstance leaves team_id null when no actor is attached (defensive, not a crash)", async () => {
+            const { remoteInstanceID } = await registerRemoteInstance(
+                userID,
+                "instance-r7-no-actor",
+                "Agent R7 No Actor"
+            );
+
+            const remoteInstance = await R.findOne("remote_instance", " id = ? ", [remoteInstanceID]);
+            assert.strictEqual(remoteInstance.team_id, null);
+        });
+
+        test("a heartbeat's mirrored monitor inherits the remote_instance's team_id (not NULL)", async () => {
+            const { token } = await registerRemoteInstance(userID, "instance-r7-heartbeat", "Agent R7 HB", teamActor);
+
+            const { status, body } = await postJson(
+                port,
+                "/api/federation/heartbeat",
+                {
+                    agentMonitorId: "monitor-r7",
+                    name: "R7 Service",
+                    type: "http",
+                    status: "up",
+                    msg: "OK",
+                    ping: 10,
+                },
+                { Authorization: `Bearer ${token}` }
+            );
+            assert.strictEqual(status, 200);
+            assert.strictEqual(body.ok, true);
+
+            const remoteInstance = await R.findOne("remote_instance", " instance_id = ? ", ["instance-r7-heartbeat"]);
+            const monitor = await R.findOne("monitor", " remote_instance_id = ? AND remote_monitor_id = ? ", [
+                remoteInstance.id,
+                "monitor-r7",
+            ]);
+
+            assert.ok(monitor, "mirrored monitor should have been created");
+            assert.strictEqual(monitor.team_id, teamId, "mirrored monitor must inherit the remote_instance's team_id");
+            assert.notStrictEqual(monitor.team_id, null, "mirrored monitor must never be a team_id=NULL orphan");
+        });
+
+        test("getRemoteInstanceList (scopeFilter, enforcement OFF) still returns the legacy user_id-scoped list", async () => {
+            const socket = createMockSocket(userID, teamActor);
+            remoteInstanceSocketHandler(socket);
+
+            const result = await socket.trigger("getRemoteInstanceList");
+            assert.strictEqual(result.ok, true);
+            const instanceIds = result.remoteInstanceList.map((r) => r.instanceId);
+            assert.ok(
+                instanceIds.includes("instance-r7-team"),
+                "scopeFilter's OFF-path must match the legacy user_id filter"
+            );
+        });
     });
 });
