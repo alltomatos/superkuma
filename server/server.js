@@ -830,11 +830,30 @@ let needSetup = false;
                     server.disconnectAllSocketClients(socket.userID, socket.id);
                 }
 
+                // ADR-0010 P4: refuse to enable RBAC enforcement if no active
+                // superadmin exists -- otherwise nobody could act with global
+                // admin authority once the dark-launch bypass is turned off.
+                if (data.rbacEnforced) {
+                    const { hasActiveSuperadmin } = require("./security/actor-repository");
+                    if (!(await hasActiveSuperadmin())) {
+                        throw new Error("Cannot enable RBAC enforcement: no active superadmin exists.");
+                    }
+                }
+
                 const previousChromeExecutable = await Settings.get("chromeExecutable");
                 const previousNSCDStatus = await Settings.get("nscd");
 
                 await setSettings("general", data);
                 server.entryPage = data.entryPage;
+
+                // ADR-0010 P4: apply the enforcement flag immediately, like the
+                // other settings below. Only when the field is actually present
+                // in the payload -- forms that don't know about this key yet
+                // must not silently reset an already-enabled flag back to OFF.
+                if (Object.prototype.hasOwnProperty.call(data, "rbacEnforced")) {
+                    const { setEnforcementEnabled } = require("./security/authz");
+                    setEnforcementEnabled(data.rbacEnforced);
+                }
 
                 // Also need to apply timezone globally
                 if (data.serverTimezone) {

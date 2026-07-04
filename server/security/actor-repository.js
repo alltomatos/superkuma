@@ -122,8 +122,20 @@ async function buildPermissionPayload(user, actor) {
     };
 }
 
+/**
+ * Whether at least one active superadmin exists. Guards against enabling RBAC
+ * enforcement (or any future user-deactivation/role-change mutation) in a
+ * state that would leave the system with no way to grant global admin access.
+ * @returns {Promise<boolean>} True if at least one active superadmin exists.
+ */
+async function hasActiveSuperadmin() {
+    const count = await R.count("user", "is_superadmin = 1 AND active = 1");
+    return count > 0;
+}
+
 module.exports = {
     buildActorForUser,
     buildActorForApiKey,
     buildPermissionPayload,
+    hasActiveSuperadmin,
 };
