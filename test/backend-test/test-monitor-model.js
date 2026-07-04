@@ -294,6 +294,46 @@ describe("Monitor model - characterization", () => {
             assert.strictEqual(json.ignoreTls, false);
         });
 
+        test("remoteInstanceId: exposes the raw remote_instance_id column value, or null when unset (F3 federation slice, see ADR-0008)", async () => {
+            const localMonitor = await createMonitor({
+                type: "http",
+                name: "local monitor",
+                url: "https://example.com",
+            });
+
+            const preloadDataLocal = await Monitor.preparePreloadData([localMonitor]);
+            const jsonLocal = localMonitor.toJSON(preloadDataLocal, true);
+
+            // NULL remote_instance_id -> exposed as null, not omitted and not undefined.
+            assert.strictEqual("remoteInstanceId" in jsonLocal, true);
+            assert.strictEqual(jsonLocal.remoteInstanceId, null);
+            assert.notStrictEqual(jsonLocal.remoteInstanceId, undefined);
+
+            const remoteInstance = R.dispense("remote_instance");
+            remoteInstance.import({
+                instance_id: "agent-1",
+                name: "Agent One",
+                token_hash: "hash",
+                active: true,
+            });
+            await R.store(remoteInstance);
+
+            const federatedMonitor = await createMonitor({
+                type: "push",
+                name: "federated monitor",
+                remote_instance_id: remoteInstance.id,
+            });
+
+            const preloadDataFederated = await Monitor.preparePreloadData([federatedMonitor]);
+            const jsonFederated = federatedMonitor.toJSON(preloadDataFederated, true);
+
+            // Raw passthrough of the FK column value - no join/resolve of the remote
+            // instance's name (that lookup happens client-side); the monitor's own
+            // "name" field is unaffected by federation.
+            assert.strictEqual(jsonFederated.remoteInstanceId, remoteInstance.id);
+            assert.strictEqual(jsonFederated.name, "federated monitor");
+        });
+
         test("preloadData-derived fields (path, childrenIDs, active, tags, notificationIDList, maintenance) reflect real DB lookups", async () => {
             const monitor = await createMonitor({
                 type: "http",

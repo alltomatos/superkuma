@@ -74,6 +74,10 @@ class Monitor extends BeanModel {
      * @returns {Promise<object>} Object ready to parse
      */
     async toPublicJSON(showTags = false, certExpiry = false) {
+        // Federation (F3): intentionally NOT exposing remoteInstanceId here.
+        // toPublicJSON() is served to anonymous visitors on public status pages;
+        // which internal Master/Agent instance is monitoring a client's service is
+        // operational topology, not something that needs to be public. See ADR-0008.
         let obj = {
             id: this.id,
             name: this.name,
@@ -157,6 +161,10 @@ class Monitor extends BeanModel {
             docker_container: this.docker_container,
             docker_host: this.docker_host,
             proxyId: this.proxy_id,
+            // Federation (F3): raw FK passthrough only, no join/resolve here to avoid
+            // N+1 queries. The frontend resolves the remote instance's name locally
+            // from its own already-loaded remote-instance list. See ADR-0008.
+            remoteInstanceId: this.remote_instance_id,
             notificationIDList: preloadData.notifications.get(this.id) || {},
             tags: preloadData.tags.get(this.id) || [],
             maintenance: preloadData.maintenanceStatus.get(this.id),
