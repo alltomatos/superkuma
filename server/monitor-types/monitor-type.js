@@ -27,7 +27,7 @@ class MonitorType {
      * Failure cases: Throw an error with a descriptive message.
      * @param {Monitor} monitor Monitor to check
      * @param {Heartbeat} heartbeat Monitor heartbeat to update
-     * @param {SuperKumaServer} server Uptime Kuma server
+     * @param {SuperKumaServer} server SuperKuma server
      * @returns {Promise<void>}
      */
     async check(monitor, heartbeat, server) {
