@@ -27,6 +27,8 @@
 | 7 | `GAP-007` | Higiene | P4 | Backend sem tipos (só JSDoc); 108 patches SQL legados; CLAUDE/AGENTS haviam sido esvaziados | T1 | 🟢 partial |
 | 8 | `GAP-008` | Segurança | P1-low | timing-enum no login; `verifyAPIKey` sem `user_id`; `setup` sem rate-limit | T2 | 🟡 queued |
 | 9 | `GAP-009` | Testes | P4 | E2E não cobre `maxRedirects` nem inversão de keyword-match no monitor HTTP | T2 | ✅ closed — `test-http.js` (10 testes), 2 mutation-checks independentes confirmaram detecção real. commit 57fcff7a |
+| 10 | `GAP-010` | Testes | P4 | Teste "partial config" do `agent-forwarder.js` só afirma "nenhum monitor criado", não "nenhuma chamada de rede feita" — mutation independente do verificador provou que o código real está correto, mas o teste não afirma isso diretamente (a request malformada é rejeitada 401 rio abaixo, mascarando o gap) | T1 | 🟡 queued |
+| 11 | `GAP-011` | Robustez | P4 | Schema zod de `federation-router.js`: campo `msg` é `.optional().default("")` sem `.nullable()` — se `bean.msg` for `null` (não `undefined`) num tipo de monitor, aquele heartbeat específico é descartado silenciosamente (rejeitado 400, logado, sem crash) | T2 | 🟡 queued |
 
 ---
 
@@ -199,7 +201,8 @@
   ref: ADR-0008
   risco: T2
   depends_on: [TASK-F1]
-  status: in_progress   # Workflow wf_ef0a78ec-1f2
+  status: done   # monitor.js: só 5 inserções (1 require + 1 chamada). Resiliência cronometrada empiricamente pelo verificador (10017ms contra endereço black-holed, bate com timeout de 10000ms). 7 testes novos (286/286 total), 26/26 e2e. commit 5d6cdecb
+  concluido_em: "2026-07-03"
 
 - id: TASK-F3
   desc: "F3 UI unificada: badge de instância + agrupamento no dashboard + página de config (Federação)"
@@ -267,6 +270,7 @@
 | 11 | 2026-07-03 | — | Fix cosmético: comentário desatualizado em http.js ("bean.ping"→"heartbeat.ping"), achado pelo verificador do TASK-120 | T1 trivial |
 | 12 | 2026-07-03 | ADR-0008 | TASK-F1: registro remote_instance + POST /api/federation/heartbeat + upsert idempotente (type=push) | Sobreviveu a interferência de agente zumbi (ver seção "Incidente" acima). 9 testes, 2 mutation-checks independentes. commit 2e99ae72 |
 | 13 | 2026-07-03 | ADR-0009 | TASK-M1: tier stat_monthly (bucket calendar-aware) + retenção em camadas | Truncagem de mês verificada por script Python fora do toolchain. 279/279 backend final. commit 18b63a41 |
+| 14 | 2026-07-03 | ADR-0008 | TASK-F2: agent-forwarder.js resiliente + 1 hook em monitor.js (5 inserções) | Verificador cronometrou empiricamente o timeout (10017ms vs 10000ms configurado) contra endereço black-holed. 286/286 backend + 26/26 e2e. Achou GAP-010/011 (menores, não bloqueantes). commit 5d6cdecb |
 | 12 | 2026-07-03 | GAP-009 | TASK-020 fase 1: `test-http.js` (10 testes) fecha GAP-009 | maxRedirects + keyword-inversion cobertos, 2 mutation-checks independentes confirmaram detecção. commit 57fcff7a |
 | 13 | 2026-07-03 | GAP-006 | TASK-020 fase 2: 64 testes novos p/ submódulos util-server(tls,misc)/database sem cobertura direta | Suíte não-Docker 194→259. mutation-check independente (checkStatusCode) confirmou. commit 8ac0ea1e |
 | 14 | 2026-07-03 | GAP-004 | TASK-030 fase 1: zod + validação keyID/tagID/monitorID/period/slug | Testes de rejeição (payload malformado) e aceitação (payload real da UI) independentes. commit 67d7e6d7 |
