@@ -166,10 +166,114 @@ describe("Uptime Calculator", () => {
         assert.strictEqual(dailyKey, dayjs.utc("2023-12-22").unix());
     });
 
+    test("getMonthlyKey() returns correct timestamp for start of calendar month (not fixed-interval truncation)", () => {
+        // 31-day month (July 2023): any timestamp within it must round down to 2023-07-01 00:00:00 UTC
+        let c2 = new UptimeCalculator();
+        let monthlyKeyResult = c2.getMonthlyKey(dayjs.utc("2023-07-15 12:34:56"));
+        assert.strictEqual(monthlyKeyResult, dayjs.utc("2023-07-01T00:00:00.000Z").unix());
+
+        // Edge case: last second of the 31-day month must still round down to that month's start
+        c2 = new UptimeCalculator();
+        monthlyKeyResult = c2.getMonthlyKey(dayjs.utc("2023-07-31 23:59:59"));
+        assert.strictEqual(monthlyKeyResult, dayjs.utc("2023-07-01T00:00:00.000Z").unix());
+
+        // Edge case: first second of the month
+        c2 = new UptimeCalculator();
+        monthlyKeyResult = c2.getMonthlyKey(dayjs.utc("2023-07-01 00:00:00"));
+        assert.strictEqual(monthlyKeyResult, dayjs.utc("2023-07-01T00:00:00.000Z").unix());
+
+        // February (28-day, non-leap year 2023): must round down to 2023-02-01, not drift due to
+        // shorter month length. This is the case that a fixed-seconds-per-bucket implementation
+        // (incorrectly copy-pasted from day/hour/minute) would get wrong.
+        c2 = new UptimeCalculator();
+        monthlyKeyResult = c2.getMonthlyKey(dayjs.utc("2023-02-27 05:00:00"));
+        assert.strictEqual(monthlyKeyResult, dayjs.utc("2023-02-01T00:00:00.000Z").unix());
+
+        // February (29-day, leap year 2024): must round down to 2024-02-01
+        c2 = new UptimeCalculator();
+        monthlyKeyResult = c2.getMonthlyKey(dayjs.utc("2024-02-29 23:59:59"));
+        assert.strictEqual(monthlyKeyResult, dayjs.utc("2024-02-01T00:00:00.000Z").unix());
+
+        // Boundary: the instant a new month starts must produce a DIFFERENT key than the previous month
+        c2 = new UptimeCalculator();
+        let julyKey = c2.getMonthlyKey(dayjs.utc("2023-07-31 23:59:59"));
+        let augustKey = c2.getMonthlyKey(dayjs.utc("2023-08-01 00:00:00"));
+        assert.notStrictEqual(julyKey, augustKey);
+        assert.strictEqual(augustKey, dayjs.utc("2023-08-01T00:00:00.000Z").unix());
+
+        // Test timezone (mirrors the daily-key timezone test): local time is 2023-12-23 in
+        // GMT+0800, which is still 2023-12-22 in UTC, so the monthly key must be December 2023,
+        // not shifted to a different month by local-time truncation.
+        c2 = new UptimeCalculator();
+        monthlyKeyResult = c2.getMonthlyKey(dayjs("Sat Dec 23 2023 05:38:39 GMT+0800 (Hong Kong Standard Time)"));
+        assert.strictEqual(monthlyKeyResult, dayjs.utc("2023-12-01T00:00:00.000Z").unix());
+    });
+
     test("lastDailyUptimeData tracks UP status correctly", async () => {
         let c2 = new UptimeCalculator();
         await c2.update(UP);
         assert.strictEqual(c2.lastDailyUptimeData.up, 1);
+    });
+
+    test("update() aggregates up/down/ping into stat_monthly bucket the same way as daily/hourly", async () => {
+        UptimeCalculator.currentDate = dayjs.utc("2023-07-12 20:46:59");
+
+        let c2 = new UptimeCalculator();
+
+        // 1 Up
+        await c2.update(UP, 100);
+        assert.strictEqual(c2.lastMonthlyUptimeData.up, 1);
+        assert.strictEqual(c2.lastMonthlyUptimeData.down, 0);
+        assert.strictEqual(c2.lastMonthlyUptimeData.avgPing, 100);
+        assert.strictEqual(c2.lastMonthlyUptimeData.minPing, 100);
+        assert.strictEqual(c2.lastMonthlyUptimeData.maxPing, 100);
+
+        // 2nd Up, averages the ping like daily/hourly does
+        await c2.update(UP, 200);
+        assert.strictEqual(c2.lastMonthlyUptimeData.up, 2);
+        assert.strictEqual(c2.lastMonthlyUptimeData.avgPing, 150);
+        assert.strictEqual(c2.lastMonthlyUptimeData.minPing, 100);
+        assert.strictEqual(c2.lastMonthlyUptimeData.maxPing, 200);
+
+        // Down does not touch ping stats
+        await c2.update(DOWN);
+        assert.strictEqual(c2.lastMonthlyUptimeData.up, 2);
+        assert.strictEqual(c2.lastMonthlyUptimeData.down, 1);
+        assert.strictEqual(c2.lastMonthlyUptimeData.avgPing, 150);
+
+        // Both heartbeats landed in the same monthly bucket (July 2023)
+        assert.strictEqual(c2.monthlyUptimeDataList.length(), 1);
+        let monthlyKeyValue = c2.getMonthlyKey(dayjs.utc("2023-07-12 20:46:59"));
+        assert.strictEqual(monthlyKeyValue, dayjs.utc("2023-07-01T00:00:00.000Z").unix());
+        assert.strictEqual(c2.monthlyUptimeDataList[monthlyKeyValue].up, 2);
+        assert.strictEqual(c2.monthlyUptimeDataList[monthlyKeyValue].down, 1);
+    });
+
+    test("heartbeats in two different calendar months land in two different stat_monthly buckets", async () => {
+        let c2 = new UptimeCalculator();
+
+        // Heartbeat late in July 2023
+        UptimeCalculator.currentDate = dayjs.utc("2023-07-31 23:59:59");
+        await c2.update(UP, 50);
+        let julyKey = c2.getMonthlyKey(UptimeCalculator.currentDate);
+
+        // Heartbeat early in August 2023 (the very next calendar month)
+        UptimeCalculator.currentDate = dayjs.utc("2023-08-01 00:00:01");
+        await c2.update(UP, 150);
+        let augustKey = c2.getMonthlyKey(UptimeCalculator.currentDate);
+
+        // Must be two distinct buckets, not the same one
+        assert.notStrictEqual(julyKey, augustKey);
+        assert.strictEqual(c2.monthlyUptimeDataList.length(), 2);
+
+        assert.strictEqual(c2.monthlyUptimeDataList[julyKey].up, 1);
+        assert.strictEqual(c2.monthlyUptimeDataList[julyKey].avgPing, 50);
+
+        assert.strictEqual(c2.monthlyUptimeDataList[augustKey].up, 1);
+        assert.strictEqual(c2.monthlyUptimeDataList[augustKey].avgPing, 150);
+
+        // The most recent update's bucket should be the last tracked one
+        assert.strictEqual(c2.lastMonthlyUptimeData, c2.monthlyUptimeDataList[augustKey]);
     });
 
     test("get24Hour() calculates uptime and average ping correctly", async () => {

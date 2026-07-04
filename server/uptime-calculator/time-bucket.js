@@ -40,6 +40,22 @@ function dailyKey(date) {
 }
 
 /**
+ * Truncate a date to the start of its calendar month (UTC) and return the unix timestamp (seconds).
+ *
+ * IMPORTANT: Months have variable length (28-31 days), so this MUST use calendar-aware month
+ * truncation (dayjs' startOf("month")), NOT a fixed-seconds-per-bucket division like the other
+ * tiers use. Truncating months via a fixed multiple of seconds (e.g. assuming 30 days) will
+ * silently drift away from real calendar month boundaries.
+ * @param {import("dayjs").Dayjs} date The heartbeat date
+ * @returns {number} Timestamp in seconds
+ */
+function monthlyKey(date) {
+    // Truncate value to start of month (e.g. 2021-01-15 12:34:56 -> 2021-01-01 00:00:00)
+    // Considering if the user keep changing could affect the calculation, so use UTC time to avoid this problem.
+    return date.utc().startOf("month").unix();
+}
+
+/**
  * Get the number of seconds spanned by a single bucket of the given type.
  * @param {"day" | "hour" | "minute"} type the type of data which is expected to be returned
  * @returns {number} Number of seconds per bucket
@@ -57,5 +73,6 @@ module.exports = {
     minutelyKey,
     hourlyKey,
     dailyKey,
+    monthlyKey,
     secondsPerBucket,
 };

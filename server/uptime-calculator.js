@@ -3,7 +3,7 @@ const { UP, MAINTENANCE, DOWN, PENDING } = require("../src/util");
 const { LimitQueue } = require("./utils/limit-queue");
 const { log } = require("../src/util");
 const { R } = require("redbean-node");
-const { minutelyKey, hourlyKey, dailyKey, secondsPerBucket } = require("./uptime-calculator/time-bucket");
+const { minutelyKey, hourlyKey, dailyKey, monthlyKey, secondsPerBucket } = require("./uptime-calculator/time-bucket");
 const { findOrDispenseStatBean } = require("./uptime-calculator/stat-bean-repository");
 
 /**
@@ -48,13 +48,22 @@ class UptimeCalculator {
      */
     dailyUptimeDataList = new LimitQueue(365);
 
+    /**
+     * Monthly uptime data (long-term retention tier), each item is a calendar-month interval.
+     * Key: {number} MonthlyKey
+     * @type {LimitQueue<number,string>}
+     */
+    monthlyUptimeDataList = new LimitQueue(60);
+
     lastUptimeData = null;
     lastHourlyUptimeData = null;
     lastDailyUptimeData = null;
+    lastMonthlyUptimeData = null;
 
     lastDailyStatBean = null;
     lastHourlyStatBean = null;
     lastMinutelyStatBean = null;
+    lastMonthlyStatBean = null;
 
     /**
      * For migration purposes.
@@ -202,6 +211,31 @@ class UptimeCalculator {
 
             this.dailyUptimeDataList.push(bean.timestamp, data);
         }
+
+        // Load monthly data from database (recent 60 months only)
+        let monthlyStatBeans = await R.find("stat_monthly", " monitor_id = ? AND timestamp > ? ORDER BY timestamp", [
+            monitorID,
+            this.getMonthlyKey(now.subtract(60, "month")),
+        ]);
+
+        for (let bean of monthlyStatBeans) {
+            let data = {
+                up: bean.up,
+                down: bean.down,
+                avgPing: bean.ping,
+                minPing: bean.pingMin,
+                maxPing: bean.pingMax,
+            };
+
+            if (bean.extras != null) {
+                data = {
+                    ...data,
+                    ...JSON.parse(bean.extras),
+                };
+            }
+
+            this.monthlyUptimeDataList.push(bean.timestamp, data);
+        }
     }
 
     /**
@@ -225,19 +259,23 @@ class UptimeCalculator {
         let divisionKey = this.getMinutelyKey(date);
         let hourlyKey = this.getHourlyKey(date);
         let dailyKey = this.getDailyKey(date);
+        let monthlyKey = this.getMonthlyKey(date);
 
         let minutelyData = this.minutelyUptimeDataList[divisionKey];
         let hourlyData = this.hourlyUptimeDataList[hourlyKey];
         let dailyData = this.dailyUptimeDataList[dailyKey];
+        let monthlyData = this.monthlyUptimeDataList[monthlyKey];
 
         if (status === MAINTENANCE) {
             minutelyData.maintenance = minutelyData.maintenance ? minutelyData.maintenance + 1 : 1;
             hourlyData.maintenance = hourlyData.maintenance ? hourlyData.maintenance + 1 : 1;
             dailyData.maintenance = dailyData.maintenance ? dailyData.maintenance + 1 : 1;
+            monthlyData.maintenance = monthlyData.maintenance ? monthlyData.maintenance + 1 : 1;
         } else if (flatStatus === UP) {
             minutelyData.up += 1;
             hourlyData.up += 1;
             dailyData.up += 1;
+            monthlyData.up += 1;
 
             // Only UP status can update the ping
             if (!isNaN(ping)) {
@@ -276,11 +314,24 @@ class UptimeCalculator {
                     dailyData.minPing = Math.min(dailyData.minPing, ping);
                     dailyData.maxPing = Math.max(dailyData.maxPing, ping);
                 }
+
+                // Add avg ping (monthly)
+                // The first beat of the month, the ping is the current ping
+                if (monthlyData.up === 1) {
+                    monthlyData.avgPing = ping;
+                    monthlyData.minPing = ping;
+                    monthlyData.maxPing = ping;
+                } else {
+                    monthlyData.avgPing = (monthlyData.avgPing * (monthlyData.up - 1) + ping) / monthlyData.up;
+                    monthlyData.minPing = Math.min(monthlyData.minPing, ping);
+                    monthlyData.maxPing = Math.max(monthlyData.maxPing, ping);
+                }
             }
         } else if (flatStatus === DOWN) {
             minutelyData.down += 1;
             hourlyData.down += 1;
             dailyData.down += 1;
+            monthlyData.down += 1;
         }
 
         if (minutelyData !== this.lastUptimeData) {
@@ -293,6 +344,10 @@ class UptimeCalculator {
 
         if (dailyData !== this.lastDailyUptimeData) {
             this.lastDailyUptimeData = dailyData;
+        }
+
+        if (monthlyData !== this.lastMonthlyUptimeData) {
+            this.lastMonthlyUptimeData = monthlyData;
         }
 
         // Don't store data in test mode
@@ -315,6 +370,21 @@ class UptimeCalculator {
             }
         }
         await R.store(dailyStatBean);
+
+        let monthlyStatBean = await this.getMonthlyStatBean(monthlyKey);
+        monthlyStatBean.up = monthlyData.up;
+        monthlyStatBean.down = monthlyData.down;
+        monthlyStatBean.ping = monthlyData.avgPing;
+        monthlyStatBean.pingMin = monthlyData.minPing;
+        monthlyStatBean.pingMax = monthlyData.maxPing;
+        {
+            // eslint-disable-next-line no-unused-vars
+            const { up, down, avgPing, minPing, maxPing, timestamp, ...extras } = monthlyData;
+            if (Object.keys(extras).length > 0) {
+                monthlyStatBean.extras = JSON.stringify(extras);
+            }
+        }
+        await R.store(monthlyStatBean);
 
         let currentDate = this.getCurrentDate();
 
@@ -406,6 +476,16 @@ class UptimeCalculator {
     }
 
     /**
+     * Get the monthly stat bean
+     * @param {number} timestamp milliseconds
+     * @returns {Promise<import("redbean-node").Bean>} stat_monthly bean
+     */
+    async getMonthlyStatBean(timestamp) {
+        this.lastMonthlyStatBean = await findOrDispenseStatBean("stat_monthly", this.monitorID, timestamp, this.lastMonthlyStatBean);
+        return this.lastMonthlyStatBean;
+    }
+
+    /**
      * Convert timestamp to minutely key
      * @param {dayjs.Dayjs} date The heartbeat date
      * @param {boolean} createIfMissing Whether to create a missing bucket, defaults to true
@@ -472,6 +552,33 @@ class UptimeCalculator {
         }
 
         return dayKey;
+    }
+
+    /**
+     * Convert timestamp to monthly key
+     *
+     * IMPORTANT: Unlike the other tiers, this MUST use calendar-aware month truncation (months
+     * are 28-31 days long), not a fixed-seconds-per-bucket division. See monthlyKey() in
+     * ./uptime-calculator/time-bucket.js for details.
+     * @param {dayjs.Dayjs} date The heartbeat date
+     * @param {boolean} createIfMissing Whether to create a missing bucket, defaults to true
+     * @returns {number} Timestamp
+     */
+    getMonthlyKey(date, createIfMissing = true) {
+        // Truncate value to start of calendar month (UTC) and convert to timestamp in seconds
+        let monthKey = monthlyKey(date);
+
+        if (createIfMissing && !this.monthlyUptimeDataList[monthKey]) {
+            this.monthlyUptimeDataList.push(monthKey, {
+                up: 0,
+                down: 0,
+                avgPing: 0,
+                minPing: 0,
+                maxPing: 0,
+            });
+        }
+
+        return monthKey;
     }
 
     /**
@@ -768,6 +875,7 @@ class UptimeCalculator {
         await R.exec("DELETE FROM stat_minutely WHERE monitor_id = ?", [monitorID]);
         await R.exec("DELETE FROM stat_hourly WHERE monitor_id = ?", [monitorID]);
         await R.exec("DELETE FROM stat_daily WHERE monitor_id = ?", [monitorID]);
+        await R.exec("DELETE FROM stat_monthly WHERE monitor_id = ?", [monitorID]);
 
         await UptimeCalculator.remove(monitorID);
     }
@@ -781,6 +889,7 @@ class UptimeCalculator {
         await R.exec("DELETE FROM stat_minutely");
         await R.exec("DELETE FROM stat_hourly");
         await R.exec("DELETE FROM stat_daily");
+        await R.exec("DELETE FROM stat_monthly");
 
         await UptimeCalculator.removeAll();
     }
