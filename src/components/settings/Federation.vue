@@ -12,14 +12,16 @@
         </div>
 
         <div>
-            <span
-                v-if="remoteInstanceList.length === 0"
-                class="d-flex align-items-center justify-content-center my-3"
-            >
+            <span v-if="remoteInstanceList.length === 0" class="d-flex align-items-center justify-content-center my-3">
                 {{ $t("No Remote Instances") }}
             </span>
 
-            <div v-for="item in remoteInstanceList" :key="item.id" class="item" :class="{ active: item.active, inactive: !item.active }">
+            <div
+                v-for="item in remoteInstanceList"
+                :key="item.id"
+                class="item"
+                :class="{ active: item.active, inactive: !item.active }"
+            >
                 <div class="left-part">
                     <div class="circle"></div>
                     <div class="info">
@@ -43,7 +45,13 @@
             </div>
         </div>
 
-        <Confirm ref="confirmDelete" btn-style="btn-danger" :yes-text="$t('Yes')" :no-text="$t('No')" @yes="deleteRemoteInstance">
+        <Confirm
+            ref="confirmDelete"
+            btn-style="btn-danger"
+            :yes-text="$t('Yes')"
+            :no-text="$t('No')"
+            @yes="deleteRemoteInstance"
+        >
             {{ $t("deleteRemoteInstanceMsg") }}
         </Confirm>
 

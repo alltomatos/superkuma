@@ -16,17 +16,17 @@ Uptime Kuma — ferramenta self-hosted de monitoramento. Stack:
 
 ### Mapa de arquitetura
 
-| Área | Caminho | Nota |
-|---|---|---|
-| Bootstrap backend | `server/server.js` | monólito (2k linhas) — evitar crescer |
-| Modelo de monitor | `server/model/monitor.js` | god-object (2k) — extrair ao mexer |
-| Tipos de monitor | `server/monitor-types/` | **padrão de plugin** — 1 tipo por arquivo |
-| Notificações | `server/notification-providers/` | **padrão de plugin** — 1 provider por arquivo |
-| Handlers socket | `server/socket-handlers/` | protegidos por `checkLogin(socket)` |
-| Rotas HTTP públicas | `server/routers/` | badges, push, status-page |
-| Agregação de uptime | `server/uptime-calculator.js` | janelas em memória + persistência `stat_*` |
-| Migrations | `db/knex_migrations/` | Knex é o caminho oficial (patches SQL legados = deprecados) |
-| Frontend | `src/pages/`, `src/components/`, `src/mixins/` | `EditMonitor.vue` é o maior (4k) |
+| Área                | Caminho                                        | Nota                                                        |
+| ------------------- | ---------------------------------------------- | ----------------------------------------------------------- |
+| Bootstrap backend   | `server/server.js`                             | monólito (2k linhas) — evitar crescer                       |
+| Modelo de monitor   | `server/model/monitor.js`                      | god-object (2k) — extrair ao mexer                          |
+| Tipos de monitor    | `server/monitor-types/`                        | **padrão de plugin** — 1 tipo por arquivo                   |
+| Notificações        | `server/notification-providers/`               | **padrão de plugin** — 1 provider por arquivo               |
+| Handlers socket     | `server/socket-handlers/`                      | protegidos por `checkLogin(socket)`                         |
+| Rotas HTTP públicas | `server/routers/`                              | badges, push, status-page                                   |
+| Agregação de uptime | `server/uptime-calculator.js`                  | janelas em memória + persistência `stat_*`                  |
+| Migrations          | `db/knex_migrations/`                          | Knex é o caminho oficial (patches SQL legados = deprecados) |
+| Frontend            | `src/pages/`, `src/components/`, `src/mixins/` | `EditMonitor.vue` é o maior (4k)                            |
 
 ---
 
@@ -89,11 +89,11 @@ Definido por `.prettierrc.js` e `.eslintrc.js` — **rode `npm run fmt` antes de
 
 ## 7. Política de mudanças por Tier (orchestrator)
 
-| Tier | O que é | Autonomia |
-|---|---|---|
-| **T1** | lint, fmt, typo, docs simples | executa direto, loga no estado |
-| **T2** | testes, refactor localizado sem breaking change, ADRs | executa em lote sob rede de testes, reporta no fim |
-| **T3** | **schema de DB, autenticação, arquitetura macro, API pública** | **PARA e pede "Go" humano** |
+| Tier   | O que é                                                        | Autonomia                                          |
+| ------ | -------------------------------------------------------------- | -------------------------------------------------- |
+| **T1** | lint, fmt, typo, docs simples                                  | executa direto, loga no estado                     |
+| **T2** | testes, refactor localizado sem breaking change, ADRs          | executa em lote sob rede de testes, reporta no fim |
+| **T3** | **schema de DB, autenticação, arquitetura macro, API pública** | **PARA e pede "Go" humano**                        |
 
 Refactor pesado (>1 arquivo grande, mudança de esquema) → rodar em **git worktree isolada**. O estado da fila (DAG) vive em [`.claude/ESTADO_ORQUESTRATOR.md`](.claude/ESTADO_ORQUESTRATOR.md).
 
