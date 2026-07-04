@@ -1,4 +1,4 @@
-process.env.UPTIME_KUMA_HIDE_LOG = ["info_db", "info_server"].join(",");
+process.env.SUPERKUMA_HIDE_LOG = ["info_db", "info_server"].join(",");
 
 // Maintenance.toJSON() formats dates via dayjs().tz(...); server.js normally
 // registers this plugin at boot, but a standalone test process doesn't get it

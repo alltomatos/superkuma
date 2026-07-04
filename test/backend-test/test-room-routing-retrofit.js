@@ -1,4 +1,4 @@
-process.env.UPTIME_KUMA_HIDE_LOG = ["info_db", "info_server"].join(",");
+process.env.SUPERKUMA_HIDE_LOG = ["info_db", "info_server"].join(",");
 
 const { describe, test, before, after, afterEach } = require("node:test");
 const assert = require("node:assert");
@@ -16,7 +16,7 @@ const TestDB = require("../mock-testdb");
 const { Settings } = require("../../server/settings");
 const { setEnforcementEnabled, buildActor } = require("../../server/security/authz");
 const { roomFor } = require("../../server/security/rooms");
-const { UptimeKumaServer } = require("../../server/uptime-kuma-server");
+const { SuperKumaServer } = require("../../server/superkuma-server");
 const {
     sendNotificationList,
     sendProxyList,
@@ -54,14 +54,14 @@ function makeSocket(userID, actor) {
  * Monkeypatch the shared Socket.io server's `to()` method for the duration of
  * `work()`, capturing every room name it was called with, then restore the
  * original implementation. Since every retrofitted call site ultimately reads
- * `UptimeKumaServer.getInstance().io` (directly or via a captured module-level
+ * `SuperKumaServer.getInstance().io` (directly or via a captured module-level
  * reference to the same object), patching the shared instance's method is
  * visible to all of them.
  * @param {Function} work Async function to run while the spy is installed
  * @returns {Promise<string[]>} The room names `to()` was called with, in order
  */
 async function withRoomSpy(work) {
-    const server = UptimeKumaServer.getInstance();
+    const server = SuperKumaServer.getInstance();
     const realTo = server.io.to.bind(server.io);
     const calls = [];
     server.io.to = (room) => {
@@ -150,9 +150,9 @@ describe("Socket.io room-routing retrofit (ADR-0010 P4)", () => {
     });
 
     // -----------------------------------------------------------------
-    // uptime-kuma-server.js: monitor + maintenance list emit sites.
+    // superkuma-server.js: monitor + maintenance list emit sites.
     // -----------------------------------------------------------------
-    describe("uptime-kuma-server.js: monitor/maintenance emit sites route through roomFor", () => {
+    describe("superkuma-server.js: monitor/maintenance emit sites route through roomFor", () => {
         let monitorId;
 
         before(async () => {
@@ -168,7 +168,7 @@ describe("Socket.io room-routing retrofit (ADR-0010 P4)", () => {
         });
 
         test("sendMonitorList: enforcement OFF uses the legacy per-user room", async () => {
-            const server = UptimeKumaServer.getInstance();
+            const server = SuperKumaServer.getInstance();
             const socket = makeSocket(userId, actor());
             const calls = await withRoomSpy(() => server.sendMonitorList(socket));
             assert.deepStrictEqual(calls, [String(userId)]);
@@ -176,14 +176,14 @@ describe("Socket.io room-routing retrofit (ADR-0010 P4)", () => {
 
         test("sendMonitorList: enforcement ON uses the team room", async () => {
             setEnforcementEnabled(true);
-            const server = UptimeKumaServer.getInstance();
+            const server = SuperKumaServer.getInstance();
             const socket = makeSocket(userId, actor());
             const calls = await withRoomSpy(() => server.sendMonitorList(socket));
             assert.deepStrictEqual(calls, ["team:" + teamId]);
         });
 
         test("sendUpdateMonitorIntoList: enforcement OFF uses the legacy per-user room", async () => {
-            const server = UptimeKumaServer.getInstance();
+            const server = SuperKumaServer.getInstance();
             const socket = makeSocket(userId, actor());
             const calls = await withRoomSpy(() => server.sendUpdateMonitorIntoList(socket, monitorId));
             assert.deepStrictEqual(calls, [String(userId)]);
@@ -191,14 +191,14 @@ describe("Socket.io room-routing retrofit (ADR-0010 P4)", () => {
 
         test("sendUpdateMonitorIntoList: enforcement ON uses the team room", async () => {
             setEnforcementEnabled(true);
-            const server = UptimeKumaServer.getInstance();
+            const server = SuperKumaServer.getInstance();
             const socket = makeSocket(userId, actor());
             const calls = await withRoomSpy(() => server.sendUpdateMonitorIntoList(socket, monitorId));
             assert.deepStrictEqual(calls, ["team:" + teamId]);
         });
 
         test("sendDeleteMonitorFromList: enforcement OFF uses the legacy per-user room", async () => {
-            const server = UptimeKumaServer.getInstance();
+            const server = SuperKumaServer.getInstance();
             const socket = makeSocket(userId, actor());
             const calls = await withRoomSpy(() => server.sendDeleteMonitorFromList(socket, monitorId));
             assert.deepStrictEqual(calls, [String(userId)]);
@@ -206,14 +206,14 @@ describe("Socket.io room-routing retrofit (ADR-0010 P4)", () => {
 
         test("sendDeleteMonitorFromList: enforcement ON uses the team room", async () => {
             setEnforcementEnabled(true);
-            const server = UptimeKumaServer.getInstance();
+            const server = SuperKumaServer.getInstance();
             const socket = makeSocket(userId, actor());
             const calls = await withRoomSpy(() => server.sendDeleteMonitorFromList(socket, monitorId));
             assert.deepStrictEqual(calls, ["team:" + teamId]);
         });
 
         test("sendMaintenanceList: enforcement OFF uses the legacy per-user room", async () => {
-            const server = UptimeKumaServer.getInstance();
+            const server = SuperKumaServer.getInstance();
             const socket = makeSocket(userId, actor());
             const calls = await withRoomSpy(() => server.sendMaintenanceList(socket));
             assert.deepStrictEqual(calls, [String(userId)]);
@@ -221,7 +221,7 @@ describe("Socket.io room-routing retrofit (ADR-0010 P4)", () => {
 
         test("sendMaintenanceList: enforcement ON uses the team room", async () => {
             setEnforcementEnabled(true);
-            const server = UptimeKumaServer.getInstance();
+            const server = SuperKumaServer.getInstance();
             const socket = makeSocket(userId, actor());
             const calls = await withRoomSpy(() => server.sendMaintenanceList(socket));
             assert.deepStrictEqual(calls, ["team:" + teamId]);
@@ -319,7 +319,7 @@ describe("Socket.io room-routing retrofit (ADR-0010 P4)", () => {
             bOtherUser.password = "x";
             otherUserId = await R.store(bOtherUser);
 
-            server = UptimeKumaServer.getInstance();
+            server = SuperKumaServer.getInstance();
             server.io.on("connection", (socket) => {
                 const q = socket.handshake.query;
                 socket.join(roomFor(Number(q.userId), q.teamId ? Number(q.teamId) : null));
