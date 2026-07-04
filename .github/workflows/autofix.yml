@@ -2,7 +2,7 @@ name: autofix.ci
 
 on:
   push:
-    branches: ["master", "1.23.X"]
+    branches: ["master", "main", "develop", "1.23.X"]
   pull_request:
 permissions: {}
 
