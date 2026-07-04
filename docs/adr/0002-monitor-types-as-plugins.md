@@ -9,7 +9,7 @@ Existem 24+ formas de verificar um alvo (http, ping, dns, tcp, postgres, mqtt, g
 
 ## Decisão
 
-Cada tipo é uma classe em `server/monitor-types/` que estende `MonitorType` e implementa `async check(monitor, heartbeat, server)`. Os tipos são registrados em `UptimeKumaServer.monitorTypeList` no boot. Adicionar um tipo = adicionar um arquivo + registrar.
+Cada tipo é uma classe em `server/monitor-types/` que estende `MonitorType` e implementa `async check(monitor, heartbeat, server)`. Os tipos são registrados em `SuperKumaServer.monitorTypeList` no boot. Adicionar um tipo = adicionar um arquivo + registrar.
 
 ## Consequências
 

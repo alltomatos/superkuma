@@ -1,6 +1,6 @@
 //
 //  bark.js
-//  UptimeKuma
+//  SuperKuma
 //
 //  Created by Lakr Aream on 2021/10/24.
 //  Copyright © 2021 Lakr Aream. All rights reserved.
@@ -30,17 +30,17 @@ class Bark extends NotificationProvider {
         }
 
         if (msg != null && heartbeatJSON != null && heartbeatJSON["status"] === UP) {
-            let title = "UptimeKuma Monitor Up";
+            let title = "SuperKuma Monitor Up";
             return await this.postNotification(notification, title, msg, barkEndpoint);
         }
 
         if (msg != null && heartbeatJSON != null && heartbeatJSON["status"] === DOWN) {
-            let title = "UptimeKuma Monitor Down";
+            let title = "SuperKuma Monitor Down";
             return await this.postNotification(notification, title, msg, barkEndpoint);
         }
 
         if (msg != null) {
-            let title = "UptimeKuma Message";
+            let title = "SuperKuma Message";
             return await this.postNotification(notification, title, msg, barkEndpoint);
         }
     }
@@ -59,7 +59,7 @@ class Bark extends NotificationProvider {
             params += "&group=" + notification.barkGroup;
         } else {
             // default name
-            params += "&group=" + "UptimeKuma";
+            params += "&group=" + "SuperKuma";
         }
         // picked a sound, this should follow system's mute status when arrival
         if (notification.barkSound != null) {
@@ -111,7 +111,7 @@ class Bark extends NotificationProvider {
                     body: subtitle,
                     icon: barkNotificationAvatar,
                     sound: notification.barkSound || "telegraph", // default sound is telegraph
-                    group: notification.barkGroup || "UptimeKuma", // default group is UptimeKuma
+                    group: notification.barkGroup || "SuperKuma", // default group is SuperKuma
                 },
                 config
             );
