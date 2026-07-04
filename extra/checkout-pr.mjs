@@ -1,7 +1,7 @@
 import childProcess from "child_process";
 import { parsePrName } from "./kuma-pr/pr-lib.mjs";
 
-let { name, branch } = parsePrName(process.env.UPTIME_KUMA_GH_REPO);
+let { name, branch } = parsePrName(process.env.SUPERKUMA_GH_REPO);
 
 console.log(`Checking out PR from ${name}:${branch}`);
 

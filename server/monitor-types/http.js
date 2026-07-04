@@ -219,7 +219,7 @@ class HttpMonitorType extends MonitorType {
         }
 
         // eslint-disable-next-line eqeqeq
-        if (process.env.UPTIME_KUMA_LOG_RESPONSE_BODY_MONITOR_ID == monitor.id) {
+        if (process.env.SUPERKUMA_LOG_RESPONSE_BODY_MONITOR_ID == monitor.id) {
             log.info("monitor", res.data);
         }
 

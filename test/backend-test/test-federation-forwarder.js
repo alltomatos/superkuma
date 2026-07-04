@@ -1,4 +1,4 @@
-process.env.UPTIME_KUMA_HIDE_LOG = ["info_db", "info_server"].join(",");
+process.env.SUPERKUMA_HIDE_LOG = ["info_db", "info_server"].join(",");
 
 const { describe, test, before, after, beforeEach } = require("node:test");
 const assert = require("node:assert");

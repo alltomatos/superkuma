@@ -167,20 +167,20 @@ class Database {
 
         let config = {};
 
-        let parsedMaxPoolConnections = parseInt(process.env.UPTIME_KUMA_DB_POOL_MAX_CONNECTIONS);
+        let parsedMaxPoolConnections = parseInt(process.env.SUPERKUMA_DB_POOL_MAX_CONNECTIONS);
 
-        if (!process.env.UPTIME_KUMA_DB_POOL_MAX_CONNECTIONS) {
+        if (!process.env.SUPERKUMA_DB_POOL_MAX_CONNECTIONS) {
             parsedMaxPoolConnections = 10;
         } else if (Number.isNaN(parsedMaxPoolConnections)) {
             log.warn(
                 "db",
-                "Max database connections defaulted to 10 because UPTIME_KUMA_DB_POOL_MAX_CONNECTIONS was invalid."
+                "Max database connections defaulted to 10 because SUPERKUMA_DB_POOL_MAX_CONNECTIONS was invalid."
             );
             parsedMaxPoolConnections = 10;
         } else if (parsedMaxPoolConnections < 1) {
             log.warn(
                 "db",
-                "Max database connections defaulted to 10 because UPTIME_KUMA_DB_POOL_MAX_CONNECTIONS was less than 1."
+                "Max database connections defaulted to 10 because SUPERKUMA_DB_POOL_MAX_CONNECTIONS was less than 1."
             );
             parsedMaxPoolConnections = 10;
         } else if (parsedMaxPoolConnections > 100) {
@@ -217,7 +217,7 @@ class Database {
 
             // Default is still single connection.
             // Multiple connection could run into "SQLITE_BUSY: database is locked" error.
-            if (process.env.UPTIME_KUMA_SQLITE_SINGLE_CONNECTION !== "false") {
+            if (process.env.SUPERKUMA_SQLITE_SINGLE_CONNECTION !== "false") {
                 log.info("db", "Using single connection for SQLite");
                 poolConfig = {
                     min: 1,
