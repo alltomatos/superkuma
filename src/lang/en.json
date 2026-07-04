@@ -1020,7 +1020,6 @@
     "agentConfigurationDescription": "Configure this instance to forward its own monitor heartbeats to a Master Uptime Kuma instance.",
     "Master URL": "Master URL",
     "federationInstanceIdDescription": "The Instance ID this agent identifies itself with. Must match the Instance ID registered on the Master.",
-    "Token": "Token",
     "federationTokenDescription": "The one-time token issued by the Master when the Remote Instance was added.",
     "federatedMonitorTooltip": "Federated from remote instance: {name}",
     "pagertreeIntegrationUrl": "Integration URL",
