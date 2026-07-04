@@ -245,6 +245,12 @@ function scopeFilter(actor, options) {
     const opts = options || {};
     const column = opts.column || "team_id";
 
+    // No actor to scope by (should not normally happen -- afterLogin always
+    // builds one, even a minimal fail-closed one, on error) -- see nothing
+    // rather than crash or, worse, silently fall through to an unfiltered query.
+    if (!actor) {
+        return { clause: "1 = 0", params: [] };
+    }
     if (!enforcementEnabled) {
         return { clause: "user_id = ?", params: [actor.userId] };
     }

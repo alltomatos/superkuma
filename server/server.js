@@ -136,6 +136,9 @@ const {
 log.debug("server", "Importing Notification");
 const { Notification } = require("./notification");
 Notification.init();
+
+const { requireResource } = require("./security/authz");
+const { teamIdLoader } = require("./security/team-id-loaders");
 log.debug("server", "Importing Web-Push");
 const webpush = require("web-push");
 
@@ -869,7 +872,12 @@ let needSetup = false;
             try {
                 checkLogin(socket);
 
-                let notificationBean = await Notification.save(notification, notificationID, socket.userID);
+                let notificationBean = await Notification.save(
+                    notification,
+                    notificationID,
+                    socket.userID,
+                    socket.actor
+                );
                 await sendNotificationList(socket);
 
                 callback({
@@ -890,7 +898,7 @@ let needSetup = false;
             try {
                 checkLogin(socket);
 
-                await Notification.delete(notificationID, socket.userID);
+                await Notification.delete(notificationID, socket.userID, socket.actor);
                 await sendNotificationList(socket);
 
                 callback({
@@ -964,6 +972,7 @@ let needSetup = false;
         socket.on("clearEvents", async (monitorID, callback) => {
             try {
                 checkLogin(socket);
+                await requireResource(socket.actor, "monitor:manage_state", "monitor", monitorID, teamIdLoader);
 
                 log.info("manage", `Clear Events Monitor: ${monitorID} User ID: ${socket.userID}`);
 
@@ -983,6 +992,7 @@ let needSetup = false;
         socket.on("clearHeartbeats", async (monitorID, callback) => {
             try {
                 checkLogin(socket);
+                await requireResource(socket.actor, "monitor:manage_state", "monitor", monitorID, teamIdLoader);
 
                 log.info("manage", `Clear Heartbeats Monitor: ${monitorID} User ID: ${socket.userID}`);
 
@@ -1103,13 +1113,21 @@ let needSetup = false;
  * @param {number} monitorID ID of monitor to update
  * @param {number[]} notificationIDList List of new notification
  * providers to add
+ * @param {object} actor The RBAC actor performing the update (optional; when
+ * given, each linked notification is validated to belong to the actor's team
+ * before being linked -- a no-op while enforcement is OFF). Closes the
+ * cross-tenant hole where a client could link a monitor to a notification it
+ * does not own (ADR-0010 §4.4).
  * @returns {Promise<void>}
  */
-async function updateMonitorNotification(monitorID, notificationIDList) {
+async function updateMonitorNotification(monitorID, notificationIDList, actor) {
     await R.exec("DELETE FROM monitor_notification WHERE monitor_id = ? ", [monitorID]);
 
     for (let notificationID in notificationIDList) {
         if (notificationIDList[notificationID]) {
+            if (actor) {
+                await requireResource(actor, "notification:read", "notification", notificationID, teamIdLoader);
+            }
             let relation = R.dispense("monitor_notification");
             relation.monitor_id = monitorID;
             relation.notification_id = notificationID;
@@ -1151,7 +1169,13 @@ async function afterLogin(socket, user) {
         socket.actor = await buildActorForUser(user);
         socket.permissionPayload = await buildPermissionPayload(user, socket.actor);
     } catch (e) {
-        socket.actor = null;
+        // Fall back to a minimal actor carrying the correct userId (never null)
+        // so scopeFilter()'s OFF-path -- which reads actor.userId directly,
+        // matching legacy "WHERE user_id = ?" queries -- keeps working exactly
+        // as before. Empty memberships also make this actor fail closed (deny
+        // everything) if enforcement is ever ON, the safe default for an error.
+        const { buildActor } = require("./security/authz");
+        socket.actor = buildActor({ userId: user.id, isSuperadmin: false }, []);
         socket.permissionPayload = null;
         log.warn("auth", "RBAC actor build skipped (dark-launch): " + e.message);
     }

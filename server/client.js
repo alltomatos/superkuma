@@ -9,6 +9,7 @@ const io = server.io;
 const { setting } = require("./util-server");
 const checkVersion = require("./check-version");
 const Database = require("./database");
+const { scopeFilter } = require("./security/authz");
 
 /**
  * Send list of notification providers to client
@@ -19,7 +20,8 @@ async function sendNotificationList(socket) {
     const timeLogger = new TimeLogger();
 
     let result = [];
-    let list = await R.find("notification", " user_id = ? ", [socket.userID]);
+    const filter = scopeFilter(socket.actor);
+    let list = await R.find("notification", filter.clause, filter.params);
 
     for (let bean of list) {
         let notificationObject = bean.export();
@@ -104,7 +106,8 @@ async function sendImportantHeartbeatList(socket, monitorID, toUser = false, ove
 async function sendProxyList(socket) {
     const timeLogger = new TimeLogger();
 
-    const list = await R.find("proxy", " user_id = ? ", [socket.userID]);
+    const filter = scopeFilter(socket.actor);
+    const list = await R.find("proxy", filter.clause, filter.params);
     io.to(socket.userID).emit(
         "proxyList",
         list.map((bean) => bean.export())
@@ -124,7 +127,8 @@ async function sendAPIKeyList(socket) {
     const timeLogger = new TimeLogger();
 
     let result = [];
-    const list = await R.find("api_key", "user_id=?", [socket.userID]);
+    const filter = scopeFilter(socket.actor);
+    const list = await R.find("api_key", filter.clause, filter.params);
 
     for (let bean of list) {
         result.push(bean.toPublicJSON());
@@ -179,7 +183,8 @@ async function sendDockerHostList(socket) {
     const timeLogger = new TimeLogger();
 
     let result = [];
-    let list = await R.find("docker_host", " user_id = ? ", [socket.userID]);
+    const filter = scopeFilter(socket.actor);
+    let list = await R.find("docker_host", filter.clause, filter.params);
 
     for (let bean of list) {
         result.push(bean.toJSON());
@@ -201,7 +206,8 @@ async function sendRemoteBrowserList(socket) {
     const timeLogger = new TimeLogger();
 
     let result = [];
-    let list = await R.find("remote_browser", " user_id = ? ", [socket.userID]);
+    const filter = scopeFilter(socket.actor);
+    let list = await R.find("remote_browser", filter.clause, filter.params);
 
     for (let bean of list) {
         result.push(bean.toJSON());

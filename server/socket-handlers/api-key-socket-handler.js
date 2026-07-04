@@ -9,6 +9,8 @@ const { Settings } = require("../settings");
 const { sendAPIKeyList } = require("../client");
 const { z } = require("zod");
 const { validate } = require("../validation");
+const { requireResource } = require("../security/authz");
+const { teamIdLoader } = require("../security/team-id-loaders");
 
 const keyIDSchema = z.number().int().positive();
 
@@ -75,6 +77,8 @@ module.exports.apiKeySocketHandler = (socket) => {
         try {
             checkLogin(socket);
             keyID = validate(keyIDSchema, keyID);
+
+            await requireResource(socket.actor, "api_key:manage", "api_key", keyID, teamIdLoader);
 
             log.debug("apikeys", `Deleted API Key: ${keyID} User ID: ${socket.userID}`);
 

@@ -5,6 +5,8 @@ const fsAsync = require("fs").promises;
 const path = require("path");
 const Database = require("./database");
 const { axiosAbortSignal, fsExists } = require("./util-server");
+const { requireResource } = require("./security/authz");
+const { teamIdLoader } = require("./security/team-id-loaders");
 
 class DockerHost {
     static CertificateFileNameCA = "ca.pem";
@@ -16,12 +18,14 @@ class DockerHost {
      * @param {object} dockerHost Docker host to save
      * @param {?number} dockerHostID ID of the docker host to update
      * @param {number} userID ID of the user who adds the docker host
+     * @param {object} actor RBAC actor performing the save (dark-launch; ADR-0010 P3)
      * @returns {Promise<Bean>} Updated docker host
      */
-    static async save(dockerHost, dockerHostID, userID) {
+    static async save(dockerHost, dockerHostID, userID, actor) {
         let bean;
 
         if (dockerHostID) {
+            await requireResource(actor, "docker_host:manage", "docker_host", dockerHostID, teamIdLoader);
             bean = await R.findOne("docker_host", " id = ? AND user_id = ? ", [dockerHostID, userID]);
 
             if (!bean) {
@@ -45,9 +49,11 @@ class DockerHost {
      * Delete a Docker host
      * @param {number} dockerHostID ID of the Docker host to delete
      * @param {number} userID ID of the user who created the Docker host
+     * @param {object} actor RBAC actor performing the delete (dark-launch; ADR-0010 P3)
      * @returns {Promise<void>}
      */
-    static async delete(dockerHostID, userID) {
+    static async delete(dockerHostID, userID, actor) {
+        await requireResource(actor, "docker_host:manage", "docker_host", dockerHostID, teamIdLoader);
         let bean = await R.findOne("docker_host", " id = ? AND user_id = ? ", [dockerHostID, userID]);
 
         if (!bean) {

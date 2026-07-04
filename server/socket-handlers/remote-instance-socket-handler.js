@@ -5,6 +5,8 @@ const { nanoid } = require("nanoid");
 const passwordHash = require("../password-hash");
 const { z } = require("zod");
 const { validate } = require("../validation");
+const { requireResource } = require("../security/authz");
+const { teamIdLoader } = require("../security/team-id-loaders");
 
 const remoteInstanceIDSchema = z.number().int().positive();
 
@@ -86,6 +88,14 @@ module.exports.remoteInstanceSocketHandler = (socket) => {
         try {
             checkLogin(socket);
             remoteInstanceID = validate(remoteInstanceIDSchema, remoteInstanceID);
+
+            await requireResource(
+                socket.actor,
+                "remote_instance:manage",
+                "remote_instance",
+                remoteInstanceID,
+                teamIdLoader
+            );
 
             log.debug("remote-instance", `Deleted Remote Instance: ${remoteInstanceID} User ID: ${socket.userID}`);
 

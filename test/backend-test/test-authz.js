@@ -290,6 +290,11 @@ describe("scopeFilter with enforcement ON", () => {
         assert.deepStrictEqual(scopeFilter(actor), { clause: "1 = 0", params: [] });
     });
 
+    test("a null/undefined actor sees nothing (fails closed, never throws)", () => {
+        assert.deepStrictEqual(scopeFilter(null), { clause: "1 = 0", params: [] });
+        assert.deepStrictEqual(scopeFilter(undefined), { clause: "1 = 0", params: [] });
+    });
+
     test("permission filter excludes teams lacking the read permission", () => {
         const actor = buildActor({ userId: 4, isSuperadmin: false }, [
             { teamId: 4, roleSlug: "viewer" },
@@ -334,6 +339,11 @@ describe("flag-OFF dark-launch contract", () => {
     test("scopeFilter falls back to the legacy per-user filter", () => {
         const actor = buildActor({ userId: 42, isSuperadmin: false }, [{ teamId: 1, roleSlug: "viewer" }]);
         assert.deepStrictEqual(scopeFilter(actor), { clause: "user_id = ?", params: [42] });
+    });
+
+    test("scopeFilter never throws on a null/undefined actor, even while OFF", () => {
+        assert.deepStrictEqual(scopeFilter(null), { clause: "1 = 0", params: [] });
+        assert.deepStrictEqual(scopeFilter(undefined), { clause: "1 = 0", params: [] });
     });
 
     test("authorizeResource returns true without ever calling the loader", async () => {

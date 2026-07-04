@@ -8,20 +8,24 @@ const { validate } = require("../validation");
 // "socket" and "tcp" are the only values DockerHost.testDockerHost() and
 // DockerHost.getHttpsAgentOptions() branch on (server/docker.js); anything
 // else falls through as an unconfigured request.
-const dockerHostSchema = z.object({
-    name: z.string().min(1).max(255),
-    dockerType: z.enum(["socket", "tcp"]),
-    dockerDaemon: z.string().min(1).max(1000),
-}).passthrough();
+const dockerHostSchema = z
+    .object({
+        name: z.string().min(1).max(255),
+        dockerType: z.enum(["socket", "tcp"]),
+        dockerDaemon: z.string().min(1).max(1000),
+    })
+    .passthrough();
 
 // The "Test" button in DockerHostDialog.vue is a plain type="button", so it
 // bypasses the form's HTML5 "required" validation and can submit before
 // "name" is filled in. testDockerHost() itself only reads dockerType/
 // dockerDaemon, so only those need to be validated here.
-const dockerHostTestSchema = z.object({
-    dockerType: z.enum(["socket", "tcp"]),
-    dockerDaemon: z.string().min(1).max(1000),
-}).passthrough();
+const dockerHostTestSchema = z
+    .object({
+        dockerType: z.enum(["socket", "tcp"]),
+        dockerDaemon: z.string().min(1).max(1000),
+    })
+    .passthrough();
 
 /**
  * Handlers for docker hosts
@@ -34,7 +38,7 @@ module.exports.dockerSocketHandler = (socket) => {
             checkLogin(socket);
             dockerHost = validate(dockerHostSchema, dockerHost);
 
-            let dockerHostBean = await DockerHost.save(dockerHost, dockerHostID, socket.userID);
+            let dockerHostBean = await DockerHost.save(dockerHost, dockerHostID, socket.userID, socket.actor);
             await sendDockerHostList(socket);
 
             callback({
@@ -55,7 +59,7 @@ module.exports.dockerSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
-            await DockerHost.delete(dockerHostID, socket.userID);
+            await DockerHost.delete(dockerHostID, socket.userID, socket.actor);
             await sendDockerHostList(socket);
 
             callback({

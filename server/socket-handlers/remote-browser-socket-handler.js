@@ -13,17 +13,21 @@ const { validate } = require("../validation");
 // RemoteBrowserDialog.vue -- so this must accept ws(s):// URLs, not just
 // http(s). z.string().url() only checks general URL well-formedness and
 // does not restrict the scheme, so ws(s):// values pass.
-const remoteBrowserSchema = z.object({
-    name: z.string().min(1).max(255),
-    url: z.string().min(1).max(2000).url(),
-}).passthrough();
+const remoteBrowserSchema = z
+    .object({
+        name: z.string().min(1).max(255),
+        url: z.string().min(1).max(2000).url(),
+    })
+    .passthrough();
 
 // The "Test" button in RemoteBrowserDialog.vue is a plain type="button", so
 // it bypasses the form's HTML5 "required" validation and can submit before
 // "name" is filled in. testRemoteBrowser() only reads remoteBrowser.url.
-const remoteBrowserTestSchema = z.object({
-    url: z.string().min(1).max(2000).url(),
-}).passthrough();
+const remoteBrowserTestSchema = z
+    .object({
+        url: z.string().min(1).max(2000).url(),
+    })
+    .passthrough();
 
 /**
  * Handlers for docker hosts
@@ -36,7 +40,12 @@ module.exports.remoteBrowserSocketHandler = (socket) => {
             checkLogin(socket);
             remoteBrowser = validate(remoteBrowserSchema, remoteBrowser);
 
-            let remoteBrowserBean = await RemoteBrowser.save(remoteBrowser, remoteBrowserID, socket.userID);
+            let remoteBrowserBean = await RemoteBrowser.save(
+                remoteBrowser,
+                remoteBrowserID,
+                socket.userID,
+                socket.actor
+            );
             await sendRemoteBrowserList(socket);
 
             callback({
@@ -57,7 +66,7 @@ module.exports.remoteBrowserSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
-            await RemoteBrowser.delete(dockerHostID, socket.userID);
+            await RemoteBrowser.delete(dockerHostID, socket.userID, socket.actor);
             await sendRemoteBrowserList(socket);
 
             callback({

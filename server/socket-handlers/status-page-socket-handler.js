@@ -8,6 +8,8 @@ const apicache = require("../modules/apicache");
 const StatusPage = require("../model/status_page");
 const { UptimeKumaServer } = require("../uptime-kuma-server");
 const { Settings } = require("../settings");
+const { requireResource } = require("../security/authz");
+const { teamIdLoader } = require("../security/team-id-loaders");
 
 /**
  * Validates incident data
@@ -25,6 +27,25 @@ function validateIncident(incident) {
 }
 
 /**
+ * Resolve a status page's numeric id from its slug and, if found, run the
+ * RBAC authorization gate against it (ADR-0010 phase P3). A pure no-op while
+ * enforcement is OFF (the default). Callers still perform their own
+ * not-found handling for a `null`/falsy id -- this helper does not throw for
+ * an unresolved slug so existing "slug is not found" flows are unchanged.
+ * @param {object} actor The requesting socket's actor (may be null).
+ * @param {string} action Canonical permission action (e.g. "status_page:read").
+ * @param {string} slug The status page slug to resolve.
+ * @returns {Promise<number|undefined>} The resolved status_page id, if any.
+ */
+async function authorizeStatusPageBySlug(actor, action, slug) {
+    const statusPageID = await StatusPage.slugToID(slug);
+    if (statusPageID) {
+        await requireResource(actor, action, "status_page", statusPageID, teamIdLoader);
+    }
+    return statusPageID;
+}
+
+/**
  * Socket handlers for status page
  * @param {Socket} socket Socket.io instance to add listeners on
  * @returns {void}
@@ -35,7 +56,7 @@ module.exports.statusPageSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
-            let statusPageID = await StatusPage.slugToID(slug);
+            let statusPageID = await authorizeStatusPageBySlug(socket.actor, "status_page:manage", slug);
 
             if (!statusPageID) {
                 throw new Error("slug is not found");
@@ -85,7 +106,7 @@ module.exports.statusPageSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
-            let statusPageID = await StatusPage.slugToID(slug);
+            let statusPageID = await authorizeStatusPageBySlug(socket.actor, "status_page:manage", slug);
 
             await R.exec("UPDATE incident SET pin = 0 WHERE pin = 1 AND status_page_id = ? ", [statusPageID]);
 
@@ -102,7 +123,7 @@ module.exports.statusPageSocketHandler = (socket) => {
 
     socket.on("getIncidentHistory", async (slug, cursor, callback) => {
         try {
-            let statusPageID = await StatusPage.slugToID(slug);
+            let statusPageID = await authorizeStatusPageBySlug(socket.actor, "status_page:read", slug);
             if (!statusPageID) {
                 throw new Error("slug is not found");
             }
@@ -125,7 +146,7 @@ module.exports.statusPageSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
-            let statusPageID = await StatusPage.slugToID(slug);
+            let statusPageID = await authorizeStatusPageBySlug(socket.actor, "status_page:manage", slug);
             if (!statusPageID) {
                 callback({
                     ok: false,
@@ -188,7 +209,7 @@ module.exports.statusPageSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
-            let statusPageID = await StatusPage.slugToID(slug);
+            let statusPageID = await authorizeStatusPageBySlug(socket.actor, "status_page:manage", slug);
             if (!statusPageID) {
                 callback({
                     ok: false,
@@ -228,7 +249,7 @@ module.exports.statusPageSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
-            let statusPageID = await StatusPage.slugToID(slug);
+            let statusPageID = await authorizeStatusPageBySlug(socket.actor, "status_page:manage", slug);
             if (!statusPageID) {
                 callback({
                     ok: false,
@@ -269,6 +290,8 @@ module.exports.statusPageSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
+            await authorizeStatusPageBySlug(socket.actor, "status_page:read", slug);
+
             let statusPage = await R.findOne("status_page", " slug = ? ", [slug]);
 
             if (!statusPage) {
@@ -299,6 +322,11 @@ module.exports.statusPageSocketHandler = (socket) => {
             if (!statusPage) {
                 throw new Error("No slug?");
             }
+
+            // Editing an existing page: resolve its team via the authz gate. A
+            // brand-new page (no existing row to resolve a team from) has no
+            // check here yet -- P3 limitation matching the addTag precedent.
+            await requireResource(socket.actor, "status_page:manage", "status_page", statusPage.id, teamIdLoader);
 
             checkSlug(config.slug);
 
@@ -485,7 +513,7 @@ module.exports.statusPageSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
-            let statusPageID = await StatusPage.slugToID(slug);
+            let statusPageID = await authorizeStatusPageBySlug(socket.actor, "status_page:manage", slug);
 
             if (statusPageID) {
                 // Reset entry page if it is the default one.
