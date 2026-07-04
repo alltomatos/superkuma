@@ -4,7 +4,7 @@
 
 # SuperKuma
 
-SuperKuma is an easy-to-use self-hosted monitoring tool.
+SuperKuma is an easy-to-use self-hosted monitoring tool, with built-in Master-Agent federation and multi-tenant Teams/RBAC for managing monitoring across multiple instances and teams.
 
 <a target="_blank" href="https://github.com/alltomatos/superkuma"><img src="https://img.shields.io/github/stars/alltomatos/superkuma?style=flat" /></a> <a target="_blank" href="https://github.com/alltomatos/superkuma"><img src="https://img.shields.io/github/last-commit/alltomatos/superkuma" /></a>
 
@@ -103,11 +103,11 @@ Requests/issues are assigned to upcoming milestones.
 
 <https://github.com/alltomatos/superkuma/milestones>
 
-## Motivation
+## Credits
 
-SuperKuma is a private fork of [Uptime Kuma](https://github.com/louislam/uptime-kuma), an excellent self-hosted monitoring tool built by Louis Lam and its contributors. This fork exists to extend it with Master-Agent federation, long-term metrics history, and multi-tenant Teams/RBAC, tailored to our own operational needs.
+SuperKuma began as a fork of [Uptime Kuma](https://github.com/louislam/uptime-kuma) — an excellent self-hosted monitoring tool built by Louis Lam and its contributors — and builds on that foundation. It has since grown into its own project, extending the original with Master-Agent federation, long-term metrics history, and multi-tenant Teams/RBAC.
 
-If you love this project, please consider giving [the original Uptime Kuma](https://github.com/louislam/uptime-kuma) a ⭐.
+If you find SuperKuma useful, consider giving it a ⭐ — and if you'd like to support the project it's built on, [Uptime Kuma](https://github.com/louislam/uptime-kuma) deserves one too.
 
 ## 🗣️ Discussion / Ask for Help
 

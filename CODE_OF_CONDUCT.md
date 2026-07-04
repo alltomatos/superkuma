@@ -59,9 +59,10 @@ representative at an online or offline event.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement at
-<uptime@kuma.pet>. All complaints will be reviewed and investigated promptly and
-fairly.
+reported to the maintainers responsible for enforcement by opening a
+[GitHub issue](https://github.com/alltomatos/superkuma/issues) or contacting a
+maintainer directly. All complaints will be reviewed and investigated promptly
+and fairly.
 
 All community leaders are obligated to respect the privacy and security of the
 reporter of any incident.

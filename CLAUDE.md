@@ -1,6 +1,6 @@
 # Regras de Desenvolvimento — alltomatos/superkuma
 
-> Fork privado do Uptime Kuma, renomeado para SuperKuma. Este arquivo define como humanos e agentes de código trabalham neste repo.
+> SuperKuma é um projeto independente de monitoramento self-hosted, com raízes no [Uptime Kuma](https://github.com/louislam/uptime-kuma) (créditos no README). Este arquivo define como humanos e agentes de código trabalham neste repo.
 > Governança do orchestrator: [`ORCHESTRATOR-ROADMAP.md`](ORCHESTRATOR-ROADMAP.md) · [`.claude/ESTADO_ORQUESTRATOR.md`](.claude/ESTADO_ORQUESTRATOR.md) · [`docs/agents/`](docs/agents).
 
 ---
@@ -30,9 +30,9 @@ SuperKuma — ferramenta self-hosted de monitoramento. Stack:
 
 ---
 
-## 2. Política do fork
+## 2. Política do projeto
 
-- **Fork privado.** Nenhum PR gerado por agente vai para o upstream `louislam/uptime-kuma`.
+- **Projeto próprio.** `alltomatos/superkuma` segue seu próprio caminho — não enviamos PRs para o `louislam/uptime-kuma` original.
 - **Revisão obrigatória.** Toda mudança de código é entendida, revisada e **testada manualmente** antes de qualquer `push`. Não submeter código gerado + descrição de LLM sem revisar.
 - **Nunca** trabalhar direto no `master`: sempre branch. **Nunca** `git push --force` nem `git reset --hard` sem pedido explícito.
 
