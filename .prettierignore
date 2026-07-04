@@ -1,2 +1,5 @@
 # language files
 src/lang/*.json
+
+# generated (tsc-compiled from src/util.ts); already ignored by ESLint
+src/util.js

@@ -21,13 +21,6 @@
             "playwright-core",
             "prom-client"
         ],
-        "frontend": [
-            "vue",
-            "vue-router",
-            "vue-i18n",
-            "vite",
-            "chart.js",
-            "bootstrap"
-        ]
+        "frontend": ["vue", "vue-router", "vue-i18n", "vite", "chart.js", "bootstrap"]
     }
 }

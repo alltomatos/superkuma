@@ -36,7 +36,7 @@ describe("HTTP Monitor", () => {
             jsonPathOperator: "==",
             expectedValue: null,
             getIgnoreTls: () => true,
-            getAcceptedStatuscodes: () => [ "200-299" ],
+            getAcceptedStatuscodes: () => ["200-299"],
             isInvertKeyword: () => false,
             getSaveResponse: () => false,
             getSaveErrorResponse: () => false,
@@ -134,10 +134,7 @@ describe("HTTP Monitor", () => {
                 });
                 const heartbeat = makeHeartbeat();
 
-                await assert.rejects(
-                    httpMonitor.check(monitor, heartbeat, {}),
-                    /Maximum number of redirects exceeded/
-                );
+                await assert.rejects(httpMonitor.check(monitor, heartbeat, {}), /Maximum number of redirects exceeded/);
             } finally {
                 await closeServer(server);
             }
@@ -215,10 +212,7 @@ describe("HTTP Monitor", () => {
                 });
                 const heartbeat = makeHeartbeat();
 
-                await assert.rejects(
-                    httpMonitor.check(monitor, heartbeat, {}),
-                    /keyword is present/
-                );
+                await assert.rejects(httpMonitor.check(monitor, heartbeat, {}), /keyword is present/);
             } finally {
                 await closeServer(server);
             }
@@ -237,10 +231,7 @@ describe("HTTP Monitor", () => {
                 });
                 const heartbeat = makeHeartbeat();
 
-                await assert.rejects(
-                    httpMonitor.check(monitor, heartbeat, {}),
-                    /but keyword is not in \[/
-                );
+                await assert.rejects(httpMonitor.check(monitor, heartbeat, {}), /but keyword is not in \[/);
             } finally {
                 await closeServer(server);
             }
@@ -322,10 +313,7 @@ describe("HTTP Monitor", () => {
                 });
                 const heartbeat = makeHeartbeat();
 
-                await assert.rejects(
-                    httpMonitor.check(monitor, heartbeat, {}),
-                    /JSON query does not pass/
-                );
+                await assert.rejects(httpMonitor.check(monitor, heartbeat, {}), /JSON query does not pass/);
             } finally {
                 await closeServer(server);
             }

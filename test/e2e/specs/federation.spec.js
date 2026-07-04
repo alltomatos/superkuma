@@ -112,7 +112,9 @@ test.describe("Federation", () => {
         await page.locator("#remote-instance-name").fill(instanceName);
         await page.locator("#remote-instance-id").fill(instanceId);
         await page.locator("button[type=submit]", { hasText: "Add Remote Instance" }).click();
-        await expect(page.locator(".modal", { hasText: "Remote Instance Added" }).locator("input[type=text]")).toBeVisible();
+        await expect(
+            page.locator(".modal", { hasText: "Remote Instance Added" }).locator("input[type=text]")
+        ).toBeVisible();
         await page.getByRole("button", { name: "Continue" }).click();
         await expect(page.getByText(instanceName)).toBeVisible();
 
