@@ -179,9 +179,12 @@ router.post("/api/federation/heartbeat", async (request, response) => {
 
         await R.store(bean);
 
-        io.to(monitor.user_id).emit("heartbeat", bean.toJSON());
+        {
+            const { roomFor } = require("../security/rooms");
+            io.to(roomFor(monitor.user_id, monitor.team_id)).emit("heartbeat", bean.toJSON());
+        }
 
-        Monitor.sendStats(io, monitor.id, monitor.user_id);
+        Monitor.sendStats(io, monitor.id, monitor.user_id, monitor.team_id);
 
         try {
             new Prometheus(monitor, await monitor.getTags()).update(bean, undefined);

@@ -1165,7 +1165,6 @@ async function checkOwner(userID, monitorID) {
  */
 async function afterLogin(socket, user) {
     socket.userID = user.id;
-    socket.join(user.id);
 
     // Dark-launch (ADR-0010 P2): attach the RBAC actor + permission payload.
     // Must never break login while enforcement is OFF.
@@ -1184,6 +1183,11 @@ async function afterLogin(socket, user) {
         socket.permissionPayload = null;
         log.warn("auth", "RBAC actor build skipped (dark-launch): " + e.message);
     }
+
+    // ADR-0010 P4: join the room AFTER the actor is resolved, since roomFor()
+    // needs socket.actor.activeTeamId to route correctly once enforcement is ON.
+    const { roomFor } = require("./security/rooms");
+    socket.join(roomFor(user.id, socket.actor.activeTeamId));
 
     let monitorList = await server.sendMonitorList(socket);
     await Promise.allSettled([
