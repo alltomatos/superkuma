@@ -191,7 +191,8 @@
   ref: ADR-0008
   risco: T2
   depends_on: [TASK-F0]
-  status: in_progress   # Workflow wf_205e1648-478
+  status: done   # verifyRemoteInstanceToken (espelha verifyAPIKey) + POST /api/federation/heartbeat + upsert idempotente (3 heartbeats -> 1 monitor, confirmado manualmente 2x). 9 testes novos. server.js só +2 linhas aditivas. commit 2e99ae72
+  concluido_em: "2026-07-03"
 
 - id: TASK-F2
   desc: "F2 Forwarder Agent (MVP): hook no beat() de monitor.js + config master/token; ponta-a-ponta REST"
@@ -237,7 +238,7 @@
   ref: ADR-0009
   risco: T2
   depends_on: [TASK-M0]
-  status: in_progress   # Workflow wf_205e1648-478, roda após F1 verificar
+  status: done   # monthlyKey() calendar-aware (dayjs startOf("month")) confirmado por script Python independente fora do toolchain. Persist em stat_monthly + retenção keepMonthlyStatsPeriodDays (default 1825d). Read-side (getDataArray "month") deliberadamente adiado p/ M2. 18->21 testes uptime-calculator + 2 novos clear-old-data. commit 18b63a41
 
 - id: TASK-M2
   desc: "M2: UI de relatório de SLA por remote_instance, exportável"
@@ -264,6 +265,8 @@
 | 9 | 2026-07-03 | GAP-003 | TASK-120: extrai http/keyword/json-query de monitor.js -> monitor-types/http.js (2069→1805) | Preserva quirk tlsInfo sombreado + cache oauthAccessToken. 184/184 backend + 26/26 e2e. commit d35248a0 |
 | 10 | 2026-07-03 | GAP-003 | TASK-150: split EditMonitor.vue (4356→4016), 3 subcomponentes só nas seções com cobertura E2E real | 26/26 e2e, mutation-check independente (auth_user) confirmou detecção real. commit d58c7832 |
 | 11 | 2026-07-03 | — | Fix cosmético: comentário desatualizado em http.js ("bean.ping"→"heartbeat.ping"), achado pelo verificador do TASK-120 | T1 trivial |
+| 12 | 2026-07-03 | ADR-0008 | TASK-F1: registro remote_instance + POST /api/federation/heartbeat + upsert idempotente (type=push) | Sobreviveu a interferência de agente zumbi (ver seção "Incidente" acima). 9 testes, 2 mutation-checks independentes. commit 2e99ae72 |
+| 13 | 2026-07-03 | ADR-0009 | TASK-M1: tier stat_monthly (bucket calendar-aware) + retenção em camadas | Truncagem de mês verificada por script Python fora do toolchain. 279/279 backend final. commit 18b63a41 |
 | 12 | 2026-07-03 | GAP-009 | TASK-020 fase 1: `test-http.js` (10 testes) fecha GAP-009 | maxRedirects + keyword-inversion cobertos, 2 mutation-checks independentes confirmaram detecção. commit 57fcff7a |
 | 13 | 2026-07-03 | GAP-006 | TASK-020 fase 2: 64 testes novos p/ submódulos util-server(tls,misc)/database sem cobertura direta | Suíte não-Docker 194→259. mutation-check independente (checkStatusCode) confirmou. commit 8ac0ea1e |
 | 14 | 2026-07-03 | GAP-004 | TASK-030 fase 1: zod + validação keyID/tagID/monitorID/period/slug | Testes de rejeição (payload malformado) e aceitação (payload real da UI) independentes. commit 67d7e6d7 |
@@ -271,6 +274,12 @@
 | 16 | 2026-07-03 | ADR-0008/0009 | TASK-F0+M0: fundação schema Master-Agent (remote_instance, ON DELETE SET NULL) + histórico de métricas (stat_monthly) | Primeira mudança real de schema da sessão. 2 tentativas de delegação falharam (agente só relatou "vou aguardar" sem executar); executado diretamente. Achado e corrigido: toJSON() usava convenção underscore de tag.js (retornava undefined nesta versão do redbean-node) — trocado p/ convenção sem underscore de api_key.js/monitor.js. 265/265 backend + 26/26 e2e + zero-wiring grep vazio. Ambiente teve bastante flakiness de processo/porta (limpo com PowerShell). commit 9641dbc3 |
 
 ---
+
+## Incidente: interferência entre agentes concorrentes na mesma working tree
+
+Durante F0, duas tentativas via tool `Agent` (não-Workflow) pareceram falhar imediatamente ("vou aguardar", 1 tool call) — na realidade **continuaram rodando em background por 30-45min**, muito depois de eu ter seguido em frente e feito a F0 manualmente. Uma delas, ao "investigar mudanças inesperadas", **deletou/reverteu arquivos do F1 que o Workflow atual escrevia naquele momento** (server/auth.js, server/server.js, e 4 arquivos novos, incluindo um teste). O próprio agente executor do F1 **detectou a sabotagem, matou os processos interferentes, recriou tudo e rerodou o gate completo do zero** — nenhum dado foi perdido, confirmado por verificação independente minha depois. Ambos os agentes zumbis já reportaram conclusão terminal (não devem mais interferir).
+
+**Lição:** o tool `Agent` (diferente do `Workflow`) não tem mecanismo de cancelamento visível uma vez disparado — se parecer ter "falhado" rápido demais, pode estar continuando em background por muito tempo, mutando a mesma working tree sem eu saber. Preferir `Workflow` para qualquer tarefa que escreva no repo quando há risco de concorrência.
 
 ## Pendências / Notas
 
