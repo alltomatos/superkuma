@@ -1,4 +1,4 @@
-process.env.UPTIME_KUMA_HIDE_LOG = ["info_db", "info_server"].join(",");
+process.env.SUPERKUMA_HIDE_LOG = ["info_db", "info_server"].join(",");
 
 const dayjs = require("dayjs");
 dayjs.extend(require("dayjs/plugin/utc"));
@@ -12,7 +12,7 @@ const { Settings } = require("../../server/settings");
 const { setEnforcementEnabled } = require("../../server/security/authz");
 const { buildActorForUser } = require("../../server/security/actor-repository");
 const { roomFor } = require("../../server/security/rooms");
-const { UptimeKumaServer } = require("../../server/uptime-kuma-server");
+const { SuperKumaServer } = require("../../server/superkuma-server");
 const { monitorSocketHandler } = require("../../server/socket-handlers/monitor-socket-handler");
 const { maintenanceSocketHandler } = require("../../server/socket-handlers/maintenance-socket-handler");
 const { statusPageSocketHandler } = require("../../server/socket-handlers/status-page-socket-handler");
@@ -227,7 +227,7 @@ describe("Two-team isolation, end-to-end (ADR-0010 P4 capstone fixture)", () => 
         });
 
         test("list scoping: Bob sees zero monitors, Alice sees exactly her own, via the real getMonitorJSONList", async () => {
-            const server = UptimeKumaServer.getInstance();
+            const server = SuperKumaServer.getInstance();
             const bobActor = await buildActorForUser(bob);
             const aliceActor = await buildActorForUser(alice);
 
@@ -245,7 +245,7 @@ describe("Two-team isolation, end-to-end (ADR-0010 P4 capstone fixture)", () => 
 
         before(async () => {
             setEnforcementEnabled(true);
-            server = UptimeKumaServer.getInstance();
+            server = SuperKumaServer.getInstance();
             server.io.on("connection", (socket) => {
                 const q = socket.handshake.query;
                 socket.join(roomFor(Number(q.userId), q.teamId ? Number(q.teamId) : null));

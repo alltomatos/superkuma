@@ -1,4 +1,4 @@
-# ADR-0010 — Teams + RBAC Granular (Multi-Tenancy) para o fork Uptime Kuma
+# ADR-0010 — Teams + RBAC Granular (Multi-Tenancy) para o fork SuperKuma
 
 **Status:** PROPOSTA FINAL (Tier-3 — requer "Go" humano explícito antes de qualquer código)
 **Data:** 2026-07-04
