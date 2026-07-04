@@ -18,7 +18,7 @@ class Webpush extends NotificationProvider {
             webpush.setVapidDetails("https://github.com/alltomatos/superkuma", publicVapidKey, privateVapidKey);
 
             const data = JSON.stringify({
-                title: "Uptime Kuma",
+                title: "SuperKuma",
                 body: msg,
             });
 

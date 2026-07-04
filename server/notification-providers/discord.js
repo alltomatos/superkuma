@@ -19,7 +19,7 @@ class Discord extends NotificationProvider {
 
         try {
             let config = this.getAxiosConfigWithProxy({});
-            const discordDisplayName = notification.discordUsername || "Uptime Kuma";
+            const discordDisplayName = notification.discordUsername || "SuperKuma";
             const webhookUrl = new URL(notification.discordWebhookUrl);
             if (notification.discordChannelType === "postToThread") {
                 webhookUrl.searchParams.append("thread_id", notification.threadId);
