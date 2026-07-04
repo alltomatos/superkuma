@@ -206,6 +206,31 @@ async function authorizeResource(actor, action, resourceType, resourceId, teamId
 }
 
 /**
+ * Convenience wrapper around {@link authorizeResource} for call sites that want
+ * to throw rather than branch on a boolean. This is the call every retrofitted
+ * handler/gate should use (ADR-0010 phase P3): while enforcement is OFF it is a
+ * pure no-op (never even calls the loader), so it can be inserted ahead of an
+ * existing legacy ownership check without changing today's behaviour. Existing
+ * `WHERE ... AND user_id = ?` predicates are intentionally left in place during
+ * P3 — only P4 (tied to the enforcement flip) switches the trusted column to
+ * `team_id`, avoiding a window where a stale/incomplete team model could grant
+ * broader access than the current per-user check for an existing multi-user
+ * install.
+ * @param {Actor} actor The actor requesting access.
+ * @param {string} action Canonical (team-scoped) action string.
+ * @param {string} resourceType The resource family (e.g. "monitor").
+ * @param {number} resourceId The resource id to resolve the owning team from.
+ * @param {Function} teamIdLoader Async (resourceType, resourceId) => teamId|null.
+ * @returns {Promise<void>}
+ * @throws {ForbiddenError} If the actor lacks the permission (enforcement ON only).
+ */
+async function requireResource(actor, action, resourceType, resourceId, teamIdLoader) {
+    if (!(await authorizeResource(actor, action, resourceType, resourceId, teamIdLoader))) {
+        throw new ForbiddenError(`Permission denied: ${action}`);
+    }
+}
+
+/**
  * Build a SQL WHERE fragment restricting a list query to rows an actor may see.
  * Enforced mode filters by the actor's team memberships (optionally only those
  * granting a given read permission); flag-OFF falls back to the legacy per-user
@@ -253,5 +278,6 @@ module.exports = {
     can,
     requirePermission,
     authorizeResource,
+    requireResource,
     scopeFilter,
 };

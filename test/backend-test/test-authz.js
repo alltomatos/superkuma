@@ -19,6 +19,7 @@ const {
     can,
     requirePermission,
     authorizeResource,
+    requireResource,
     scopeFilter,
     setEnforcementEnabled,
     isEnforcementEnabled,
@@ -252,6 +253,14 @@ describe("authorization with enforcement ON", () => {
         const nullLoader = async () => null;
         assert.strictEqual(await authorizeResource(editor, "monitor:read", "monitor", 1, nullLoader), false);
     });
+
+    test("requireResource throws ForbiddenError when denied and resolves silently when allowed", async () => {
+        const loaderTeam1 = async () => 1;
+        const loaderTeam2 = async () => 2;
+        await assert.doesNotReject(requireResource(editor, "monitor:read", "monitor", 1, loaderTeam1));
+        await assert.rejects(requireResource(viewer, "monitor:create", "monitor", 1, loaderTeam1), ForbiddenError);
+        await assert.rejects(requireResource(editor, "monitor:read", "monitor", 1, loaderTeam2), ForbiddenError);
+    });
 });
 
 // -------------------------------------------------------------------------
@@ -335,6 +344,17 @@ describe("flag-OFF dark-launch contract", () => {
         };
         const actor = buildActor({ userId: 42, isSuperadmin: false }, []);
         assert.strictEqual(await authorizeResource(actor, "monitor:update", "monitor", 1, loader), true);
+        assert.strictEqual(called, false, "loader must not run while enforcement is OFF");
+    });
+
+    test("requireResource never throws and never calls the loader while OFF", async () => {
+        let called = false;
+        const loader = async () => {
+            called = true;
+            return 1;
+        };
+        const actor = buildActor({ userId: 42, isSuperadmin: false }, []);
+        await assert.doesNotReject(requireResource(actor, "monitor:delete", "monitor", 1, loader));
         assert.strictEqual(called, false, "loader must not run while enforcement is OFF");
     });
 });
