@@ -421,6 +421,11 @@ let needSetup = false;
                         throw new Error("The token is invalid due to password change or old token");
                     }
 
+                    // Grandfather tokens issued before token_version existed as v0 (ADR-0010 R6).
+                    if ((decoded.tv ?? 0) !== (user.token_version ?? 0)) {
+                        throw new Error("The token has been revoked");
+                    }
+
                     log.debug("auth", "afterLogin");
                     await afterLogin(socket, user);
                     log.debug("auth", "afterLogin ok");
@@ -482,7 +487,7 @@ let needSetup = false;
 
                     callback({
                         ok: true,
-                        token: User.createJWT(user, server.jwtSecret),
+                        token: await User.createSignedToken(user, server.jwtSecret),
                     });
                 }
 
@@ -509,7 +514,7 @@ let needSetup = false;
 
                         callback({
                             ok: true,
-                            token: User.createJWT(user, server.jwtSecret),
+                            token: await User.createSignedToken(user, server.jwtSecret),
                         });
                     } else {
                         log.warn("auth", `Invalid token provided for user ${data.username}. IP=${clientIP}`);
@@ -763,7 +768,7 @@ let needSetup = false;
 
                 callback({
                     ok: true,
-                    token: User.createJWT(user, server.jwtSecret),
+                    token: await User.createSignedToken(user, server.jwtSecret),
                     msg: "successAuthChangePassword",
                     msgi18n: true,
                 });
@@ -1058,7 +1063,9 @@ let needSetup = false;
         log.debug("auth", "check auto login");
         if (await setting("disableAuth")) {
             log.info("auth", "Disabled Auth: auto login to admin");
-            await afterLogin(socket, await R.findOne("user"));
+            // Deterministic auto-login (ADR-0010 R12): lowest-id active user
+            // (which the backfill made the super admin), not a plan-dependent row.
+            await afterLogin(socket, await R.findOne("user", " active = 1 ORDER BY id ASC "));
             socket.emit("autoLogin");
         } else {
             socket.emit("loginRequired");
@@ -1136,6 +1143,18 @@ async function checkOwner(userID, monitorID) {
 async function afterLogin(socket, user) {
     socket.userID = user.id;
     socket.join(user.id);
+
+    // Dark-launch (ADR-0010 P2): attach the RBAC actor + permission payload.
+    // Must never break login while enforcement is OFF.
+    try {
+        const { buildActorForUser, buildPermissionPayload } = require("./security/actor-repository");
+        socket.actor = await buildActorForUser(user);
+        socket.permissionPayload = await buildPermissionPayload(user, socket.actor);
+    } catch (e) {
+        socket.actor = null;
+        socket.permissionPayload = null;
+        log.warn("auth", "RBAC actor build skipped (dark-launch): " + e.message);
+    }
 
     let monitorList = await server.sendMonitorList(socket);
     await Promise.allSettled([

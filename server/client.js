@@ -159,6 +159,14 @@ async function sendInfo(socket, hideVersion = false) {
         };
     }
 
+    // Dark-launch (ADR-0010 P2): expose the current user + their teams/permissions
+    // so the frontend can render role-gated UI. Server-side remains the boundary.
+    if (socket.permissionPayload) {
+        info.currentUser = socket.permissionPayload.currentUser;
+        info.teams = socket.permissionPayload.teams;
+        info.activeTeamId = socket.permissionPayload.activeTeamId;
+    }
+
     socket.emit("info", info);
 }
 

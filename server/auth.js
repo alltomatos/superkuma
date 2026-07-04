@@ -36,7 +36,7 @@ exports.login = async function (username, password) {
 /**
  * Validate a provided API key
  * @param {string} key API key to verify
- * @returns {boolean} API is ok?
+ * @returns {Promise<(object|boolean)>} The api_key bean if valid, otherwise false
  */
 async function verifyAPIKey(key) {
     if (typeof key !== "string") {
@@ -59,7 +59,9 @@ async function verifyAPIKey(key) {
         return false;
     }
 
-    return hash && passwordHash.verify(clear, hash.key);
+    // Return the bean itself (not just a boolean) so callers can build a
+    // permission-scoped actor from it (ADR-0010 P2/§8.4).
+    return passwordHash.verify(clear, hash.key) ? hash : false;
 }
 
 /**
@@ -111,7 +113,7 @@ function apiAuthorizer(username, password, callback) {
                 if (!valid) {
                     log.warn("api-auth", "Failed API auth attempt: invalid API Key");
                 }
-                callback(null, valid);
+                callback(null, Boolean(valid));
                 // Only allow a set number of api requests per minute
                 // (currently set to 60)
                 apiRateLimiter.removeTokens(1);
