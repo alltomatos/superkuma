@@ -277,7 +277,8 @@
   ref: ADR-0010
   risco: T3
   depends_on: [TASK-R1]
-  status: blocked
+  status: done   # commit 4b8fa74b (NÃO pushed). actor-repository (buildActorForUser/ApiKey/PermissionPayload, knex builder p/ quoting cross-DB de "role") + JWT sub/tv + createSignedToken (jwtExpiryHours default 0 = SEM exp, opt-in; ajuste vs ADR "8h" p/ não deslogar dashboards) + loginByToken grandfather (tv??0) + verifyAPIKey retorna bean + sendInfo payload + disableAuth determinístico (id ASC). req.actor HTTP ADIADO p/ P4 (junto do gate /metrics). 6 unit + 22 login-flow + 76 regressão + mutation 3/3. Enforcement OFF.
+  concluido_em: "2026-07-04"
 
 - id: TASK-R3
   desc: "P3 Enforcement socket: checkOwner->require; ~21 gates + ~15 handlers antes omitidos (status-page, tags, maintenance-joins, clearEvents/clearHeartbeats/getMonitorBeats); validação FK cross-resource; list scoping via scopeFilter; regra hard team_id (freeze-mode); CI sweep."
@@ -335,6 +336,7 @@
 | 16 | 2026-07-03 | ADR-0008/0009 | TASK-F0+M0: fundação schema Master-Agent (remote_instance, ON DELETE SET NULL) + histórico de métricas (stat_monthly) | Primeira mudança real de schema da sessão. 2 tentativas de delegação falharam (agente só relatou "vou aguardar" sem executar); executado diretamente. Achado e corrigido: toJSON() usava convenção underscore de tag.js (retornava undefined nesta versão do redbean-node) — trocado p/ convenção sem underscore de api_key.js/monitor.js. 265/265 backend + 26/26 e2e + zero-wiring grep vazio. Ambiente teve bastante flakiness de processo/porta (limpo com PowerShell). commit 9641dbc3 |
 | 17 | 2026-07-04 | ADR-0010 | TASK-R0: P0 RBAC — `permissions/catalog.js` + `security/authz.js` + 36 testes | Branch `feat/rbac-multitenant`, commit `973c05aa` (**não pushed**). Enforcement default OFF. Mutation-check independente **4/4** (isolamento de time, bypass superadmin, contrato flag-OFF, escada de privilégios). Worktree isolada `.claude/worktrees/rbac`. Resolve a origem do "ADR misterioso" do Incidente 2. |
 | 18 | 2026-07-04 | ADR-0010 | TASK-R1: P1 migração RBAC + backfill (dark-launch) | Commit `0a293219` (**não pushed**). 6 tabelas + team_id em 9 tabelas + status_page.is_public + api_key.role_id + user flags. Backfill: Default Team, users→owner, MIN(id)→superadmin, api keys legadas→viewer, `group` intocado. **Validado nos 4 engines** (SQLite/Postgres/MySQL/MariaDB) via testcontainers: up+backfill+idempotência+down. Mutation-check independente 4/4. Enforcement OFF. Achado: ordem de createTable do ADR §5 estava invertida (role antes de team) — corrigida na migração. |
+| 19 | 2026-07-04 | ADR-0010 | TASK-R2: P2 buildActor + JWT hardening (dark) | Commit `4b8fa74b` (**não pushed**). `actor-repository.js` (actor de user/api-key/payload) + JWT `sub`/`tv` + `createSignedToken` (exp opt-in via `jwtExpiryHours`, default 0) + grandfather no `loginByToken` + `verifyAPIKey`→bean + `sendInfo` com currentUser/teams/permissions + disableAuth determinístico. **req.actor HTTP adiado p/ P4** (junto do gate `/metrics`). 6 unit + 22 login-flow (federação sobe servidor) + 76 regressão + mutation 3/3. Enforcement OFF. Fecha o mecanismo de GAP-002 (exp opt-in + token_version). |
 
 ---
 
