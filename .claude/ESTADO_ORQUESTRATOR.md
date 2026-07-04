@@ -205,11 +205,11 @@
   concluido_em: "2026-07-03"
 
 - id: TASK-F3
-  desc: "F3 UI unificada: badge de instância + agrupamento no dashboard + página de config (Federação)"
+  desc: "F3 UI unificada. Fase 1: Monitor.toJSON() expõe remoteInstanceId (+ atualiza os 19 testes de caracterização). Fase 2: Federation.vue (lista/add/delete remote_instance, molde APIKeys.vue) + config do Agent (reusa setSettings genérico, com teste anti-clobber) + badge no MonitorListItem (lookup local, sem N+1)"
   ref: ADR-0008
   risco: T2
   depends_on: [TASK-F2]
-  status: blocked
+  status: in_progress   # Workflow wf_40d82b71-827
 
 - id: TASK-F4
   desc: "F4 Federação Socket.io (v2): server/federation/agent-client.js persistente + keepalive + detecção 'agente caiu'"
