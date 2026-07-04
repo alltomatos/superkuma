@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues e PRDs deste repo vivem como GitHub issues no fork `alltomatos/superkuma`. Use o `gh` CLI para todas as operações.
+Issues e PRDs deste repo vivem como GitHub issues em `alltomatos/superkuma`. Use o `gh` CLI para todas as operações.
 
 ## Convenções
 
@@ -15,4 +15,4 @@ O repo é inferido de `git remote -v` (`gh` faz isso automaticamente dentro do c
 
 ## ⚠️ Política de PR
 
-Este é um **fork privado**. **Nenhum PR gerado por agente deve ir para o upstream `louislam/uptime-kuma`** — ver a política anti-AI-slop em `CLAUDE.md` / `AGENTS.md`. Issues e PRs ficam no fork, e mudanças grandes exigem revisão humana + teste manual antes de qualquer push.
+Este é um **projeto próprio**, com raízes no `louislam/uptime-kuma` original. **Nenhum PR gerado por agente deve ir para lá** — ver a política anti-AI-slop em `CLAUDE.md` / `AGENTS.md`. Issues e PRs ficam neste repo, e mudanças grandes exigem revisão humana + teste manual antes de qualquer push.

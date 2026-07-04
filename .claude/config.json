@@ -1,6 +1,6 @@
 {
-    "project": "uptime-kuma",
-    "fork": "alltomatos/uptime-kuma",
+    "project": "superkuma",
+    "repo": "alltomatos/superkuma",
     "upstream": "louislam/uptime-kuma",
     "stack": {
         "frontend": "Vue 3 + Vite",
@@ -17,7 +17,7 @@
     "policy": {
         "upstreamAiSlopPolicy": "CLAUDE.md / AGENTS.md (mantenedores) — respeitar SEMPRE",
         "noUpstreamPR": true,
-        "rule": "Este e um fork privado. Nenhum PR gerado por agente vai para louislam/uptime-kuma. Mudancas grandes exigem revisao humana + teste manual antes de qualquer push. Nunca submeter codigo gerado + descricao de LLM sem revisao."
+        "rule": "SuperKuma e um projeto independente com raizes no louislam/uptime-kuma original. Nenhum PR gerado por agente vai para la. Mudancas grandes exigem revisao humana + teste manual antes de qualquer push. Nunca submeter codigo gerado + descricao de LLM sem revisao."
     },
     "standards": {
         "lint": "npm run lint",

@@ -1,7 +1,7 @@
-# ORCHESTRATOR ROADMAP — SuperKuma (fork alltomatos)
+# ORCHESTRATOR ROADMAP — SuperKuma (alltomatos)
 
 > Direção estratégica e Epics. Consultado por qualquer skill de planejamento.
-> Fork privado — **sem PR para o upstream `louislam/uptime-kuma`**. Respeitar a política anti-AI-slop de `CLAUDE.md`/`AGENTS.md`: mudanças grandes exigem revisão humana + teste manual antes de qualquer push.
+> Projeto próprio, com raízes no `louislam/uptime-kuma` original (créditos no README) — **sem PR para lá**. Respeitar a política anti-AI-slop de `CLAUDE.md`/`AGENTS.md`: mudanças grandes exigem revisão humana + teste manual antes de qualquer push.
 
 **Atualizado em:** 2026-07-04
 **Baseline:** v2.4.0 · ~63,7k LOC · 193 arq. backend · 185 frontend
@@ -10,7 +10,7 @@
 
 ## Norte
 
-Padronizar e endurecer o fork sem quebrar comportamento, priorizando **segurança de segredos** e **quebra de monólitos** para testabilidade, com execução **tier-gated** (aprovação por item nos T3).
+Padronizar e endurecer o projeto sem quebrar comportamento, priorizando **segurança de segredos** e **quebra de monólitos** para testabilidade, com execução **tier-gated** (aprovação por item nos T3).
 
 ---
 
@@ -102,7 +102,7 @@ Salvaguarda transversal: o modo `standalone` (default) deve permanecer **sem reg
 
 > Design: [ADR-0010](docs/adr/0010-teams-rbac-multitenancy.md). Decisões do usuário (2026-07-04): **times/grupos + RBAC granular + criação de usuário só por admin**; **1 papel por (user,team)** na v1; status pages **team-scoped com `is_public`**; **desativar** usuário (não hard-delete); API keys legadas → **viewer** no flip.
 
-Transforma o fork de single-user em **multi-tenant com Teams**. `team_id` vira o eixo de autorização/consulta (o `user_id` permanece como principal de auditoria, **sem rename**). Enforcement atrás de flag **dark-launch `rbacEnforced`** (OFF = byte-idêntico ao legado). Design endurecido por workflow (3 arquitetos + painel de juízes + 2 red-teams; **8 falhas estruturais corrigidas** e verificadas no código). Fecha **GAP-002** (JWT `exp` + `token_version`) e **GAP-008** (`verifyAPIKey` com `user_id`/escopo); **re-abre GAP-001** (segredos em texto plano — reavaliar cifragem agora que há multi-tenant).
+Transforma o projeto de single-user em **multi-tenant com Teams**. `team_id` vira o eixo de autorização/consulta (o `user_id` permanece como principal de auditoria, **sem rename**). Enforcement atrás de flag **dark-launch `rbacEnforced`** (OFF = byte-idêntico ao legado). Design endurecido por workflow (3 arquitetos + painel de juízes + 2 red-teams; **8 falhas estruturais corrigidas** e verificadas no código). Fecha **GAP-002** (JWT `exp` + `token_version`) e **GAP-008** (`verifyAPIKey` com `user_id`/escopo); **re-abre GAP-001** (segredos em texto plano — reavaliar cifragem agora que há multi-tenant).
 
 | Fase                             | Entrega                                                                                                                                                                                     | Tier | Status                                                                            |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------------------- |

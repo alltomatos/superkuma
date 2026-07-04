@@ -440,8 +440,13 @@ Os três gaps achados até agora eram itens que EU não tinha atribuído explici
 - id: TASK-SK10
   desc: "PR #4 (chore/rebrand-superkuma -> develop) aberto. Aguardar revisão/aprovação humana + CI verde antes do merge."
   depends_on: [TASK-SK9]
-  status: in_progress # PR aberto: https://github.com/alltomatos/uptime-kuma/pull/4 . CI achou 2 falhas: (1) check-file-changes (prevent-file-change.yml) -- removido, commit 9fd62c9c (ver TASK-SK10 nota anterior / GAP resolvido). (2) autofix (autofix-ci bot) -- investigado a fundo: esse check roda os fixers sobre a ÁRVORE INTEIRA do repo (não só o diff da PR) e precisa do GitHub App autofix.ci instalado pra auto-commitar; sem o App, fica vermelho pra sempre até alguém reformatar TODO o repo (~423 arquivos de drift pré-existente, virou GAP-012). Usuário decidiu (AskUserQuestion): deixar esse check falhar -- não bloqueia merge (`develop` sem branch protection) -- e resolver GAP-012 depois, numa PR dedicada. Únicas mudanças mantidas desta investigação: nenhuma (working tree revertido ao estado do commit 28bc701e, limpo). Aguardando aprovação humana do PR para prosseguir ao merge + rename do repo.
+  status: done # CI achou 2 falhas: (1) check-file-changes (prevent-file-change.yml) -- removido, commit 9fd62c9c. (2) autofix (autofix-ci bot) -- investigado a fundo, vira GAP-012/014, decisão do usuário: deixar falhar (não bloqueia merge). PR #2 do RBAC mergeou em develop ANTES do #4 (inverteu a sequência planejada) -- exigiu resolver 7 conflitos reais (rename vs. imports/params novos do RBAC) + achar 18 arquivos de teste do RBAC ainda importando `server/uptime-kuma-server` (path morto) / usando `UPTIME_KUMA_HIDE_LOG` (env var morta). **Erro próprio**: esqueci de `git add` esses 18 arquivos antes do commit do merge -- PR #4 mergeou sem eles; corrigido no mesmo dia via PR #5 (mergeado). PR #4 mergeado 2026-07-04 (commit f48d746d), PR #5 mergeado 2026-07-04 (commit faabf455).
 
-### Passo final (após merge do PR #4)
+- id: TASK-SK11
+  desc: "Usuário decidiu (2026-07-04) parar de tratar o projeto como \"fork\" -- é o SuperKuma, projeto próprio, com raízes no Uptime Kuma. Remover referências ao repo original, autofix.ci, e reescrever o README pra essa nova realidade (com créditos)."
+  depends_on: [TASK-SK10]
+  status: in_progress # PR #6 (chore/drop-fork-references -> develop) aberto, aguardando revisão. Removido autofix.yml (GAP-014) e CNAME; CODE_OF_CONDUCT.md e-mail atualizado; 3 guards de Docker publish repontados pra alltomatos/superkuma (decisão revertida -- antes ficavam intocados de propósito); linguagem "fork privado" trocada por "projeto independente" em CLAUDE.md/ORCHESTRATOR-ROADMAP.md/docs/agents/issue-tracker.md/.claude/config.json; README "Motivation" virou "Credits"; descrição do repo no GitHub atualizada. LICENSE deliberadamente intocado (MIT exige manter aviso de copyright do Louis Lam -- confirmado ao usuário que a licença permite tudo que ele quer fazer).
+
+### Passo final (após merge do PR #6)
 
 `gh repo rename superkuma` → atualizar remotes nas outras 2 worktrees (`ci-setup`, `rbac`).
