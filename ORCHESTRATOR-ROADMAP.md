@@ -69,7 +69,7 @@ Modelo Master-Agent para agregar N instâncias de clientes num painel central co
 | **F0** Fundação | migration `remote_instance` + `monitor.remote_instance_id` + model + setting `federation.role` | T3 | ✅ concluída — commit `9641dbc3` |
 | **F1** Receptor Master (MVP) | registro `remote_instance` + `POST /api/federation/heartbeat` + espelhamento idempotente (`type=push`) | T2 | ✅ concluída — commit `2e99ae72` |
 | **F2** Forwarder Agent (MVP) | `agent-forwarder.js` resiliente + hook mínimo (5 linhas) em `monitor.js` | T2 | ✅ concluída — commit `5d6cdecb` |
-| **F3** UI unificada | badge de instância, agrupamento no dashboard, página de config | T2 | ▶️ destravada |
+| **F3** UI unificada | `Federation.vue` (gestão de instâncias remotas + config do Agent) + badge no monitor list | T2 | ✅ concluída — commits `314a71fd` + `f16b2828` |
 | **F4** Federação Socket.io (v2) | `agent-client.js` persistente + keepalive + detecção "agente caiu" | T3 | ⏸ bloqueada por F2 |
 | **F5** Robustez | buffering offline, versionamento de protocolo, notificação configurável, sync rename/delete | T2 | ⏸ bloqueada por F3/F4 |
 
