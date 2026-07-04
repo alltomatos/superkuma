@@ -202,6 +202,7 @@ const { proxySocketHandler } = require("./socket-handlers/proxy-socket-handler")
 const { dockerSocketHandler } = require("./socket-handlers/docker-socket-handler");
 const { maintenanceSocketHandler } = require("./socket-handlers/maintenance-socket-handler");
 const { apiKeySocketHandler } = require("./socket-handlers/api-key-socket-handler");
+const { remoteInstanceSocketHandler } = require("./socket-handlers/remote-instance-socket-handler");
 const { generalSocketHandler } = require("./socket-handlers/general-socket-handler");
 const { monitorSocketHandler } = require("./socket-handlers/monitor-socket-handler");
 const { Settings } = require("./settings");
@@ -375,6 +376,10 @@ let needSetup = false;
     // Status Page Router
     const statusPageRouter = require("./routers/status-page-router");
     app.use(statusPageRouter);
+
+    // Federation Router
+    const federationRouter = require("./routers/federation-router");
+    app.use(federationRouter);
 
     // Universal Route Handler, must be at the end of all express routes.
     app.get("*", async (_request, response) => {
@@ -1033,6 +1038,7 @@ let needSetup = false;
         dockerSocketHandler(socket);
         maintenanceSocketHandler(socket);
         apiKeySocketHandler(socket);
+        remoteInstanceSocketHandler(socket);
         remoteBrowserSocketHandler(socket);
         generalSocketHandler(socket, server);
         chartSocketHandler(socket);

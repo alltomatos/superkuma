@@ -63,6 +63,33 @@ async function verifyAPIKey(key) {
 }
 
 /**
+ * Validate a provided remote instance (federation agent) token
+ * @param {string} token Remote instance token to verify
+ * @returns {Promise<(object|false)>} The remote_instance bean if valid, otherwise false
+ */
+exports.verifyRemoteInstanceToken = async function (token) {
+    if (typeof token !== "string") {
+        return false;
+    }
+
+    // ri prefix + remote_instance ID is before _
+    let index = token.substring(2, token.indexOf("_"));
+    let clear = token.substring(token.indexOf("_") + 1, token.length);
+
+    let remoteInstance = await R.findOne("remote_instance", " id = ? ", [index]);
+
+    if (remoteInstance === null) {
+        return false;
+    }
+
+    if (!remoteInstance.active) {
+        return false;
+    }
+
+    return passwordHash.verify(clear, remoteInstance.token_hash) ? remoteInstance : false;
+};
+
+/**
  * Callback for basic auth authorizers
  * @callback authCallback
  * @param {any} err Any error encountered
