@@ -36,7 +36,16 @@
                                 />
                             </span>
                             <div class="flex-fill text-truncate" style="min-width: 0">
-                                <div class="text-truncate">{{ monitor.name }}</div>
+                                <div class="text-truncate">
+                                    {{ monitor.name }}
+                                    <span
+                                        v-if="monitor.remoteInstanceId"
+                                        class="badge bg-primary ms-2"
+                                        :title="$t('federatedMonitorTooltip', { name: remoteInstanceName })"
+                                    >
+                                        {{ remoteInstanceName }}
+                                    </span>
+                                </div>
                                 <div v-if="monitor.tags.length > 0" class="tags gap-1">
                                     <Tag
                                         v-for="tag in monitor.tags"
@@ -162,6 +171,24 @@ export default {
         },
         hasChildren() {
             return this.sortedChildMonitorList.length > 0;
+        },
+        /**
+         * Resolve this monitor's remote instance name purely client-side
+         * from the already-loaded Federation remote instance list (no
+         * backend enrichment/query). Falls back to the raw ID if the
+         * instance is not (yet) loaded locally.
+         * @returns {(string|null)} Remote instance name, raw ID fallback, or null if not federated
+         */
+        remoteInstanceName() {
+            if (!this.monitor.remoteInstanceId) {
+                return null;
+            }
+
+            const remoteInstance = this.$root.remoteInstanceList.find(
+                (item) => item.id === this.monitor.remoteInstanceId
+            );
+
+            return remoteInstance ? remoteInstance.name : String(this.monitor.remoteInstanceId);
         },
         depthMargin() {
             return {

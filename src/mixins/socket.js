@@ -45,6 +45,7 @@ export default {
             monitorTypeList: {},
             maintenanceList: {},
             apiKeyList: {},
+            remoteInstanceList: [],
             heartbeatList: {},
             avgPingList: {},
             uptimeList: {},
@@ -557,6 +558,26 @@ export default {
         },
 
         /**
+         * Fetch and store the list of registered remote instances
+         * (Master-Agent federation). Unlike apiKeyList, the server does not
+         * push updates for this list, so callers must re-fetch after any
+         * add/delete.
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        getRemoteInstanceList(callback) {
+            if (!callback) {
+                callback = () => {};
+            }
+            socket.emit("getRemoteInstanceList", (res) => {
+                if (res.ok) {
+                    this.remoteInstanceList = res.remoteInstanceList;
+                }
+                callback(res);
+            });
+        },
+
+        /**
          * Add a monitor
          * @param {object} monitor Object representing monitor to add
          * @param {socketCB} callback Callback for socket response
@@ -657,6 +678,36 @@ export default {
          */
         deleteAPIKey(keyID, callback) {
             socket.emit("deleteAPIKey", keyID, callback);
+        },
+
+        /**
+         * Register a new remote instance (Master-Agent federation)
+         * @param {object} remoteInstance Remote instance to add ({ name, instanceId })
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        addRemoteInstance(remoteInstance, callback) {
+            socket.emit("addRemoteInstance", remoteInstance, (res) => {
+                if (res.ok) {
+                    this.getRemoteInstanceList();
+                }
+                callback(res);
+            });
+        },
+
+        /**
+         * Delete specified remote instance
+         * @param {number} remoteInstanceID ID of remote instance to delete
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        deleteRemoteInstance(remoteInstanceID, callback) {
+            socket.emit("deleteRemoteInstance", remoteInstanceID, (res) => {
+                if (res.ok) {
+                    this.getRemoteInstanceList();
+                }
+                callback(res);
+            });
         },
 
         /**

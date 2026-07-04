@@ -31,6 +31,7 @@ const Security = () => import("./components/settings/Security.vue");
 import Proxies from "./components/settings/Proxies.vue";
 import About from "./components/settings/About.vue";
 import RemoteBrowsers from "./components/settings/RemoteBrowsers.vue";
+import Federation from "./components/settings/Federation.vue";
 
 const routes = [
     {
@@ -130,6 +131,10 @@ const routes = [
                             {
                                 path: "proxies",
                                 component: Proxies,
+                            },
+                            {
+                                path: "federation",
+                                component: Federation,
                             },
                             {
                                 path: "about",
