@@ -6,7 +6,7 @@ concurrency:
 
 on:
   push:
-    branches: [master, 1.23.X, 3.0.0]
+    branches: [master, main, develop, 1.23.X, 3.0.0]
   pull_request:
 permissions: {}
 
