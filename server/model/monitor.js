@@ -723,7 +723,7 @@ class Monitor extends BeanModel {
                 log.debug("monitor", `[${this.name}] apicache clear`);
                 apicache.clear();
 
-                await UptimeKumaServer.getInstance().sendMaintenanceListByUserID(this.user_id);
+                await UptimeKumaServer.getInstance().sendMaintenanceListByUserID(this.user_id, this.team_id);
             } else {
                 bean.important = false;
 
@@ -797,8 +797,11 @@ class Monitor extends BeanModel {
 
             // Send to frontend
             log.debug("monitor", `[${this.name}] Send to socket`);
-            io.to(this.user_id).emit("heartbeat", bean.toJSON());
-            Monitor.sendStats(io, this.id, this.user_id);
+            {
+                const { roomFor } = require("../security/rooms");
+                io.to(roomFor(this.user_id, this.team_id)).emit("heartbeat", bean.toJSON());
+            }
+            Monitor.sendStats(io, this.id, this.user_id, this.team_id);
 
             // Store to database
             log.debug("monitor", `[${this.name}] Store`);
@@ -1055,33 +1058,40 @@ class Monitor extends BeanModel {
      * @param {Server} io Socket server instance
      * @param {number} monitorID ID of monitor to send
      * @param {number} userID ID of user to send to
+     * @param {number} teamId The monitor's owning team id (ADR-0010); used
+     * only when enforcement is ON to route to the team's room instead of the
+     * legacy per-user room. Optional so callers that only have a userID
+     * (none currently do, but keeps this a non-breaking addition) keep
+     * working unchanged while enforcement is OFF.
      * @returns {void}
      */
-    static async sendStats(io, monitorID, userID) {
-        const hasClients = getTotalClientInRoom(io, userID) > 0;
+    static async sendStats(io, monitorID, userID, teamId = null) {
+        const { roomFor } = require("../security/rooms");
+        const room = roomFor(userID, teamId);
+        const hasClients = getTotalClientInRoom(io, room) > 0;
         let uptimeCalculator = await UptimeCalculator.getUptimeCalculator(monitorID);
 
         if (hasClients) {
             // Send 24 hour average ping
             let data24h = await uptimeCalculator.get24Hour();
-            io.to(userID).emit("avgPing", monitorID, data24h.avgPing ? Number(data24h.avgPing.toFixed(2)) : null);
+            io.to(room).emit("avgPing", monitorID, data24h.avgPing ? Number(data24h.avgPing.toFixed(2)) : null);
 
             // Send 24 hour uptime
-            io.to(userID).emit("uptime", monitorID, 24, data24h.uptime);
+            io.to(room).emit("uptime", monitorID, 24, data24h.uptime);
 
             // Send 30 day uptime
             let data30d = await uptimeCalculator.get30Day();
-            io.to(userID).emit("uptime", monitorID, 720, data30d.uptime);
+            io.to(room).emit("uptime", monitorID, 720, data30d.uptime);
 
             // Send 1-year uptime
             let data1y = await uptimeCalculator.get1Year();
-            io.to(userID).emit("uptime", monitorID, "1y", data1y.uptime);
+            io.to(room).emit("uptime", monitorID, "1y", data1y.uptime);
 
             // Send Cert Info
-            await Monitor.sendCertInfo(io, monitorID, userID);
+            await Monitor.sendCertInfo(io, monitorID, userID, teamId);
 
             // Send domain info
-            await Monitor.sendDomainInfo(io, monitorID, userID);
+            await Monitor.sendDomainInfo(io, monitorID, userID, teamId);
         } else {
             log.debug("monitor", "No clients in the room, no need to send stats");
         }
@@ -1092,12 +1102,14 @@ class Monitor extends BeanModel {
      * @param {Server} io Socket server instance
      * @param {number} monitorID ID of monitor to send
      * @param {number} userID ID of user to send to
+     * @param {number} teamId The monitor's owning team id (ADR-0010), see {@link Monitor.sendStats}
      * @returns {void}
      */
-    static async sendCertInfo(io, monitorID, userID) {
+    static async sendCertInfo(io, monitorID, userID, teamId = null) {
+        const { roomFor } = require("../security/rooms");
         let tlsInfo = await R.findOne("monitor_tls_info", "monitor_id = ?", [monitorID]);
         if (tlsInfo != null) {
-            io.to(userID).emit("certInfo", monitorID, tlsInfo.info_json);
+            io.to(roomFor(userID, teamId)).emit("certInfo", monitorID, tlsInfo.info_json);
         }
     }
 
@@ -1106,16 +1118,23 @@ class Monitor extends BeanModel {
      * @param {Server} io Socket server instance
      * @param {number} monitorID ID of monitor to send
      * @param {number} userID ID of user to send to
+     * @param {number} teamId The monitor's owning team id (ADR-0010), see {@link Monitor.sendStats}
      * @returns {void}
      */
-    static async sendDomainInfo(io, monitorID, userID) {
+    static async sendDomainInfo(io, monitorID, userID, teamId = null) {
+        const { roomFor } = require("../security/rooms");
         const monitor = await R.findOne("monitor", "id = ?", [monitorID]);
 
         try {
             const supportInfo = await DomainExpiry.checkSupport(monitor);
             const domain = await DomainExpiry.findByDomainNameOrCreate(supportInfo.domain);
             if (domain?.expiry) {
-                io.to(userID).emit("domainInfo", monitorID, domain.daysRemaining, new Date(domain.expiry));
+                io.to(roomFor(userID, teamId)).emit(
+                    "domainInfo",
+                    monitorID,
+                    domain.daysRemaining,
+                    new Date(domain.expiry)
+                );
             }
         } catch (e) {}
     }

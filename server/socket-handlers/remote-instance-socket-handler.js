@@ -5,6 +5,8 @@ const { nanoid } = require("nanoid");
 const passwordHash = require("../password-hash");
 const { z } = require("zod");
 const { validate } = require("../validation");
+const { requireResource, scopeFilter } = require("../security/authz");
+const { teamIdLoader } = require("../security/team-id-loaders");
 
 const remoteInstanceIDSchema = z.number().int().positive();
 
@@ -35,6 +37,10 @@ module.exports.remoteInstanceSocketHandler = (socket) => {
             bean.token_hash = hashedSecret;
             bean.active = true;
             bean.user_id = socket.userID;
+            // ADR-0010 R7: without this, every remote_instance (and every
+            // monitor it later mirrors via federation-router.js) is born with
+            // team_id=NULL -- a cross-tenant-invisible orphan.
+            bean.team_id = socket.actor ? socket.actor.activeTeamId : null;
 
             try {
                 await R.store(bean);
@@ -67,7 +73,8 @@ module.exports.remoteInstanceSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
-            let list = await R.find("remote_instance", " user_id = ? ", [socket.userID]);
+            const filter = scopeFilter(socket.actor);
+            let list = await R.find("remote_instance", filter.clause, filter.params);
 
             callback({
                 ok: true,
@@ -86,6 +93,14 @@ module.exports.remoteInstanceSocketHandler = (socket) => {
         try {
             checkLogin(socket);
             remoteInstanceID = validate(remoteInstanceIDSchema, remoteInstanceID);
+
+            await requireResource(
+                socket.actor,
+                "remote_instance:manage",
+                "remote_instance",
+                remoteInstanceID,
+                teamIdLoader
+            );
 
             log.debug("remote-instance", `Deleted Remote Instance: ${remoteInstanceID} User ID: ${socket.userID}`);
 
