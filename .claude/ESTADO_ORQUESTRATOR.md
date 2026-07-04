@@ -195,11 +195,11 @@
   concluido_em: "2026-07-03"
 
 - id: TASK-F2
-  desc: "F2 Forwarder Agent (MVP): hook no beat() de monitor.js + config master/token; ponta-a-ponta REST"
+  desc: "F2 Forwarder Agent (MVP): server/federation/agent-forwarder.js resiliente (no-op se não configurado, timeout limitado, nunca propaga erro) + 1 hook em monitor.js pós R.store(bean). Reusa settings genéricos existentes (Settings.get), sem novo socket handler"
   ref: ADR-0008
   risco: T2
   depends_on: [TASK-F1]
-  status: blocked
+  status: in_progress   # Workflow wf_ef0a78ec-1f2
 
 - id: TASK-F3
   desc: "F3 UI unificada: badge de instância + agrupamento no dashboard + página de config (Federação)"
