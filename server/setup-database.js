@@ -54,14 +54,14 @@ class SetupDatabase {
     runningSetup = false;
     /**
      * @inheritDoc
-     * @type {UptimeKumaServer}
+     * @type {SuperKumaServer}
      * @private
      */
     server;
 
     /**
      * @param  {object} args The arguments passed from the command line
-     * @param  {UptimeKumaServer} server the main server instance
+     * @param  {SuperKumaServer} server the main server instance
      */
     constructor(args, server) {
         this.server = server;

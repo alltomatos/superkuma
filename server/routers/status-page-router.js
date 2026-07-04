@@ -1,6 +1,6 @@
 let express = require("express");
 const apicache = require("../modules/apicache");
-const { UptimeKumaServer } = require("../uptime-kuma-server");
+const { SuperKumaServer } = require("../uptime-kuma-server");
 const StatusPage = require("../model/status_page");
 const { allowDevAllOrigin, sendHttpError } = require("../util-server");
 const { R } = require("redbean-node");
@@ -13,7 +13,7 @@ const { validate } = require("../validation");
 let router = express.Router();
 
 let cache = apicache.middleware;
-const server = UptimeKumaServer.getInstance();
+const server = SuperKumaServer.getInstance();
 
 // Status page slugs are always lower-cased before being looked up, so only
 // lowercase letters, digits and hyphens are ever valid.

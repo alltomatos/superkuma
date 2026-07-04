@@ -1,10 +1,10 @@
 const { checkLogin } = require("../util-server");
 const { Proxy } = require("../proxy");
 const { sendProxyList } = require("../client");
-const { UptimeKumaServer } = require("../uptime-kuma-server");
+const { SuperKumaServer } = require("../uptime-kuma-server");
 const { z } = require("zod");
 const { validate } = require("../validation");
-const server = UptimeKumaServer.getInstance();
+const server = SuperKumaServer.getInstance();
 
 // Username/password are only required by the UI when "auth" is enabled
 // (ProxyDialog.vue toggles their <input required> with proxy.auth), but the
