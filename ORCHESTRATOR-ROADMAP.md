@@ -3,7 +3,7 @@
 > Direção estratégica e Epics. Consultado por qualquer skill de planejamento.
 > Fork privado — **sem PR para o upstream `louislam/uptime-kuma`**. Respeitar a política anti-AI-slop de `CLAUDE.md`/`AGENTS.md`: mudanças grandes exigem revisão humana + teste manual antes de qualquer push.
 
-**Atualizado em:** 2026-07-03
+**Atualizado em:** 2026-07-04
 **Baseline:** v2.4.0 · ~63,7k LOC · 193 arq. backend · 185 frontend
 
 ---
@@ -90,7 +90,27 @@ Salvaguarda transversal: o modo `standalone` (default) deve permanecer **sem reg
 
 ---
 
-## Ordem sugerida (atualizada 2026-07-03)
+## 👥 Feature: Multi-tenant (Teams + RBAC) — em execução (T3)
+
+> Design: [ADR-0010](docs/adr/0010-teams-rbac-multitenancy.md). Decisões do usuário (2026-07-04): **times/grupos + RBAC granular + criação de usuário só por admin**; **1 papel por (user,team)** na v1; status pages **team-scoped com `is_public`**; **desativar** usuário (não hard-delete); API keys legadas → **viewer** no flip.
+
+Transforma o fork de single-user em **multi-tenant com Teams**. `team_id` vira o eixo de autorização/consulta (o `user_id` permanece como principal de auditoria, **sem rename**). Enforcement atrás de flag **dark-launch `rbacEnforced`** (OFF = byte-idêntico ao legado). Design endurecido por workflow (3 arquitetos + painel de juízes + 2 red-teams; **8 falhas estruturais corrigidas** e verificadas no código). Fecha **GAP-002** (JWT `exp` + `token_version`) e **GAP-008** (`verifyAPIKey` com `user_id`/escopo); **re-abre GAP-001** (segredos em texto plano — reavaliar cifragem agora que há multi-tenant).
+
+| Fase | Entrega | Tier | Status |
+|---|---|---|---|
+| **P0** Fundação | `permissions/catalog.js` (vocabulário + papéis built-in) + `security/authz.js` (can/require/scopeFilter/buildActor) + 36 testes — sem schema/comportamento | T2 | ✅ concluída — commit `973c05aa` (branch `feat/rbac-multitenant`, **não-pushed**) |
+| **P1** Schema + backfill | migração Knex idempotente cross-DB: `team`/`team_user`/`role`/`permission`/`role_permission`/`audit_log` + `team_id` em 9 tabelas + `status_page.is_public` + Default Team (dark, flag OFF) | T3 | ⛔ aguardando "Go" |
+| **P2** buildActor + JWT | `socket.actor`/`req.actor` no login/HTTP + JWT `exp`/`tv` (grandfather) + payload de permissões no `info` | T3 | ⛔ aguardando "Go" |
+| **P3** Enforcement | `checkOwner`→`require`, ~21 gates + ~15 handlers antes omitidos + validação FK cross-resource + list scoping + CI sweep | T3 | ⛔ aguardando "Go" |
+| **P4** HTTP/API/federação + flip | `attachActor`, `isMonitorPublic` (badge-leak), push/federação por team, team rooms, **flip `rbacEnforced=true`** | T3 | ⛔ aguardando "Go" |
+| **P5** Frontend admin | telas Manage Users/Teams/Members/Roles + UI role-gated + team switcher | T2 | ⏸ bloqueada por P4 |
+| **P6** Hardening | constant-time login, `/metrics` gate, `audit_log`, E2E negativos cross-tenant | T2 | ⏸ bloqueada por P5 |
+
+Salvaguarda transversal: flag OFF byte-idêntico como **contrato de regressão**; testes negativos cross-tenant como gate de merge; migração validada em SQLite/MariaDB/MySQL/Postgres (testcontainers → **Docker**). Rodar em **worktree isolada** (`.claude/worktrees/rbac`). Estimativa bruta 8-11 semanas.
+
+---
+
+## Ordem sugerida (atualizada 2026-07-04)
 
 1. ✅ **Governança + documentação de domínio** (CONTEXT.md, ADRs) — concluída.
 2. ✅ **EPIC-2 — quebra de monólitos** — concluída.

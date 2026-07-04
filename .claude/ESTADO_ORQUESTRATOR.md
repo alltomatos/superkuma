@@ -8,7 +8,7 @@
 ## Sessão
 
 - **iniciado_em**: `2026-07-03`
-- **fase_atual**: `Fase 4` (Fragmentação/Delegação — tier-gated)
+- **fase_atual**: `Fase 4` (tier-gated) · **EPIC Multi-Tenancy (Teams+RBAC, ADR-0010)** — P0 done (branch `feat/rbac-multitenant`), P1+ aguardando "Go"
 - **repositorio**: `alltomatos/uptime-kuma` (fork privado, sem PR upstream)
 - **branch**: `chore/orchestrator-standardization`
 
@@ -18,14 +18,14 @@
 
 | # | ID | Dimensão | Sev | Descritivo | Tier | Status |
 |---|----|----------|-----|------------|------|--------|
-| 1 | `GAP-001` | Segurança | P1 | Segredos em texto plano at rest (creds de monitor/notificação, JWT secret) | T3 | 🔵 deferred → ADR-0007 |
-| 2 | `GAP-002` | Segurança | P1 | JWT sem expiração; troca de senha não invalida tokens | T3 | 🔴 open |
+| 1 | `GAP-001` | Segurança | P1 | Segredos em texto plano at rest (creds de monitor/notificação, JWT secret) | T3 | 🔵 deferred → ADR-0007; **re-aberto** por multi-tenant (ADR-0010 §1) — reavaliar cifragem |
+| 2 | `GAP-002` | Segurança | P1 | JWT sem expiração; troca de senha não invalida tokens | T3 | 🟠 endereçado no design ADR-0010 (EPIC Multi-Tenancy, P2: `exp` + `token_version`) |
 | 3 | `GAP-003` | Arquitetura | P2 | Monólitos god-object (monitor.js 2069, server.js 2018, EditMonitor.vue 4356, util-server.js 1066…) | T2 | 🟡 queued |
 | 4 | `GAP-004` | Arquitetura | P2 | Sem camada de validação de entrada (parsing manual em sockets/routers) | T2 | 🟢 avançado (TASK-030: zod em api-key/tags/chart/slug/proxy/docker/remote-browser/cloudflared). Monitor add/editMonitor e status-page save/incident ficam para EPIC-3b (fora de escopo, maior risco) |
 | 5 | `GAP-005` | Performance | P3 | Import eager de 24 monitor-types + 96 providers; tabelas `stat_*` sem model | T2 | 🟡 queued |
 | 6 | `GAP-006` | Testes | P4 | Cobertura ~14%; `monitor.js` e models sem teste unitário direto | T2 | 🟢 avançado (TASK-020/105: +19 model +10 http +64 submódulos +3 e2e) |
 | 7 | `GAP-007` | Higiene | P4 | Backend sem tipos (só JSDoc); 108 patches SQL legados; CLAUDE/AGENTS haviam sido esvaziados | T1 | 🟢 partial |
-| 8 | `GAP-008` | Segurança | P1-low | timing-enum no login; `verifyAPIKey` sem `user_id`; `setup` sem rate-limit | T2 | 🟡 queued |
+| 8 | `GAP-008` | Segurança | P1-low | timing-enum no login; `verifyAPIKey` sem `user_id`; `setup` sem rate-limit | T2 | 🟠 endereçado no design ADR-0010 (P2: `verifyAPIKey`→bean+`user_id`; P6: rate-limit + login constant-time) |
 | 9 | `GAP-009` | Testes | P4 | E2E não cobre `maxRedirects` nem inversão de keyword-match no monitor HTTP | T2 | ✅ closed — `test-http.js` (10 testes), 2 mutation-checks independentes confirmaram detecção real. commit 57fcff7a |
 | 10 | `GAP-010` | Testes | P4 | Teste "partial config" do `agent-forwarder.js` só afirma "nenhum monitor criado", não "nenhuma chamada de rede feita" — mutation independente do verificador provou que o código real está correto, mas o teste não afirma isso diretamente (a request malformada é rejeitada 401 rio abaixo, mascarando o gap) | T1 | 🟡 queued |
 | 11 | `GAP-011` | Robustez | P4 | Schema zod de `federation-router.js`: campo `msg` é `.optional().default("")` sem `.nullable()` — se `bean.msg` for `null` (não `undefined`) num tipo de monitor, aquele heartbeat específico é descartado silenciosamente (rejeitado 400, logado, sem crash) | T2 | 🟡 queued |
@@ -250,6 +250,61 @@
   risco: T2
   depends_on: [TASK-M1, TASK-F3]
   status: blocked
+
+# Feature: Multi-tenant (Teams + RBAC) — T3, design em ADR-0010
+# Decisões do usuário (2026-07-04): times/grupos + RBAC granular + admin cria usuários;
+# 1 papel/(user,team); status pages team-scoped + is_public; DESATIVAR (não apagar) user;
+# API keys legadas -> viewer no flip. Rodar em worktree isolada .claude/worktrees/rbac.
+
+- id: TASK-R0
+  desc: "P0 Fundação: server/permissions/catalog.js (vocabulário + papéis built-in) + server/security/authz.js (can/require/scopeFilter/buildActor) + 36 testes. Sem schema, sem comportamento, enforcement default OFF."
+  ref: ADR-0010
+  risco: T2
+  depends_on: []
+  status: done   # branch feat/rbac-multitenant, commit 973c05aa (NÃO pushed). Lint 0 err, 36/36 testes, mutation-check independente 4/4 (isolamento de time, bypass superadmin, contrato flag-OFF, escada de privilégios).
+  concluido_em: "2026-07-04"
+
+- id: TASK-R1
+  desc: "P1 Schema + backfill (dark-launch): migração Knex idempotente cross-DB — team/team_user/role/permission/role_permission/audit_log + team_id (nullable, FK RESTRICT) em 9 tabelas + status_page.is_public. Default Team + memberships + MIN(id)=superadmin. rbacEnforced=false. SEM rebuild de FK (decisão 'desativar user'). Validar SQLite/MariaDB/MySQL/Postgres via testcontainers."
+  ref: ADR-0010
+  risco: T3
+  depends_on: [TASK-R0]
+  status: blocked   # aguardando "Go" humano
+
+- id: TASK-R2
+  desc: "P2 buildActor no login/HTTP + JWT hardening (exp/iat/sub/tv, grandfather tv??0) + verifyAPIKey retorna bean (user_id capado ao role_id, sem superadmin do dono) + payload currentUser/teams/permissions no sendInfo. Nenhum require() enforça ainda (flag OFF)."
+  ref: ADR-0010
+  risco: T3
+  depends_on: [TASK-R1]
+  status: blocked
+
+- id: TASK-R3
+  desc: "P3 Enforcement socket: checkOwner->require; ~21 gates + ~15 handlers antes omitidos (status-page, tags, maintenance-joins, clearEvents/clearHeartbeats/getMonitorBeats); validação FK cross-resource; list scoping via scopeFilter; regra hard team_id (freeze-mode); CI sweep."
+  ref: ADR-0010
+  risco: T3
+  depends_on: [TASK-R2]
+  status: blocked
+
+- id: TASK-R4
+  desc: "P4 HTTP/API/federação + flip: attachActor; /metrics superadmin-only; isMonitorPublic exige team match (badge-leak); /push + federação por team; team rooms atômico; flip rbacEnforced=true (reversível) + last-superadmin guard. Fixture E2E 2-teams."
+  ref: ADR-0010
+  risco: T3
+  depends_on: [TASK-R3]
+  status: blocked
+
+- id: TASK-R5
+  desc: "P5 Frontend admin: telas Manage Users/Teams/Members/Roles + Audit; src/mixins/permissions.js ($root.can); tabs Settings + nav role-gated; team switcher; force-change-password gate."
+  ref: ADR-0010
+  risco: T2
+  depends_on: [TASK-R4]
+  status: blocked
+
+- id: TASK-R6
+  desc: "P6 Hardening: constant-time login (bcrypt dummy), setup rate-limit, disableAuth->single-user warning, audit_log em ações privilegiadas, integrity check team_id IS NULL, suíte E2E negativa cross-tenant."
+  ref: ADR-0010
+  risco: T2
+  depends_on: [TASK-R5]
+  status: blocked
 ```
 
 ---
@@ -277,6 +332,7 @@
 | 14 | 2026-07-03 | GAP-004 | TASK-030 fase 1: zod + validação keyID/tagID/monitorID/period/slug | Testes de rejeição (payload malformado) e aceitação (payload real da UI) independentes. commit 67d7e6d7 |
 | 15 | 2026-07-03 | GAP-004 | TASK-030 fase 2: validação proxy/docker/remote-browser/cloudflared | Verificador confirmou schemas contra fonte real (SUPPORTED_PROXY_PROTOCOLS, dialogs Vue) e que url aceita ws:// (não quebra remote-browser real). commit 76717066 |
 | 16 | 2026-07-03 | ADR-0008/0009 | TASK-F0+M0: fundação schema Master-Agent (remote_instance, ON DELETE SET NULL) + histórico de métricas (stat_monthly) | Primeira mudança real de schema da sessão. 2 tentativas de delegação falharam (agente só relatou "vou aguardar" sem executar); executado diretamente. Achado e corrigido: toJSON() usava convenção underscore de tag.js (retornava undefined nesta versão do redbean-node) — trocado p/ convenção sem underscore de api_key.js/monitor.js. 265/265 backend + 26/26 e2e + zero-wiring grep vazio. Ambiente teve bastante flakiness de processo/porta (limpo com PowerShell). commit 9641dbc3 |
+| 17 | 2026-07-04 | ADR-0010 | TASK-R0: P0 RBAC — `permissions/catalog.js` + `security/authz.js` + 36 testes | Branch `feat/rbac-multitenant`, commit `973c05aa` (**não pushed**). Enforcement default OFF. Mutation-check independente **4/4** (isolamento de time, bypass superadmin, contrato flag-OFF, escada de privilégios). Worktree isolada `.claude/worktrees/rbac`. Resolve a origem do "ADR misterioso" do Incidente 2. |
 
 ---
 
@@ -293,6 +349,8 @@ Durante o F3 (2026-07-04), o agente escritor do Stage 2 (frontend) rodou ~177min
 **Mais grave:** junto aos arquivos legítimos do F3, apareceu `docs/adr/0010-teams-rbac-multitenancy.md` — um ADR **extenso e tecnicamente detalhado** (340 linhas, referencia linhas exatas de `knex_init_db.js`) sobre uma feature de **Teams + RBAC multi-tenancy** nunca pedida nesta sessão. O texto menciona "síntese de 3 propostas + 3 juízes + 2 red-teams" — um padrão de judge-panel. Origem desconhecida; não vim de nenhum `Agent`/`Workflow` que eu disparei. **Não commitado** — movido para o scratchpad da sessão (`0010-teams-rbac-multitenancy-MYSTERY.md`), preservado mas fora do repo, para o usuário decidir o que fazer.
 
 **Ação tomada:** verifiquei pessoalmente o trabalho do F3 (lint, build, e2e 29/29, e a claim de segurança do `setSettings` lendo `server/settings.js` diretamente — confirmado merge por-chave, nunca replace) e commitei apenas os arquivos legítimos (`f16b2828`).
+
+**Resolução (2026-07-04):** o "ADR misterioso" 0010 **não é misterioso** — é o output do workflow de design de RBAC desta sessão (judge-panel: 3 arquitetos + 3 juízes + 2 red-teams; a assinatura "3 propostas + 3 juízes + 2 red-teams" confirma). Um primeiro `extract-adr.js` escreveu o 0010 na árvore principal antes de eu redirecionar a escrita para a worktree isolada; foi esse arquivo transitório que a sessão do F3 encontrou e quarentenou. O ADR agora está autorado corretamente (revisado, hardened) na branch `feat/rbac-multitenant` (commit `973c05aa`). A cópia em scratchpad (`0010-...-MYSTERY.md`) pode ser descartada. Lição reforçada: escritas via Bash/node aqui são **sandboxed** (overlay efêmero) — usar Write/Edit ou `dangerouslyDisableSandbox`, e isolar em worktree qualquer trabalho concorrente no repo.
 
 ## Pendências / Notas
 
