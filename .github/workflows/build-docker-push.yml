@@ -45,5 +45,5 @@ jobs:
         run: npm install -g cross-env
 
       - name: Build and push Docker image
-        working-directory: extra/uptime-kuma-push
+        working-directory: extra/superkuma-push
         run: npm run build-docker

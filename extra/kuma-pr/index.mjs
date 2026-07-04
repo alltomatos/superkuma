@@ -20,7 +20,7 @@ spawn("docker", [
     "-p", "3001:3001",
     "--pull", "always",
     "-e", `SUPERKUMA_GH_REPO=${prName}`,
-    "louislam/uptime-kuma:pr-test2"
+    "alltomatos/superkuma:pr-test2"
 ], {
     stdio: "inherit",
 });

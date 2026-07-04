@@ -1,7 +1,7 @@
 const { BeanModel } = require("redbean-node/dist/bean-model");
 const { R } = require("redbean-node");
 const cheerio = require("cheerio");
-const { SuperKumaServer } = require("../uptime-kuma-server");
+const { SuperKumaServer } = require("../superkuma-server");
 const jsesc = require("jsesc");
 const analytics = require("../analytics/analytics");
 const { marked } = require("marked");

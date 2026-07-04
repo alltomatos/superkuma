@@ -3,7 +3,7 @@ const { HttpProxyAgent } = require("http-proxy-agent");
 const { HttpsProxyAgent } = require("https-proxy-agent");
 const { SocksProxyAgent } = require("socks-proxy-agent");
 const { debug } = require("../src/util");
-const { SuperKumaServer } = require("./uptime-kuma-server");
+const { SuperKumaServer } = require("./superkuma-server");
 const { CookieJar } = require("tough-cookie");
 const { createCookieAgent } = require("http-cookie-agent/http");
 

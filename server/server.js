@@ -110,7 +110,7 @@ log.debug("server", "Importing 2FA Modules");
 const notp = require("notp");
 const base32 = require("thirty-two");
 
-const { SuperKumaServer } = require("./uptime-kuma-server");
+const { SuperKumaServer } = require("./superkuma-server");
 const server = SuperKumaServer.getInstance();
 const io = (module.exports.io = server.io);
 const app = server.app;

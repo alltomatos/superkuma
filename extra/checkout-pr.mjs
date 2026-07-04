@@ -6,7 +6,7 @@ let { name, branch } = parsePrName(process.env.SUPERKUMA_GH_REPO);
 console.log(`Checking out PR from ${name}:${branch}`);
 
 // Checkout the pr
-let result = childProcess.spawnSync("git", [ "remote", "add", name, `https://github.com/${name}/uptime-kuma` ], {
+let result = childProcess.spawnSync("git", [ "remote", "add", name, `https://github.com/${name}/superkuma` ], {
     stdio: "inherit"
 });
 

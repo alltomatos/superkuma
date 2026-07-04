@@ -3,7 +3,7 @@
  */
 const { TimeLogger } = require("../src/util");
 const { R } = require("redbean-node");
-const { SuperKumaServer } = require("./uptime-kuma-server");
+const { SuperKumaServer } = require("./superkuma-server");
 const server = SuperKumaServer.getInstance();
 const io = server.io;
 const { setting } = require("./util-server");

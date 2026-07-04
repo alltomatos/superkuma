@@ -3,7 +3,7 @@ const { parseTimeObject, parseTimeFromTimeObject, log, SQL_DATETIME_FORMAT } = r
 const { R } = require("redbean-node");
 const dayjs = require("dayjs");
 const Cron = require("croner");
-const { SuperKumaServer } = require("../uptime-kuma-server");
+const { SuperKumaServer } = require("../superkuma-server");
 const apicache = require("../modules/apicache");
 
 class Maintenance extends BeanModel {

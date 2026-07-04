@@ -1,7 +1,7 @@
 const { checkLogin } = require("../util-server");
 const { Proxy } = require("../proxy");
 const { sendProxyList } = require("../client");
-const { SuperKumaServer } = require("../uptime-kuma-server");
+const { SuperKumaServer } = require("../superkuma-server");
 const { z } = require("zod");
 const { validate } = require("../validation");
 const server = SuperKumaServer.getInstance();

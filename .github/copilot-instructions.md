@@ -1,6 +1,6 @@
-# Copilot Instructions for Uptime Kuma
+# Copilot Instructions for SuperKuma
 
-Warning: Only maintainers of Uptime Kuma can use this instructions, for other contributors, must read AGENTS.md and CLAUDE.md to avoid to get banned because of AI slop.
+Warning: Only maintainers of SuperKuma can use this instructions, for other contributors, must read AGENTS.md and CLAUDE.md to avoid to get banned because of AI slop.
 
 ## Copilot's Goals/Tasks
 
@@ -10,7 +10,7 @@ Warning: Only maintainers of Uptime Kuma can use this instructions, for other co
 
 ## Repository Overview
 
-**Uptime Kuma** is a self-hosted monitoring tool for HTTP(s), TCP, DNS, Docker, etc. Built with Vue 3 (frontend) and Node.js/Express (backend), using Socket.IO for real-time communication.
+**SuperKuma** is a self-hosted monitoring tool for HTTP(s), TCP, DNS, Docker, etc. Built with Vue 3 (frontend) and Node.js/Express (backend), using Socket.IO for real-time communication.
 
 - **Languages**: JavaScript, Vue 3, TypeScript (limited), HTML, CSS/SCSS
 - **Backend**: Node.js >= 20.4, Express.js, Socket.IO, SQLite
@@ -69,7 +69,7 @@ npm run dev  # Starts frontend (port 3000) and backend (port 3001)
 │   ├── routers/        Express routers
 │   ├── socket-handlers/  Socket.IO event handlers
 │   ├── server.js       Server entry point
-│   └── uptime-kuma-server.js  Main server logic
+│   └── superkuma-server.js  Main server logic
 ├── src/                Frontend source code (Vue 3 SPA)
 │   ├── components/     Vue components
 │   ├── pages/          Page components
@@ -164,7 +164,7 @@ Files to modify:
 Files to modify:
 
 1. `server/monitor-types/MONITORING_TYPE.js` (backend logic)
-2. `server/uptime-kuma-server.js` (register monitor type)
+2. `server/superkuma-server.js` (register monitor type)
 3. `src/pages/EditMonitor.vue` (frontend UI)
 4. `src/lang/en.json` (add translation keys)
 

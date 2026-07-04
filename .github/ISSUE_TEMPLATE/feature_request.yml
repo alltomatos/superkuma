@@ -19,8 +19,8 @@ body:
     attributes:
       label: 📑 I have found these related issues/pull requests
       description: |
-        Please search for related **[ISSUES](https://github.com/louislam/uptime-kuma/issues?q=is%3Aissue%20sort%3Acreated-desc)**
-        and **[PULL REQUESTS](https://github.com/louislam/uptime-kuma/pulls?q=is%3Apr+sort%3Acreated-desc+)**.
+        Please search for related **[ISSUES](https://github.com/alltomatos/superkuma/issues?q=is%3Aissue%20sort%3Acreated-desc)**
+        and **[PULL REQUESTS](https://github.com/alltomatos/superkuma/pulls?q=is%3Apr+sort%3Acreated-desc+)**.
         Explain the differences between them or clarify if you were unable to find any related issues/pull requests.
       placeholder: |
         Example: This relates to issue #1, which also affects the ... system. It should not be merged because ...
