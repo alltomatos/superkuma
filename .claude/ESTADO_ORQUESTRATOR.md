@@ -269,7 +269,8 @@
   ref: ADR-0010
   risco: T3
   depends_on: [TASK-R0]
-  status: blocked   # aguardando "Go" humano
+  status: done   # commit 0a293219 (feat/rbac-multitenant, NÃO pushed). Validado SQLite+Postgres+MySQL+MariaDB via testcontainers (up/backfill/idempotência/down); mutation-check 4/4; 7 testes; lint 0. Ordem de createTable corrigida vs ADR §5 (era role->team, correto é permission->team->role... pois role referencia team). down() dialect-aware (dropForeign antes de dropColumn em MySQL/Maria). Enforcement default OFF.
+  concluido_em: "2026-07-04"
 
 - id: TASK-R2
   desc: "P2 buildActor no login/HTTP + JWT hardening (exp/iat/sub/tv, grandfather tv??0) + verifyAPIKey retorna bean (user_id capado ao role_id, sem superadmin do dono) + payload currentUser/teams/permissions no sendInfo. Nenhum require() enforça ainda (flag OFF)."
@@ -333,6 +334,7 @@
 | 15 | 2026-07-03 | GAP-004 | TASK-030 fase 2: validação proxy/docker/remote-browser/cloudflared | Verificador confirmou schemas contra fonte real (SUPPORTED_PROXY_PROTOCOLS, dialogs Vue) e que url aceita ws:// (não quebra remote-browser real). commit 76717066 |
 | 16 | 2026-07-03 | ADR-0008/0009 | TASK-F0+M0: fundação schema Master-Agent (remote_instance, ON DELETE SET NULL) + histórico de métricas (stat_monthly) | Primeira mudança real de schema da sessão. 2 tentativas de delegação falharam (agente só relatou "vou aguardar" sem executar); executado diretamente. Achado e corrigido: toJSON() usava convenção underscore de tag.js (retornava undefined nesta versão do redbean-node) — trocado p/ convenção sem underscore de api_key.js/monitor.js. 265/265 backend + 26/26 e2e + zero-wiring grep vazio. Ambiente teve bastante flakiness de processo/porta (limpo com PowerShell). commit 9641dbc3 |
 | 17 | 2026-07-04 | ADR-0010 | TASK-R0: P0 RBAC — `permissions/catalog.js` + `security/authz.js` + 36 testes | Branch `feat/rbac-multitenant`, commit `973c05aa` (**não pushed**). Enforcement default OFF. Mutation-check independente **4/4** (isolamento de time, bypass superadmin, contrato flag-OFF, escada de privilégios). Worktree isolada `.claude/worktrees/rbac`. Resolve a origem do "ADR misterioso" do Incidente 2. |
+| 18 | 2026-07-04 | ADR-0010 | TASK-R1: P1 migração RBAC + backfill (dark-launch) | Commit `0a293219` (**não pushed**). 6 tabelas + team_id em 9 tabelas + status_page.is_public + api_key.role_id + user flags. Backfill: Default Team, users→owner, MIN(id)→superadmin, api keys legadas→viewer, `group` intocado. **Validado nos 4 engines** (SQLite/Postgres/MySQL/MariaDB) via testcontainers: up+backfill+idempotência+down. Mutation-check independente 4/4. Enforcement OFF. Achado: ordem de createTable do ADR §5 estava invertida (role antes de team) — corrigida na migração. |
 
 ---
 
