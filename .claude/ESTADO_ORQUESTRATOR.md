@@ -329,12 +329,15 @@ Durante o F3 (2026-07-04), o agente escritor do Stage 2 (frontend) rodou ~177min
 - id: TASK-SK3
   desc: "UI do frontend: Layout.vue, NotFound.vue, Setup.vue, SetupDatabase.vue, About.vue, StatusPage.vue (Powered by)"
   depends_on: [TASK-SK2]
-  status: ready
+  status: done   # 1a verificação veio verified=false: faltou index.html (title/meta) + public/manifest.json (PWA name), que eu nunca tinha atribuído a nenhum estágio no plano original (gap de planejamento, não do executor). Corrigido diretamente + confirmado no dist/. commits 7b952ccf + 9c6a5162 (fix)
 
 - id: TASK-SK4
   desc: "~45 provedores de notificação (nomes/títulos padrão) + formulários Vue correspondentes"
   depends_on: [TASK-SK2]
-  status: blocked
+  status: in_progress   # Workflow disparado
+
+## Lição (2 gaps de planejamento seguidos: Kafka clientId no SK2, index.html/manifest.json no SK3)
+Os dois gaps achados até agora eram itens que EU não tinha atribuído explicitamente a nenhum estágio no plano original — não foi o executor "esquecendo" algo que pedi, foi eu não pedindo. A partir do SK4, incluir uma varredura ampla final (não só nos arquivos nomeados) como parte do próprio gate de verificação de cada estágio, e considerar uma varredura de "sanity final" cross-stage antes de fechar o rebrand como um todo (antes do rename do repo no GitHub).
 
 - id: TASK-SK5
   desc: "i18n: en.json (20 valores) + varredura case-insensitive nos outros 77 idiomas (só valores)"
