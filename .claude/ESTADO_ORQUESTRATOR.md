@@ -370,7 +370,7 @@ Os três gaps achados até agora eram itens que EU não tinha atribuído explici
 - id: TASK-SK10
   desc: "PR #4 (chore/rebrand-superkuma -> develop) aberto. Aguardar revisão/aprovação humana + CI verde antes do merge."
   depends_on: [TASK-SK9]
-  status: in_progress # PR aberto: https://github.com/alltomatos/uptime-kuma/pull/4 . CI achou 1 falha real: check-file-changes (prevent-file-change.yml) bloqueia qualquer PR que toque src/lang/\*.json fora de en.json, exceto autor "UptimeKumaBot" (bot do Weblate). Como removemos o Weblate inteiro (SK5/SK7), esse check nunca mais passaria pra ninguém no fork -- usuário decidiu (AskUserQuestion) remover o workflow inteiro. commit 9fd62c9c, pushed. Aguardando o resto do CI rodar + aprovação humana do PR.
+  status: in_progress # PR aberto: https://github.com/alltomatos/uptime-kuma/pull/4 . CI achou 2 falhas reais: (1) check-file-changes (prevent-file-change.yml) bloqueia qualquer PR que toque src/lang/\*.json fora de en.json, exceto autor "UptimeKumaBot" (bot do Weblate) -- como removemos o Weblate inteiro (SK5/SK7), esse check nunca mais passaria pra ninguém no fork; usuário decidiu (AskUserQuestion) remover o workflow inteiro, commit 9fd62c9c. (2) autofix (autofix-ci bot) achou drift de formatação -- `npm run fmt` reformatou 581 arquivos, mas só 158 eram do diff desta PR; revertidos os outros 423 (drift pré-existente no repo, fora de escopo) antes de commitar, commit 28bc701e. Ambos pushed. Aguardando o resto do CI rodar + aprovação humana do PR.
 
 ### Passo final (após merge do PR #4)
 
