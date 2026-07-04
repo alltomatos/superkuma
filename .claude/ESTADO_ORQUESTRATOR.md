@@ -8,9 +8,9 @@
 ## Sessão
 
 - **iniciado_em**: `2026-07-03`
-- **fase_atual**: `Fase 4` (tier-gated) · Rebrand SuperKuma: 8 estágios + varredura final concluídos, PR #4 (`chore/rebrand-superkuma`→`develop`) resolvendo conflito de merge contra o RBAC recém-integrado · **EPIC Multi-Tenancy (Teams+RBAC, ADR-0010)** — P0-P4 done, dark-launch infra completa e testada (`rbacEnforced` ainda OFF em qualquer install real), PR #2 **já mergeado** na `develop` (commit `25df0e57`); P5 (frontend admin) aguardando "Go"
-- **repositorio**: `alltomatos/uptime-kuma` (fork privado, sem PR upstream; rename para `alltomatos/superkuma` via `gh repo rename` é o passo final do rebrand, ainda PENDENTE — ver seção "Rebrand SuperKuma") — GitFlow: `main`/`develop`/`feature/*` criados e no origin; PR #2 (RBAC) mergeado, PR #3 (CI develop/main) e PR #4 (rebrand) em andamento
-- **branch**: `chore/rebrand-superkuma` (resolvendo merge de `develop` pós-integração do RBAC via PR #2) · trabalho de RBAC concluído (P0-P4) e mergeado, worktree `.claude/worktrees/rbac` / branch `feature/rbac-multitenant` ainda existe para o eventual P5
+- **fase_atual**: `Fase 4` (tier-gated) · Rebrand SuperKuma: **CONCLUÍDO** — 8 estágios + varredura final + reframe de "fork" pra "projeto independente" (PR #4, #5, #6 todos mergeados) + rename real do repositório no GitHub · **EPIC Multi-Tenancy (Teams+RBAC, ADR-0010)** — P0-P4 done, dark-launch infra completa e testada (`rbacEnforced` ainda OFF em qualquer install real), PR #2 mergeado; P5 (frontend admin) aguardando "Go" · CI setup (PR #3) mergeado
+- **repositorio**: `alltomatos/superkuma` — **renomeado pelo usuário manualmente** (não via `gh repo rename` como planejado originalmente; descoberto quando um `git push` pro remote antigo retornou o aviso de redirect do GitHub). Remotes atualizados na árvore principal e nas 2 worktrees (`ci-setup`, `rbac`). GitFlow: `main`/`develop`/`feature/*` no origin; PR #2 (RBAC), #3 (CI), #4/#5 (rebrand) e #6 (drop fork framing) todos mergeados
+- **branch**: `develop` (sincronizada, HEAD em `baef6d84`) · árvore principal de volta a este branch após os 3 rounds de merge (RBAC → rebrand → CI-setup → drop-fork-references)
 
 ---
 
@@ -445,8 +445,13 @@ Os três gaps achados até agora eram itens que EU não tinha atribuído explici
 - id: TASK-SK11
   desc: "Usuário decidiu (2026-07-04) parar de tratar o projeto como \"fork\" -- é o SuperKuma, projeto próprio, com raízes no Uptime Kuma. Remover referências ao repo original, autofix.ci, e reescrever o README pra essa nova realidade (com créditos)."
   depends_on: [TASK-SK10]
-  status: in_progress # PR #6 (chore/drop-fork-references -> develop) aberto, aguardando revisão. Removido autofix.yml (GAP-014) e CNAME; CODE_OF_CONDUCT.md e-mail atualizado; 3 guards de Docker publish repontados pra alltomatos/superkuma (decisão revertida -- antes ficavam intocados de propósito); linguagem "fork privado" trocada por "projeto independente" em CLAUDE.md/ORCHESTRATOR-ROADMAP.md/docs/agents/issue-tracker.md/.claude/config.json; README "Motivation" virou "Credits"; descrição do repo no GitHub atualizada. LICENSE deliberadamente intocado (MIT exige manter aviso de copyright do Louis Lam -- confirmado ao usuário que a licença permite tudo que ele quer fazer).
+  status: done # PR #6 (chore/drop-fork-references -> develop) mergeado 2026-07-04 (commit baef6d84), depois de 1 rodada de conflito de merge contra o PR #3 (CI setup) recém-integrado -- só 1 conflito real: modify/delete em autofix.yml (esta branch deletou, PR #3 só tinha adicionado main/develop aos triggers, não resolve o problema de fundo do GAP-014) -- mantida a deleção. CI completo verde (auto-test matrix macOS/Windows/Ubuntu/Node 20-25, e2e, CodeQL, linters) antes do merge. Removido autofix.yml (GAP-014) e CNAME; CODE_OF_CONDUCT.md e-mail atualizado; 3 guards de Docker publish repontados pra alltomatos/superkuma; linguagem "fork privado" trocada por "projeto independente" em CLAUDE.md/ORCHESTRATOR-ROADMAP.md/docs/agents/issue-tracker.md/.claude/config.json; README "Motivation" virou "Credits"; descrição do repo no GitHub atualizada. LICENSE deliberadamente intocado (MIT permite tudo que o usuário quer fazer, confirmado a ele).
 
-### Passo final (após merge do PR #6)
+- id: TASK-SK12
+  desc: "Rename real do repositório no GitHub para alltomatos/superkuma + atualizar remotes nas 2 worktrees + árvore principal."
+  depends_on: [TASK-SK11]
+  status: done # Usuário renomeou o repositório MANUALMENTE (não via `gh repo rename` como planejado) durante a resolução do conflito de merge da PR #6 -- descoberto via aviso de redirect do GitHub num `git push`. Confirmado via `gh repo view alltomatos/superkuma`. Remotes atualizados: árvore principal + worktree `.claude/worktrees/ci-setup` + worktree `.claude/worktrees/rbac`, todos apontando pra `https://github.com/alltomatos/superkuma.git`.
 
-`gh repo rename superkuma` → atualizar remotes nas outras 2 worktrees (`ci-setup`, `rbac`).
+### Rebrand SuperKuma: CONCLUÍDO
+
+Todos os 12 itens (TASK-SK1..SK12) feitos: 8 estágios do rebrand técnico + varredura final cross-repo + reframe de "fork privado" pra "projeto independente" + rename real do repositório no GitHub. Nenhuma ação pendente deste arco.
