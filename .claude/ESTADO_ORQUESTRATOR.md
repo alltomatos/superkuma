@@ -10,7 +10,7 @@
 - **iniciado_em**: `2026-07-03`
 - **fase_atual**: `Fase 4` (Fragmentação/Delegação — tier-gated)
 - **repositorio**: `alltomatos/uptime-kuma` (fork privado, sem PR upstream)
-- **branch**: `chore/orchestrator-standardization`
+- **branch**: `chore/rebrand-superkuma` (criada a partir de `develop`; `chore/orchestrator-standardization` foi integrada na `develop` e seu PR fechado — ver seção "Rebrand SuperKuma")
 
 ---
 
@@ -299,3 +299,63 @@ Durante o F3 (2026-07-04), o agente escritor do Stage 2 (frontend) rodou ~177min
 - `package-lock.json` tem alteração local não relacionada (remoção de campos `libc` em deps opcionais do rollup) — provável artefato de `npm install`. Não revertido; decidir se restaura.
 - **Descoberta (2026-07-03):** `npm run build` funciona neste ambiente (gera `dist/`) e o E2E Playwright é **totalmente viável** — após `npx playwright install chromium` (browser estava desatualizado: 1228 instalado vs 1084 esperado pelo playwright 1.39), suíte completa rodou **23/23 em 2.1min**. Isso eleva a confiança na rede de segurança do frontend para além de "só teórica".
 - `check()` HTTP **não existe como método isolado** em `monitor.js` — a lógica fica embutida numa closure `beat()` dentro de `start(io)` (confirma o gap do ADR-0002). Por isso a caracterização de monitor.js foca em `toJSON`/`toPublicJSON` (isoláveis) em vez de tentar unit-testar o check em si.
+
+---
+
+## Rebrand SuperKuma (2026-07-04+)
+
+> Detalhes completos em memória: `uptime-kuma-superkuma-rebrand.md`. Branch: `chore/rebrand-superkuma` (criada a partir de `develop`, sequenciada ANTES de `chore/ci-develop-main` e `feature/rbac-multitenant` mergearem — essas duas rebasam por cima depois).
+> PR #1 (`chore/orchestrator-standardization` → `master`) foi **fechado**: `develop` já continha 100% daquele trabalho na mesma ponta (`e467e5dd`).
+
+### Decisões travadas
+- Rename **completo**, incluindo breaking changes (env vars `UPTIME_KUMA_*` → `SUPERKUMA_*`).
+- README: **remove** badges/links sem equivalente SuperKuma (Docker Hub pulls, OpenCollective, Weblate, demo, sponsors).
+- Estágio `pr-test2` do Dockerfile: repointa pro `alltomatos/superkuma.git` (não remove).
+- Tags Docker renomeadas pra `alltomatos/superkuma` mesmo sem o registro existir ainda.
+- **Não tocar**: `LICENSE` (copyright "Louis Lam", pessoa física), `CNAME` (`git.kuma.pet`, domínio real), e-mail do `CODE_OF_CONDUCT.md`.
+- i18n: renomeia só os **valores**, não as chaves `"Uptime Kuma"`/`"Uptime Kuma URL"` (evita rename sincronizado arriscado em 78 arquivos + call-sites).
+- 3 guards `if: github.repository == 'louislam/uptime-kuma'` em `.github/workflows/*.yml` **deixados intactos** de propósito — mudar pro nome novo ligaria esses workflows de publish Docker de verdade, e eles falhariam (sem secrets/registro ainda).
+
+### Tarefas (8 estágios — TASK-SK1..SK8)
+```yaml
+- id: TASK-SK1
+  desc: "Env vars UPTIME_KUMA_* -> SUPERKUMA_* (31 vars, ~25 arquivos)"
+  status: done   # 286/287 backend (1 flake de rede conhecido), 29/29 e2e, lint 0. commit aa7e335a
+
+- id: TASK-SK2
+  desc: "Identidade central: appName (recompilado via tsc), User-Agent, classe UptimeKumaServer->SuperKumaServer (~15 arquivos), VAPID, URLs GitHub"
+  status: done   # 1a verificação veio verified=false (gap real: clientId Kafka). Corrigido + varredura própria achou mais 5 pontos (logs de startup, comentários JSDoc). commits ceb6655c + 97469dd1 (fix)
+
+- id: TASK-SK3
+  desc: "UI do frontend: Layout.vue, NotFound.vue, Setup.vue, SetupDatabase.vue, About.vue, StatusPage.vue (Powered by)"
+  depends_on: [TASK-SK2]
+  status: ready
+
+- id: TASK-SK4
+  desc: "~45 provedores de notificação (nomes/títulos padrão) + formulários Vue correspondentes"
+  depends_on: [TASK-SK2]
+  status: blocked
+
+- id: TASK-SK5
+  desc: "i18n: en.json (20 valores) + varredura case-insensitive nos outros 77 idiomas (só valores)"
+  depends_on: [TASK-SK3]
+  status: blocked
+
+- id: TASK-SK6
+  desc: "Docker/build/CI neste worktree: Dockerfiles (pr-test2 repointa), compose, scripts package.json, extra/release/*.mjs, .github/workflows (SEM tocar nos 3 guards de repository)"
+  depends_on: [TASK-SK2]
+  status: blocked
+
+- id: TASK-SK7
+  desc: "Docs de topo: README.md (remove badges/links sem equivalente), CONTRIBUTING.md, SECURITY.md. NÃO: LICENSE/CNAME/e-mail CODE_OF_CONDUCT. Feito diretamente pelo orquestrador, sem agente."
+  depends_on: [TASK-SK3, TASK-SK4, TASK-SK6]
+  status: blocked
+
+- id: TASK-SK8
+  desc: "Docs de governança próprios: CLAUDE.md, CONTEXT.md, ORCHESTRATOR-ROADMAP.md, ESTADO_ORQUESTRATOR.md, docs/adr/*, docs/prd/*. Feito diretamente, sem agente."
+  depends_on: [TASK-SK7]
+  status: blocked
+```
+
+### Passo final (após TASK-SK8)
+Gate de verificação completo → `gh repo rename superkuma` → atualizar remotes nas outras 2 worktrees (`ci-setup`, `rbac`).
