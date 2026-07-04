@@ -8,9 +8,9 @@
 ## Sessão
 
 - **iniciado_em**: `2026-07-03`
-- **fase_atual**: `Fase 4` (tier-gated) · **EPIC Multi-Tenancy (Teams+RBAC, ADR-0010)** — P0 done (branch `feat/rbac-multitenant`), P1+ aguardando "Go"
-- **repositorio**: `alltomatos/uptime-kuma` (fork privado, sem PR upstream)
-- **branch**: `chore/orchestrator-standardization`
+- **fase_atual**: `Fase 4` (tier-gated) · **EPIC Multi-Tenancy (Teams+RBAC, ADR-0010)** — P0-P3 done (branch `feature/rbac-multitenant`, renomeada de `feat/`), P4+ aguardando "Go"
+- **repositorio**: `alltomatos/uptime-kuma` (fork privado, sem PR upstream) — GitFlow: `main`/`develop`/`feature/*` criados e no origin; PRs #2 (RBAC) e #3 (CI develop/main) abertos
+- **branch**: `chore/orchestrator-standardization` (árvore principal) · trabalho de RBAC segue em worktree isolada `.claude/worktrees/rbac` na branch `feature/rbac-multitenant`
 
 ---
 
@@ -285,7 +285,8 @@
   ref: ADR-0010
   risco: T3
   depends_on: [TASK-R2]
-  status: blocked
+  status: done   # commit be3828df (feature/rbac-multitenant, NÃO pushed). Executado via Workflow de 8 grupos paralelos (retrofit+verificação adversarial por grupo, 16 agentes, ~39min). 6/8 grupos SAFE de cara (docker/proxy/remote-browser/apikey-remoteinstance SAFE; status-page NEEDS-FIX só por preocupação de worktree compartilhada, código real ok). 2/8 (monitor-domain, maintenance-domain) tinham testes tautológicos (chamavam authz.js direto, nunca o handler real) — reescritos por mim usando padrão mock-socket+trigger() já usado corretamente pelo grupo status-page; no processo achei e corrigi um bug real de ordenação before()/afterEach() no teste. **Bug de segurança real achado pela verificação adversarial**: scopeFilter(actor) desreferenciava actor.userId mesmo no caminho OFF (diferente de authorizeResource, que checa a flag ANTES de tocar o actor) — um socket.actor null (caminho defensivo do afterLogin) quebraria as 5 funções sendXList do client.js. Corrigido na raiz (afterLogin monta actor mínimo com userId correto em vez de null) + defesa em profundidade (scopeFilter trata actor null como "não vê nada"). server.js (clearEvents/clearHeartbeats/updateMonitorNotification) e notification.js feitos por mim diretamente (fora do workflow, arquivos sensíveis/centrais). Validado: 232/232 testes na regressão final (P3 completo + core authz/migration/actor-repository + monitor-model/status-page/federação/uptime-calculator/migration nos 4 engines via testcontainers). Lint 0 err em todos os arquivos tocados.
+  concluido_em: "2026-07-04"
 
 - id: TASK-R4
   desc: "P4 HTTP/API/federação + flip: attachActor; /metrics superadmin-only; isMonitorPublic exige team match (badge-leak); /push + federação por team; team rooms atômico; flip rbacEnforced=true (reversível) + last-superadmin guard. Fixture E2E 2-teams."
@@ -337,6 +338,8 @@
 | 17 | 2026-07-04 | ADR-0010 | TASK-R0: P0 RBAC — `permissions/catalog.js` + `security/authz.js` + 36 testes | Branch `feat/rbac-multitenant`, commit `973c05aa` (**não pushed**). Enforcement default OFF. Mutation-check independente **4/4** (isolamento de time, bypass superadmin, contrato flag-OFF, escada de privilégios). Worktree isolada `.claude/worktrees/rbac`. Resolve a origem do "ADR misterioso" do Incidente 2. |
 | 18 | 2026-07-04 | ADR-0010 | TASK-R1: P1 migração RBAC + backfill (dark-launch) | Commit `0a293219` (**não pushed**). 6 tabelas + team_id em 9 tabelas + status_page.is_public + api_key.role_id + user flags. Backfill: Default Team, users→owner, MIN(id)→superadmin, api keys legadas→viewer, `group` intocado. **Validado nos 4 engines** (SQLite/Postgres/MySQL/MariaDB) via testcontainers: up+backfill+idempotência+down. Mutation-check independente 4/4. Enforcement OFF. Achado: ordem de createTable do ADR §5 estava invertida (role antes de team) — corrigida na migração. |
 | 19 | 2026-07-04 | ADR-0010 | TASK-R2: P2 buildActor + JWT hardening (dark) | Commit `4b8fa74b` (**não pushed**). `actor-repository.js` (actor de user/api-key/payload) + JWT `sub`/`tv` + `createSignedToken` (exp opt-in via `jwtExpiryHours`, default 0) + grandfather no `loginByToken` + `verifyAPIKey`→bean + `sendInfo` com currentUser/teams/permissions + disableAuth determinístico. **req.actor HTTP adiado p/ P4** (junto do gate `/metrics`). 6 unit + 22 login-flow (federação sobe servidor) + 76 regressão + mutation 3/3. Enforcement OFF. Fecha o mecanismo de GAP-002 (exp opt-in + token_version). |
+| 20 | 2026-07-04 | — | GitFlow: criados `main`/`develop` (a partir do HEAD do fork) + `master` mantido como espelho do upstream. Branch renomeada `feat/rbac-multitenant`→`feature/rbac-multitenant`. Push de develop/main/feature pro origin. PR #2 (feature/rbac-multitenant→develop, RBAC P0-P2) e PR #3 (chore/ci-develop-main→develop, config de CI) abertos | GitHub Actions nunca tinha rodado no repo (0 workflows registrados) — usuário habilitou nas Settings; achados 3 problemas pré-existentes no processo (chave `"Token"` duplicada em en.json, drift de prettier em 25 arquivos reais de 696 sinalizados — resto era ruído de CRLF do `core.autocrlf=true` local, `zod` com `^` fora da convenção `~`), todos corrigidos no PR #3. GAP-012 registrado (teste `test-tcp.js` flaky contra `badssl.com` externo, achado no 1º CI real, não-relacionado) |
+| 21 | 2026-07-04 | ADR-0010 | TASK-R3: P3 enforcement retrofit (dark) | Commit `be3828df` (**não pushed**). Workflow de 8 grupos paralelos (retrofit+verify adversarial, 16 agentes) + server.js/notification.js feitos diretamente. **Bug de segurança real achado e corrigido**: `scopeFilter(actor)` desreferenciava `actor.userId` mesmo com enforcement OFF (diferente de `authorizeResource`, que checa a flag antes de tocar o actor) — um `socket.actor` null quebraria as 5 listas de `client.js`; corrigido na raiz (`afterLogin` monta actor mínimo com `userId` em vez de `null`) + `scopeFilter` agora trata actor null como "não vê nada". 2 testes tautológicos (monitor/maintenance-domain) reescritos com handler real via mock-socket; achado e corrigido um bug de `before()`/`afterEach()` no processo. 232/232 na regressão final (4 engines via testcontainers). Enforcement continua OFF — P4 é quem liga de fato. |
 
 ---
 
