@@ -9,7 +9,7 @@
 
 - **iniciado_em**: `2026-07-03`
 - **fase_atual**: `Fase 4` (Fragmentação/Delegação — tier-gated)
-- **repositorio**: `alltomatos/uptime-kuma` (fork privado, sem PR upstream)
+- **repositorio**: `alltomatos/uptime-kuma` (fork privado, sem PR upstream; rename para `alltomatos/superkuma` via `gh repo rename` é o passo final do rebrand, ainda PENDENTE -- ver seção "Rebrand SuperKuma")
 - **branch**: `chore/rebrand-superkuma` (criada a partir de `develop`; `chore/orchestrator-standardization` foi integrada na `develop` e seu PR fechado — ver seção "Rebrand SuperKuma")
 
 ---
@@ -314,7 +314,7 @@ Durante o F3 (2026-07-04), o agente escritor do Stage 2 (frontend) rodou ~177min
 - Tags Docker renomeadas pra `alltomatos/superkuma` mesmo sem o registro existir ainda.
 - **Não tocar**: `LICENSE` (copyright "Louis Lam", pessoa física), `CNAME` (`git.kuma.pet`, domínio real), e-mail do `CODE_OF_CONDUCT.md`.
 - i18n: renomeia só os **valores**, não as chaves `"Uptime Kuma"`/`"Uptime Kuma URL"` (evita rename sincronizado arriscado em 78 arquivos + call-sites).
-- 3 guards `if: github.repository == 'louislam/uptime-kuma'` em `.github/workflows/*.yml` **deixados intactos** de propósito — mudar pro nome novo ligaria esses workflows de publish Docker de verdade, e eles falhariam (sem secrets/registro ainda).
+- Guards `if: github.repository == 'louislam/uptime-kuma'` em `.github/workflows/*.yml`: descoberto no SK6 que existiam em ~10 arquivos, não só 3. Usuário decidiu (AskUserQuestion) repontar os ~10 de higiene do repo pra `alltomatos/superkuma`, e deixar **intactos** apenas os 3 de Docker publish (build-docker-push, build-docker-pr-test, release-nightly) — mudar esses ligaria os workflows de publish de verdade, e eles falhariam (sem secrets/registro ainda).
 
 ### Tarefas (8 estágios — TASK-SK1..SK8)
 ```yaml
@@ -332,32 +332,32 @@ Durante o F3 (2026-07-04), o agente escritor do Stage 2 (frontend) rodou ~177min
   status: done   # 1a verificação veio verified=false: faltou index.html (title/meta) + public/manifest.json (PWA name), que eu nunca tinha atribuído a nenhum estágio no plano original (gap de planejamento, não do executor). Corrigido diretamente + confirmado no dist/. commits 7b952ccf + 9c6a5162 (fix)
 
 - id: TASK-SK4
-  desc: "~45 provedores de notificação (nomes/títulos padrão) + formulários Vue correspondentes"
+  desc: "~51 provedores de notificação (nomes/títulos padrão) + formulários Vue correspondentes"
   depends_on: [TASK-SK2]
-  status: in_progress   # Workflow disparado
+  status: done   # commit 035c2888 (49 arquivos). 1a verificação veio verified=false: achou uma 4a variante de casing nunca especificada em nenhum grep anterior -- "UptimeKuma"/"uptimekuma" SEM separador (nem espaço, nem hífen), em ~15 arquivos (bark, alerta, feishu, line, lunasea, onebot, onechat, pushbullet, pushplus, serverchan, signl4, spugpush, wecom, wpush, Cellsynt.vue) + test-oracledb.js (username de container efêmero) + docs/adr/0002.md (referência à classe já renomeada no SK2). Corrigido diretamente + confirmado: lint 0 erros, Oracle test 8/8, build com dist/ confirmando "superkuma" presente e "UptimeKuma" ausente, e2e 28/29 (1 falha flaky de timing em status-page.spec.js, não relacionada, confirmada passando isolada). Deixado de propósito: keep.js/Keep.vue ("uptimekuma" é o slug fixo da integração terceira Keep, não é nosso). commit 75312826 (fix).
 
-## Lição (2 gaps de planejamento seguidos: Kafka clientId no SK2, index.html/manifest.json no SK3)
-Os dois gaps achados até agora eram itens que EU não tinha atribuído explicitamente a nenhum estágio no plano original — não foi o executor "esquecendo" algo que pedi, foi eu não pedindo. A partir do SK4, incluir uma varredura ampla final (não só nos arquivos nomeados) como parte do próprio gate de verificação de cada estágio, e considerar uma varredura de "sanity final" cross-stage antes de fechar o rebrand como um todo (antes do rename do repo no GitHub).
+## Lição (3 gaps de planejamento CONSECUTIVOS: Kafka clientId no SK2, index.html/manifest.json no SK3, casing sem separador no SK4)
+Os três gaps achados até agora eram itens que EU não tinha atribuído explicitamente a nenhum estágio/grep no plano original — não foi o executor "esquecendo" algo que pedi, foi eu não pedindo, e no caso do SK4 nem o grep ampliado (`Uptime Kuma|Uptime-Kuma|uptime-kuma`) capturava estruturalmente a variante sem separador. Padrão agora consolidado para os estágios restantes (SK5+): (1) todo grep de descoberta de marca precisa cobrir >=4 formas de casing: `Uptime Kuma`, `Uptime-Kuma`, `uptime-kuma`, e `UptimeKuma`/`uptimekuma` (sem separador) -- usar um padrão case-insensitive tipo `uptime[- ]?kuma` sempre que possível em vez de listar variantes; (2) antes de fechar QUALQUER estágio como done, rodar uma varredura ampla própria (não só nos arquivos que o executor tocou) escopada a `server/ src/ extra/ docs/ *.json *.md *.js *.html` (nunca `.` na raiz -- trava por causa das worktrees em `.claude/worktrees/*`); (3) já confirmado para o SK5 (i18n): `src/lang/ja.json:752` tem uma ocorrência de "UptimeKuma" sem separador que precisa entrar no escopo do grep daquele estágio, além dos 77 outros idiomas; (4) `extra/generate-changelog.mjs:10: "UptimeKumaBot"` ainda pendente de investigação no SK6 (confirmar se é conta real de bot do GitHub -- funcional, cuidado -- ou só um rótulo de exibição -- seguro renomear) antes de decidir a ação.
 
 - id: TASK-SK5
-  desc: "i18n: en.json (20 valores) + varredura case-insensitive nos outros 77 idiomas (só valores)"
+  desc: "i18n: en.json (20 valores) + varredura case-insensitive (cobrindo as 4 variantes de casing, incl. sem separador -- ja.json:752 já confirmado) nos outros 77 idiomas (só valores)"
   depends_on: [TASK-SK3]
-  status: blocked
+  status: done   # feito diretamente (script node one-off em vez de Workflow, dado o volume mecânico e bem compreendido): regex case-insensitive uptime[- ]?kuma cobrindo as 4 variantes de uma vez. 60 de 61 arquivos de idioma alterados (594 linhas) + en.json (20 linhas, confirmado bater com o esperado). As 2 chaves i18n "Uptime Kuma"/"Uptime Kuma URL" preservadas (só o valor muda) em TODOS os arquivos -- confirmado via grep dedicado. Todos os 77 JSONs validados com JSON.parse. src/lang/README.md também ajustado (removida seção Weblate, sem equivalente; URLs GitHub repontadas). lint 0 erros, build ok, e2e 29/29. commit a3cc42fc
 
 - id: TASK-SK6
-  desc: "Docker/build/CI neste worktree: Dockerfiles (pr-test2 repointa), compose, scripts package.json, extra/release/*.mjs, .github/workflows (SEM tocar nos 3 guards de repository)"
+  desc: "Docker/build/CI neste worktree: Dockerfiles (pr-test2 repointa), compose, scripts package.json, extra/release/*.mjs, .github/workflows (SEM tocar nos 3 guards de Docker publish)"
   depends_on: [TASK-SK2]
-  status: blocked
+  status: done   # Achado extra importante: server/uptime-kuma-server.js NUNCA tinha sido renomeado como arquivo no SK2 (só a classe dentro dele) -- corrigido agora (git mv + 14 call sites). extra/uptime-kuma-push/ inteiro renomeado p/ extra/superkuma-push/ (dir + .go + build.js + Dockerfile, é uma ferramenta standalone). package.json (name, repo URL, tags Docker). Pergunta ao usuário: os guards `github.repository ==` apareciam em ~10 workflows, não só 3 -- usuário decidiu (AskUserQuestion) repontar os ~10 de higiene do repo (stale-bot, pr-title, conflict-labeler, deleted-pr, mark-as-draft, new-contributor-pr, npm-update, pr-description-check, ai-slop, codeql) para alltomatos/superkuma, e manter INTOCADOS apenas os 3 de Docker publish (build-docker-push, build-docker-pr-test, release-nightly). ISSUE_TEMPLATE/security_issue.yml genericizado (era pessoalmente endereçado a "Louis Lam"). Deixado intocado: @louislam/ping, @louislam/sqlite3 (escopo npm real), UptimeKumaBot (conta GitHub real, confirmada via `gh api users/UptimeKumaBot`), URLs de citação a issues upstream. lint 0 erros, backend 321/321 não-container (22 falhas Docker pré-existentes confirmadas não relacionadas), build ok, e2e 29/29. commit 5f4786cc
 
 - id: TASK-SK7
   desc: "Docs de topo: README.md (remove badges/links sem equivalente), CONTRIBUTING.md, SECURITY.md. NÃO: LICENSE/CNAME/e-mail CODE_OF_CONDUCT. Feito diretamente pelo orquestrador, sem agente."
   depends_on: [TASK-SK3, TASK-SK4, TASK-SK6]
-  status: blocked
+  status: done   # README.md reescrito (removidas seções sem equivalente: demo, sponsors, OpenCollective, Weblate badge, screenshots extras, subreddit -- mantido link de atribuição ao Uptime Kuma original no Motivation, intencional). CONTRIBUTING.md/SECURITY.md: voz pessoal genericizada, tabela de mantenedores nomeados (louislam/chakflying/commanderstorm) removida, procedimentos Docker-builder/Wiki (infra do upstream que não temos) removidos. Achados extras corrigidos na mesma passada: ecosystem.config.js, compose.yaml, .dockerignore (tinha um fix anterior que falhou silenciosamente -- reaplicado), package-lock.json (name sync). lint 0 erros. commit 26537653
 
 - id: TASK-SK8
   desc: "Docs de governança próprios: CLAUDE.md, CONTEXT.md, ORCHESTRATOR-ROADMAP.md, ESTADO_ORQUESTRATOR.md, docs/adr/*, docs/prd/*. Feito diretamente, sem agente."
   depends_on: [TASK-SK7]
-  status: blocked
+  status: done   # CLAUDE.md, CONTEXT.md, ORCHESTRATOR-ROADMAP.md (títulos), docs/agents/domain.md, docs/agents/issue-tracker.md (repo próprio), docs/prd/master-agent.md, docs/adr/0002 (fix pontual já feito no SK4), 0007/0008/0009 -- todos descrevendo o sistema ATUAL, renomeados p/ SuperKuma. Preservado de propósito: citações ao upstream real `louislam/uptime-kuma` (CLAUDE.md linha 35, issue-tracker.md linha 18, README.md Motivation) e a narrativa histórica desta própria seção do rebrand (que necessariamente cita "Uptime Kuma" ao descrever o que está sendo renomeado). Este arquivo (ESTADO_ORQUESTRATOR.md) e ORCHESTRATOR-ROADMAP.md tiveram só os títulos/campos de estado-vivo corrigidos, não a narrativa histórica.
 ```
 
 ### Passo final (após TASK-SK8)

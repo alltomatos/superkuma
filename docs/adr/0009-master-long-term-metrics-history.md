@@ -6,7 +6,7 @@
 
 ## Contexto
 
-O Master (ver ADR-0008) agrega **dezenas de clientes** e precisa de **histórico longo de uptime/latência por cliente** para relatórios de SLA (contratos costumam exigir vários anos). Hoje o Uptime Kuma:
+O Master (ver ADR-0008) agrega **dezenas de clientes** e precisa de **histórico longo de uptime/latência por cliente** para relatórios de SLA (contratos costumam exigir vários anos). Hoje o SuperKuma:
 
 - Guarda **heartbeats brutos** (`heartbeat`) com retenção curta, limpos por [`server/jobs/clear-old-data.js`](../../server/jobs/clear-old-data.js).
 - Compacta em 3 tiers via [`uptime-calculator.js`](../../server/uptime-calculator.js): `stat_minutely` (24h), `stat_hourly` (30d), `stat_daily` (365d).
@@ -17,7 +17,7 @@ Decisão do usuário: foco em **histórico de métricas** (não log de eventos),
 
 ## Decisão
 
-1. **MariaDB no Master** (não SQLite) — já suportado pelo Uptime Kuma; adequado a dezenas de agentes com escrita concorrente e histórico longo.
+1. **MariaDB no Master** (não SQLite) — já suportado pelo SuperKuma; adequado a dezenas de agentes com escrita concorrente e histórico longo.
 2. **Retenção em camadas configurável**, separando dados frios dos operacionais: `heartbeat` (curto) < `stat_minutely` < `stat_hourly` < `stat_daily` < `stat_monthly` (longo). Cada tier com sua própria política.
 3. **Novo tier `stat_monthly`** estendendo o `UptimeCalculator` — ~12 linhas/ano/monitor (custo desprezível), retenção longa (ex.: 5 anos) para SLA multi-ano barato.
 4. **Models para as tabelas `stat_*`** (fecha GAP-005) — pré-requisito para relatórios e arquival sustentáveis, em vez de `R.dispense` cru.

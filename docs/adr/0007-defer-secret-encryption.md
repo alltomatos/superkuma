@@ -5,7 +5,7 @@
 
 ## Contexto
 
-A auditoria (GAP-001) identificou que credenciais de monitor (`basic_auth_pass`, `bearer_token`, `oauth_client_secret`, connection strings de DB), tokens de notificação e o **JWT secret** são gravados em **texto plano** no banco. É um trade-off histórico e conhecido do Uptime Kuma. Cifrar exige mudança de schema, migration de dados existentes, gestão de chave fora do DB e mascaramento nas respostas de API (tarefa T3, bloqueante).
+A auditoria (GAP-001) identificou que credenciais de monitor (`basic_auth_pass`, `bearer_token`, `oauth_client_secret`, connection strings de DB), tokens de notificação e o **JWT secret** são gravados em **texto plano** no banco. É um trade-off histórico e conhecido do SuperKuma. Cifrar exige mudança de schema, migration de dados existentes, gestão de chave fora do DB e mascaramento nas respostas de API (tarefa T3, bloqueante).
 
 ## Decisão
 
