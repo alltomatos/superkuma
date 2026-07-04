@@ -9,7 +9,7 @@ Como as skills de engenharia devem consumir a documentação de domínio deste r
 
 Se algum desses arquivos não existir, **prossiga em silêncio**. Não sinalize a ausência nem sugira criá-los de antemão. A skill produtora (`/grill-with-docs`) os cria de forma preguiçosa, quando termos ou decisões forem de fato resolvidos.
 
-## Vocabulário do domínio (Uptime Kuma)
+## Vocabulário do domínio (SuperKuma)
 
 Ao nomear um conceito de domínio (título de issue, proposta de refactor, hipótese, nome de teste), use o termo consistente com o código:
 

@@ -62,7 +62,7 @@ if (process.platform === "win32") {
  * @returns {Promise<boolean>} The executable is allowed?
  */
 async function isAllowedChromeExecutable(executablePath) {
-    if (config.args["allow-all-chrome-exec"] || process.env.UPTIME_KUMA_ALLOW_ALL_CHROME_EXEC === "1") {
+    if (config.args["allow-all-chrome-exec"] || process.env.SUPERKUMA_ALLOW_ALL_CHROME_EXEC === "1") {
         return true;
     }
 
@@ -116,7 +116,7 @@ async function prepareChromeExecutable(executablePath) {
         // Set to undefined = use playwright_chromium
         executablePath = undefined;
     } else if (!executablePath) {
-        if (process.env.UPTIME_KUMA_IS_CONTAINER) {
+        if (process.env.SUPERKUMA_IS_CONTAINER) {
             executablePath = "/usr/bin/chromium";
             await installChromiumViaApt(executablePath);
         } else {
@@ -127,7 +127,7 @@ async function prepareChromeExecutable(executablePath) {
         // Check if the executablePath is in the list of allowed
         if (!(await isAllowedChromeExecutable(executablePath))) {
             throw new Error(
-                "This Chromium executable path is not allowed by default. If you are sure this is safe, please add an environment variable UPTIME_KUMA_ALLOW_ALL_CHROME_EXEC=1 to allow it."
+                "This Chromium executable path is not allowed by default. If you are sure this is safe, please add an environment variable SUPERKUMA_ALLOW_ALL_CHROME_EXEC=1 to allow it."
             );
         }
     }
@@ -258,7 +258,7 @@ class RealBrowserMonitorType extends MonitorType {
 
         // Prevent Local File Inclusion
         // Accept only http:// and https://
-        // https://github.com/louislam/uptime-kuma/security/advisories/GHSA-2qgm-m29m-cj2h
+        // https://github.com/alltomatos/superkuma/security/advisories/GHSA-2qgm-m29m-cj2h
         let url = new URL(monitor.url);
         if (url.protocol !== "http:" && url.protocol !== "https:") {
             throw new Error("Invalid url protocol, only http and https are allowed.");

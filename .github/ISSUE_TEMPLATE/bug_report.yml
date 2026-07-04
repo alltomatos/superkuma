@@ -17,8 +17,8 @@ body:
     attributes:
       label: 📑 I have found these related issues/pull requests
       description: |
-        Please search for related **[ISSUES](https://github.com/louislam/uptime-kuma/issues?q=is%3Aissue%20sort%3Acreated-desc)**
-        and **[PULL REQUESTS](https://github.com/louislam/uptime-kuma/pulls?q=is%3Apr+sort%3Acreated-desc+)**.
+        Please search for related **[ISSUES](https://github.com/alltomatos/superkuma/issues?q=is%3Aissue%20sort%3Acreated-desc)**
+        and **[PULL REQUESTS](https://github.com/alltomatos/superkuma/pulls?q=is%3Apr+sort%3Acreated-desc+)**.
         Explain the differences between them or clarify if you were unable to find any related issues/pull requests.
       placeholder: |
         Example: This relates to issue #1, which also affects the ... system. It should not be merged because ...
@@ -28,10 +28,10 @@ body:
     attributes:
       label: 🛡️ Security Policy
       description: |
-        Please review and acknowledge the Security Policy before reporting any security-related issues or bugs. You can find the full Security Policy **[HERE](https://github.com/louislam/uptime-kuma/security/policy)**.
+        Please review and acknowledge the Security Policy before reporting any security-related issues or bugs. You can find the full Security Policy **[HERE](https://github.com/alltomatos/superkuma/security/policy)**.
       options:
         - label: |
-            I have read and agree to Uptime Kuma's [Security Policy](https://github.com/louislam/uptime-kuma/security/policy).
+            I have read and agree to SuperKuma's [Security Policy](https://github.com/alltomatos/superkuma/security/policy).
           required: true
 
   - type: textarea
@@ -77,11 +77,11 @@ body:
         ...
 
   - type: input
-    id: uptime-kuma-version
+    id: superkuma-version
     attributes:
-      label: 🐻 Uptime-Kuma Version
+      label: 🐻 SuperKuma Version
       description: |
-        What version of Uptime-Kuma are you running? Please do not provide Docker tags like `latest` or `1`.
+        What version of SuperKuma are you running? Please do not provide Docker tags like `latest` or `1`.
       placeholder: |
         e.g., 1.23.16 or 2.0.0-beta.2
     validations:
@@ -136,7 +136,7 @@ body:
             - macOS: APFS/ HFS+
             - Windows: NTFS/ReFS
           - **Storage Medium**: HDD/eMMC/SSD/NVMe
-        - **Uptime Kuma Setup**:
+        - **SuperKuma Setup**:
           - Number of monitors: `X`
     validations:
       required: true

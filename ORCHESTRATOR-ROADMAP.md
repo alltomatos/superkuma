@@ -1,4 +1,4 @@
-# ORCHESTRATOR ROADMAP — Uptime Kuma (fork alltomatos)
+# ORCHESTRATOR ROADMAP — SuperKuma (fork alltomatos)
 
 > Direção estratégica e Epics. Consultado por qualquer skill de planejamento.
 > Fork privado — **sem PR para o upstream `louislam/uptime-kuma`**. Respeitar a política anti-AI-slop de `CLAUDE.md`/`AGENTS.md`: mudanças grandes exigem revisão humana + teste manual antes de qualquer push.

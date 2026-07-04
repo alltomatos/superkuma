@@ -12,7 +12,7 @@ permissions:
 jobs:
   npm-update:
     # Only run on the original repository, not on forks
-    if: github.repository == 'louislam/uptime-kuma'
+    if: github.repository == 'alltomatos/superkuma'
     runs-on: ubuntu-latest
     permissions:
       contents: write

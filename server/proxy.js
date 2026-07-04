@@ -3,7 +3,7 @@ const { HttpProxyAgent } = require("http-proxy-agent");
 const { HttpsProxyAgent } = require("https-proxy-agent");
 const { SocksProxyAgent } = require("socks-proxy-agent");
 const { debug } = require("../src/util");
-const { UptimeKumaServer } = require("./uptime-kuma-server");
+const { SuperKumaServer } = require("./superkuma-server");
 const { CookieJar } = require("tough-cookie");
 const { createCookieAgent } = require("http-cookie-agent/http");
 const { requireResource } = require("./security/authz");
@@ -172,7 +172,7 @@ class Proxy {
      * @returns {Promise<void>}
      */
     static async reloadProxy() {
-        const server = UptimeKumaServer.getInstance();
+        const server = SuperKumaServer.getInstance();
 
         let updatedList = await R.getAssoc("SELECT id, proxy_id FROM monitor");
 

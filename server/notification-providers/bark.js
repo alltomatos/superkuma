@@ -1,6 +1,6 @@
 //
 //  bark.js
-//  UptimeKuma
+//  SuperKuma
 //
 //  Created by Lakr Aream on 2021/10/24.
 //  Copyright © 2021 Lakr Aream. All rights reserved.
@@ -12,7 +12,7 @@ const { default: axios } = require("axios");
 
 // bark is an APN bridge that sends notifications to Apple devices.
 
-const barkNotificationAvatar = "https://github.com/louislam/uptime-kuma/raw/master/public/icon.png";
+const barkNotificationAvatar = "https://github.com/alltomatos/superkuma/raw/master/public/icon.png";
 const successMessage = "Successes!";
 
 class Bark extends NotificationProvider {
@@ -30,17 +30,17 @@ class Bark extends NotificationProvider {
         }
 
         if (msg != null && heartbeatJSON != null && heartbeatJSON["status"] === UP) {
-            let title = "UptimeKuma Monitor Up";
+            let title = "SuperKuma Monitor Up";
             return await this.postNotification(notification, title, msg, barkEndpoint);
         }
 
         if (msg != null && heartbeatJSON != null && heartbeatJSON["status"] === DOWN) {
-            let title = "UptimeKuma Monitor Down";
+            let title = "SuperKuma Monitor Down";
             return await this.postNotification(notification, title, msg, barkEndpoint);
         }
 
         if (msg != null) {
-            let title = "UptimeKuma Message";
+            let title = "SuperKuma Message";
             return await this.postNotification(notification, title, msg, barkEndpoint);
         }
     }
@@ -52,14 +52,14 @@ class Bark extends NotificationProvider {
      * @returns {string} Additional URL parameters
      */
     additionalParameters(notification) {
-        // set icon to uptime kuma icon, 11kb should be fine
+        // set icon to superkuma icon, 11kb should be fine
         let params = "?icon=" + barkNotificationAvatar;
         // grouping all our notifications
         if (notification.barkGroup != null) {
             params += "&group=" + notification.barkGroup;
         } else {
             // default name
-            params += "&group=" + "UptimeKuma";
+            params += "&group=" + "SuperKuma";
         }
         // picked a sound, this should follow system's mute status when arrival
         if (notification.barkSound != null) {
@@ -111,7 +111,7 @@ class Bark extends NotificationProvider {
                     body: subtitle,
                     icon: barkNotificationAvatar,
                     sound: notification.barkSound || "telegraph", // default sound is telegraph
-                    group: notification.barkGroup || "UptimeKuma", // default group is UptimeKuma
+                    group: notification.barkGroup || "SuperKuma", // default group is SuperKuma
                 },
                 config
             );

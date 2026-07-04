@@ -1,10 +1,10 @@
 ---
 name: 🛡️ Security Issue
 description: |
-  Notify Louis Lam about a security concern. Please do NOT include any sensitive details in this issue.
+  Notify the maintainers about a security concern. Please do NOT include any sensitive details in this issue.
 # title: "Security Issue"
 labels: ["security"]
-assignees: [louislam]
+assignees: [alltomatos]
 body:
   - type: markdown
     attributes:
@@ -13,10 +13,10 @@ body:
 
         ## Please do not open issues for upstream dependency scan results.
 
-        Automated security tools often report false-positive issues that are not exploitable in the context of Uptime Kuma.
+        Automated security tools often report false-positive issues that are not exploitable in the context of SuperKuma.
         Reviewing these without concrete impact does not scale for us.
 
-        If you can demonstrate that an upstream issue is actually exploitable in Uptime Kuma (e.g. with a PoC or reproducible steps), we’re happy to take a look.
+        If you can demonstrate that an upstream issue is actually exploitable in SuperKuma (e.g. with a PoC or reproducible steps), we’re happy to take a look.
 
         ### ⚠️ Report a Security Vulnerability
 
@@ -29,26 +29,26 @@ body:
         - **Credit**: You will be automatically credited as a contributor for identifying and reporting the vulnerability. Your contribution will be reflected in the MITRE Credit System.
         - **Important Reminder**: **Do not include any sensitive or detailed vulnerability information in this issue.** This issue is only for sharing the advisory URL to notify the maintainers of the repository, not for discussing the vulnerability itself.
 
-        **Thank you for helping us keep Uptime Kuma secure!**
+        **Thank you for helping us keep SuperKuma secure!**
 
         ## **Step 1: Submit a GitHub Security Advisory**
 
         Right-click the link below and select `Open link in new tab` to access the page.
         This will keep the security issue open, allowing you to easily return and paste the Advisory URL here later.
 
-        ➡️ [Create a New Security Advisory](https://github.com/louislam/uptime-kuma/security/advisories/new)
+        ➡️ [Create a New Security Advisory](https://github.com/alltomatos/superkuma/security/advisories/new)
 
         ## **Step 2: Share the Advisory URL**
 
         Once you've created your advisory, please share the URL below.
-        This will notify Louis Lam and enable them to take the appropriate action.
+        This will notify the maintainers and enable them to take the appropriate action.
 
   - type: textarea
     id: github-advisory-url
     validations:
       required: true
     attributes:
-      label: GitHub Advisory URL for @louislam
+      label: GitHub Advisory URL for @alltomatos
       placeholder: |
         Please paste the GitHub Advisory URL here. Only the URL is required.
-        Example: https://github.com/louislam/uptime-kuma/security/advisories/GHSA-8h5r-7t6l-q3kz
+        Example: https://github.com/alltomatos/superkuma/security/advisories/GHSA-8h5r-7t6l-q3kz

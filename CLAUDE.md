@@ -1,13 +1,13 @@
-# Regras de Desenvolvimento — alltomatos/uptime-kuma
+# Regras de Desenvolvimento — alltomatos/superkuma
 
-> Fork privado do Uptime Kuma. Este arquivo define como humanos e agentes de código trabalham neste repo.
+> Fork privado do Uptime Kuma, renomeado para SuperKuma. Este arquivo define como humanos e agentes de código trabalham neste repo.
 > Governança do orchestrator: [`ORCHESTRATOR-ROADMAP.md`](ORCHESTRATOR-ROADMAP.md) · [`.claude/ESTADO_ORQUESTRATOR.md`](.claude/ESTADO_ORQUESTRATOR.md) · [`docs/agents/`](docs/agents).
 
 ---
 
 ## 1. Projeto
 
-Uptime Kuma — ferramenta self-hosted de monitoramento. Stack:
+SuperKuma — ferramenta self-hosted de monitoramento. Stack:
 
 - **Frontend:** Vue 3 + Vite (estado via mixins globais em `src/mixins/`, sem Vuex/Pinia).
 - **Backend:** Node.js (>= 20.4) + Express + Socket.io.

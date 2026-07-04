@@ -40,7 +40,7 @@ async function validateMonitorLinkedResources(actor, monitor) {
 /**
  * Handlers for monitor CRUD/control and tags
  * @param {Socket} socket Socket.io instance
- * @param {UptimeKumaServer} server Uptime Kuma server
+ * @param {SuperKumaServer} server SuperKuma server
  * @param {object} helpers Helper functions shared with server.js
  * @param {Function} helpers.startMonitor Start (or resume) a monitor
  * @param {Function} helpers.restartMonitor Restart a monitor

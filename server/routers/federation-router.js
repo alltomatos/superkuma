@@ -3,7 +3,7 @@ const { R } = require("redbean-node");
 const Monitor = require("../model/monitor");
 const dayjs = require("dayjs");
 const { UP, DOWN, MAINTENANCE, flipStatus, log } = require("../../src/util");
-const { UptimeKumaServer } = require("../uptime-kuma-server");
+const { SuperKumaServer } = require("../superkuma-server");
 const { Prometheus } = require("../prometheus");
 const { UptimeCalculator } = require("../uptime-calculator");
 const { verifyRemoteInstanceToken } = require("../auth");
@@ -12,7 +12,7 @@ const { validate } = require("../validation");
 
 let router = express.Router();
 
-const server = UptimeKumaServer.getInstance();
+const server = SuperKumaServer.getInstance();
 let io = server.io;
 
 // Sensible defaults matching a regular push-type monitor created via the UI

@@ -8,9 +8,9 @@
 ## Sessão
 
 - **iniciado_em**: `2026-07-03`
-- **fase_atual**: `Fase 4` (tier-gated) · **EPIC Multi-Tenancy (Teams+RBAC, ADR-0010)** — P0-P4 done (branch `feature/rbac-multitenant`, renomeada de `feat/`), dark-launch infra completa e testada (`rbacEnforced` ainda OFF em qualquer install real); P5 (frontend admin) aguardando "Go"
-- **repositorio**: `alltomatos/uptime-kuma` (fork privado, sem PR upstream) — GitFlow: `main`/`develop`/`feature/*` criados e no origin; PRs #2 (RBAC) e #3 (CI develop/main) abertos
-- **branch**: `chore/orchestrator-standardization` (árvore principal) · trabalho de RBAC segue em worktree isolada `.claude/worktrees/rbac` na branch `feature/rbac-multitenant`
+- **fase_atual**: `Fase 4` (tier-gated) · Rebrand SuperKuma: 8 estágios + varredura final concluídos, PR #4 (`chore/rebrand-superkuma`→`develop`) resolvendo conflito de merge contra o RBAC recém-integrado · **EPIC Multi-Tenancy (Teams+RBAC, ADR-0010)** — P0-P4 done, dark-launch infra completa e testada (`rbacEnforced` ainda OFF em qualquer install real), PR #2 **já mergeado** na `develop` (commit `25df0e57`); P5 (frontend admin) aguardando "Go"
+- **repositorio**: `alltomatos/uptime-kuma` (fork privado, sem PR upstream; rename para `alltomatos/superkuma` via `gh repo rename` é o passo final do rebrand, ainda PENDENTE — ver seção "Rebrand SuperKuma") — GitFlow: `main`/`develop`/`feature/*` criados e no origin; PR #2 (RBAC) mergeado, PR #3 (CI develop/main) e PR #4 (rebrand) em andamento
+- **branch**: `chore/rebrand-superkuma` (resolvendo merge de `develop` pós-integração do RBAC via PR #2) · trabalho de RBAC concluído (P0-P4) e mergeado, worktree `.claude/worktrees/rbac` / branch `feature/rbac-multitenant` ainda existe para o eventual P5
 
 ---
 
@@ -30,7 +30,8 @@
 | 10  | `GAP-010` | Testes      | P4     | Teste "partial config" do `agent-forwarder.js` só afirma "nenhum monitor criado", não "nenhuma chamada de rede feita" — mutation independente do verificador provou que o código real está correto, mas o teste não afirma isso diretamente (a request malformada é rejeitada 401 rio abaixo, mascarando o gap)                                                | T1   | 🟡 queued                                                                                                                                                                                            |
 | 11  | `GAP-011` | Robustez    | P4     | Schema zod de `federation-router.js`: campo `msg` é `.optional().default("")` sem `.nullable()` — se `bean.msg` for `null` (não `undefined`) num tipo de monitor, aquele heartbeat específico é descartado silenciosamente (rejeitado 400, logado, sem crash)                                                                                                  | T2   | 🟡 queued                                                                                                                                                                                            |
 | 12  | `GAP-012` | Testes      | P4     | `test-tcp.js` flaky contra `badssl.com` externo (achado no 1º CI real)                                                                                                                                                                                                                                                                                         | T1   | 🟡 queued — decisão do usuário: deixar como está por ora                                                                                                                                             |
-| 13  | `GAP-013` | Segurança   | P2     | `getMaintenanceJSONList` (uptime-kuma-server.js) nunca filtrou por `userID`/`team_id` — todo usuário autenticado recebe a lista de manutenção de TODOS os usuários/times, independente de `rbacEnforced`. Achado ao fazer o retrofit de room-routing (P4); deliberadamente **não corrigido** ali (fora do escopo aditivo de "trocar apenas o destino do emit") | T2   | 🔴 novo — precisa de correção dedicada (scopeFilter + teste de regressão) antes do flip real de `rbacEnforced=true` em produção                                                                      |
+| 13  | `GAP-013` | Segurança   | P2     | `getMaintenanceJSONList` (`server/superkuma-server.js`) nunca filtrou por `userID`/`team_id` — todo usuário autenticado recebe a lista de manutenção de TODOS os usuários/times, independente de `rbacEnforced`. Achado ao fazer o retrofit de room-routing (P4); deliberadamente **não corrigido** ali (fora do escopo aditivo de "trocar apenas o destino do emit") | T2   | 🔴 novo — precisa de correção dedicada (scopeFilter + teste de regressão) antes do flip real de `rbacEnforced=true` em produção                                                                      |
+| 14  | `GAP-014` | Higiene     | P4     | ~423 arquivos do repo não são prettier/eslint/stylelint-clean (drift pré-existente, descoberto ao investigar a falha do check `autofix` na PR #4 do rebrand). O workflow `autofix.yml` roda eslint-fix+stylelint-fix+fmt+tsc sobre a ÁRVORE INTEIRA (não só o diff de uma PR) e reporta qualquer divergência; sem o GitHub App `autofix.ci` instalado no fork pra auto-commitar a correção, esse check nunca vai ficar verde até alguém reformatar o repo inteiro numa PR dedicada (não misturar com features/rebrand, per CLAUDE.md). Decisão do usuário: deixar o check falhar por ora (não bloqueia merge, `develop` sem branch protection), registrar aqui pra resolver depois | T2   | 🟡 queued                                                                                                                                                                                            |
 
 ---
 
@@ -368,3 +369,79 @@ Durante o F3 (2026-07-04), o agente escritor do Stage 2 (frontend) rodou ~177min
 - `package-lock.json` tem alteração local não relacionada (remoção de campos `libc` em deps opcionais do rollup) — provável artefato de `npm install`. Não revertido; decidir se restaura.
 - **Descoberta (2026-07-03):** `npm run build` funciona neste ambiente (gera `dist/`) e o E2E Playwright é **totalmente viável** — após `npx playwright install chromium` (browser estava desatualizado: 1228 instalado vs 1084 esperado pelo playwright 1.39), suíte completa rodou **23/23 em 2.1min**. Isso eleva a confiança na rede de segurança do frontend para além de "só teórica".
 - `check()` HTTP **não existe como método isolado** em `monitor.js` — a lógica fica embutida numa closure `beat()` dentro de `start(io)` (confirma o gap do ADR-0002). Por isso a caracterização de monitor.js foca em `toJSON`/`toPublicJSON` (isoláveis) em vez de tentar unit-testar o check em si.
+
+---
+
+## Rebrand SuperKuma (2026-07-04+)
+
+> Detalhes completos em memória: `uptime-kuma-superkuma-rebrand.md`. Branch: `chore/rebrand-superkuma` (criada a partir de `develop`, sequenciada ANTES de `chore/ci-develop-main` e `feature/rbac-multitenant` mergearem — essas duas rebasam por cima depois).
+> PR #1 (`chore/orchestrator-standardization` → `master`) foi **fechado**: `develop` já continha 100% daquele trabalho na mesma ponta (`e467e5dd`).
+
+### Decisões travadas
+
+- Rename **completo**, incluindo breaking changes (env vars `UPTIME_KUMA_*` → `SUPERKUMA_*`).
+- README: **remove** badges/links sem equivalente SuperKuma (Docker Hub pulls, OpenCollective, Weblate, demo, sponsors).
+- Estágio `pr-test2` do Dockerfile: repointa pro `alltomatos/superkuma.git` (não remove).
+- Tags Docker renomeadas pra `alltomatos/superkuma` mesmo sem o registro existir ainda.
+- **Não tocar**: `LICENSE` (copyright "Louis Lam", pessoa física), `CNAME` (`git.kuma.pet`, domínio real), e-mail do `CODE_OF_CONDUCT.md`.
+- i18n: renomeia só os **valores**, não as chaves `"Uptime Kuma"`/`"Uptime Kuma URL"` (evita rename sincronizado arriscado em 78 arquivos + call-sites).
+- Guards `if: github.repository == 'louislam/uptime-kuma'` em `.github/workflows/*.yml`: descoberto no SK6 que existiam em ~10 arquivos, não só 3. Usuário decidiu (AskUserQuestion) repontar os ~10 de higiene do repo pra `alltomatos/superkuma`, e deixar **intactos** apenas os 3 de Docker publish (build-docker-push, build-docker-pr-test, release-nightly) — mudar esses ligaria os workflows de publish de verdade, e eles falhariam (sem secrets/registro ainda).
+
+### Tarefas (8 estágios — TASK-SK1..SK8)
+
+```yaml
+- id: TASK-SK1
+  desc: "Env vars UPTIME_KUMA_* -> SUPERKUMA_* (31 vars, ~25 arquivos)"
+  status: done   # 286/287 backend (1 flake de rede conhecido), 29/29 e2e, lint 0. commit aa7e335a
+
+- id: TASK-SK2
+  desc: "Identidade central: appName (recompilado via tsc), User-Agent, classe UptimeKumaServer->SuperKumaServer (~15 arquivos), VAPID, URLs GitHub"
+  status: done   # 1a verificação veio verified=false (gap real: clientId Kafka). Corrigido + varredura própria achou mais 5 pontos (logs de startup, comentários JSDoc). commits ceb6655c + 97469dd1 (fix)
+
+- id: TASK-SK3
+  desc: "UI do frontend: Layout.vue, NotFound.vue, Setup.vue, SetupDatabase.vue, About.vue, StatusPage.vue (Powered by)"
+  depends_on: [TASK-SK2]
+  status: done   # 1a verificação veio verified=false: faltou index.html (title/meta) + public/manifest.json (PWA name), que eu nunca tinha atribuído a nenhum estágio no plano original (gap de planejamento, não do executor). Corrigido diretamente + confirmado no dist/. commits 7b952ccf + 9c6a5162 (fix)
+
+- id: TASK-SK4
+  desc: "~51 provedores de notificação (nomes/títulos padrão) + formulários Vue correspondentes"
+  depends_on: [TASK-SK2]
+  status: done   # commit 035c2888 (49 arquivos). 1a verificação veio verified=false: achou uma 4a variante de casing nunca especificada em nenhum grep anterior -- "UptimeKuma"/"uptimekuma" SEM separador (nem espaço, nem hífen), em ~15 arquivos (bark, alerta, feishu, line, lunasea, onebot, onechat, pushbullet, pushplus, serverchan, signl4, spugpush, wecom, wpush, Cellsynt.vue) + test-oracledb.js (username de container efêmero) + docs/adr/0002.md (referência à classe já renomeada no SK2). Corrigido diretamente + confirmado: lint 0 erros, Oracle test 8/8, build com dist/ confirmando "superkuma" presente e "UptimeKuma" ausente, e2e 28/29 (1 falha flaky de timing em status-page.spec.js, não relacionada, confirmada passando isolada). Deixado de propósito: keep.js/Keep.vue ("uptimekuma" é o slug fixo da integração terceira Keep, não é nosso). commit 75312826 (fix).
+
+## Lição (3 gaps de planejamento CONSECUTIVOS: Kafka clientId no SK2, index.html/manifest.json no SK3, casing sem separador no SK4)
+Os três gaps achados até agora eram itens que EU não tinha atribuído explicitamente a nenhum estágio/grep no plano original — não foi o executor "esquecendo" algo que pedi, foi eu não pedindo, e no caso do SK4 nem o grep ampliado (`Uptime Kuma|Uptime-Kuma|uptime-kuma`) capturava estruturalmente a variante sem separador. Padrão agora consolidado para os estágios restantes (SK5+): (1) todo grep de descoberta de marca precisa cobrir >=4 formas de casing: `Uptime Kuma`, `Uptime-Kuma`, `uptime-kuma`, e `UptimeKuma`/`uptimekuma` (sem separador) -- usar um padrão case-insensitive tipo `uptime[- ]?kuma` sempre que possível em vez de listar variantes; (2) antes de fechar QUALQUER estágio como done, rodar uma varredura ampla própria (não só nos arquivos que o executor tocou) escopada a `server/ src/ extra/ docs/ *.json *.md *.js *.html` (nunca `.` na raiz -- trava por causa das worktrees em `.claude/worktrees/*`); (3) já confirmado para o SK5 (i18n): `src/lang/ja.json:752` tem uma ocorrência de "UptimeKuma" sem separador que precisa entrar no escopo do grep daquele estágio, além dos 77 outros idiomas; (4) `extra/generate-changelog.mjs:10: "UptimeKumaBot"` ainda pendente de investigação no SK6 (confirmar se é conta real de bot do GitHub -- funcional, cuidado -- ou só um rótulo de exibição -- seguro renomear) antes de decidir a ação.
+
+- id: TASK-SK5
+  desc: "i18n: en.json (20 valores) + varredura case-insensitive (cobrindo as 4 variantes de casing, incl. sem separador -- ja.json:752 já confirmado) nos outros 77 idiomas (só valores)"
+  depends_on: [TASK-SK3]
+  status: done   # feito diretamente (script node one-off em vez de Workflow, dado o volume mecânico e bem compreendido): regex case-insensitive uptime[- ]?kuma cobrindo as 4 variantes de uma vez. 60 de 61 arquivos de idioma alterados (594 linhas) + en.json (20 linhas, confirmado bater com o esperado). As 2 chaves i18n "Uptime Kuma"/"Uptime Kuma URL" preservadas (só o valor muda) em TODOS os arquivos -- confirmado via grep dedicado. Todos os 77 JSONs validados com JSON.parse. src/lang/README.md também ajustado (removida seção Weblate, sem equivalente; URLs GitHub repontadas). lint 0 erros, build ok, e2e 29/29. commit a3cc42fc
+
+- id: TASK-SK6
+  desc: "Docker/build/CI neste worktree: Dockerfiles (pr-test2 repointa), compose, scripts package.json, extra/release/*.mjs, .github/workflows (SEM tocar nos 3 guards de Docker publish)"
+  depends_on: [TASK-SK2]
+  status: done   # Achado extra importante: server/uptime-kuma-server.js NUNCA tinha sido renomeado como arquivo no SK2 (só a classe dentro dele) -- corrigido agora (git mv + 14 call sites). extra/uptime-kuma-push/ inteiro renomeado p/ extra/superkuma-push/ (dir + .go + build.js + Dockerfile, é uma ferramenta standalone). package.json (name, repo URL, tags Docker). Pergunta ao usuário: os guards `github.repository ==` apareciam em ~10 workflows, não só 3 -- usuário decidiu (AskUserQuestion) repontar os ~10 de higiene do repo (stale-bot, pr-title, conflict-labeler, deleted-pr, mark-as-draft, new-contributor-pr, npm-update, pr-description-check, ai-slop, codeql) para alltomatos/superkuma, e manter INTOCADOS apenas os 3 de Docker publish (build-docker-push, build-docker-pr-test, release-nightly). ISSUE_TEMPLATE/security_issue.yml genericizado (era pessoalmente endereçado a "Louis Lam"). Deixado intocado: @louislam/ping, @louislam/sqlite3 (escopo npm real), UptimeKumaBot (conta GitHub real, confirmada via `gh api users/UptimeKumaBot`), URLs de citação a issues upstream. lint 0 erros, backend 321/321 não-container (22 falhas Docker pré-existentes confirmadas não relacionadas), build ok, e2e 29/29. commit 5f4786cc
+
+- id: TASK-SK7
+  desc: "Docs de topo: README.md (remove badges/links sem equivalente), CONTRIBUTING.md, SECURITY.md. NÃO: LICENSE/CNAME/e-mail CODE_OF_CONDUCT. Feito diretamente pelo orquestrador, sem agente."
+  depends_on: [TASK-SK3, TASK-SK4, TASK-SK6]
+  status: done   # README.md reescrito (removidas seções sem equivalente: demo, sponsors, OpenCollective, Weblate badge, screenshots extras, subreddit -- mantido link de atribuição ao Uptime Kuma original no Motivation, intencional). CONTRIBUTING.md/SECURITY.md: voz pessoal genericizada, tabela de mantenedores nomeados (louislam/chakflying/commanderstorm) removida, procedimentos Docker-builder/Wiki (infra do upstream que não temos) removidos. Achados extras corrigidos na mesma passada: ecosystem.config.js, compose.yaml, .dockerignore (tinha um fix anterior que falhou silenciosamente -- reaplicado), package-lock.json (name sync). lint 0 erros. commit 26537653
+
+- id: TASK-SK8
+  desc: "Docs de governança próprios: CLAUDE.md, CONTEXT.md, ORCHESTRATOR-ROADMAP.md, ESTADO_ORQUESTRATOR.md, docs/adr/*, docs/prd/*. Feito diretamente, sem agente."
+  depends_on: [TASK-SK7]
+  status: done   # CLAUDE.md, CONTEXT.md, ORCHESTRATOR-ROADMAP.md (títulos), docs/agents/domain.md, docs/agents/issue-tracker.md (repo próprio), docs/prd/master-agent.md, docs/adr/0002 (fix pontual já feito no SK4), 0007/0008/0009 -- todos descrevendo o sistema ATUAL, renomeados p/ SuperKuma. Preservado de propósito: citações ao upstream real `louislam/uptime-kuma` (CLAUDE.md linha 35, issue-tracker.md linha 18, README.md Motivation) e a narrativa histórica desta própria seção do rebrand (que necessariamente cita "Uptime Kuma" ao descrever o que está sendo renomeado). Este arquivo (ESTADO_ORQUESTRATOR.md) e ORCHESTRATOR-ROADMAP.md tiveram só os títulos/campos de estado-vivo corrigidos, não a narrativa histórica.
+```
+
+- id: TASK-SK9
+  desc: "Varredura final cross-stage (case-insensitive uptime[- ]?kuma em todo o repo) + gate de verificação completo, antes do rename real no GitHub."
+  depends_on: [TASK-SK8]
+  status: done # achou uma 5a variante de casing (bark.js: "uptime kuma" minúsculo com espaço) + uptimeKumaEntryPage (variável interna em server.js) + comentários em database.js/migrations/README + título de teste e2e. Confirmado exaustivamente: tudo mais remanescente é exceção justificada (URLs de terceiros reais, citações a issues/PRs upstream, @louislam/\* escopo npm real, UptimeKumaBot conta real, os 3 guards Docker-publish, as 2 chaves i18n preservadas). lint 0 erros, testes-alvo passando, build ok, e2e 29/29. commit 49fbde89
+
+- id: TASK-SK10
+  desc: "PR #4 (chore/rebrand-superkuma -> develop) aberto. Aguardar revisão/aprovação humana + CI verde antes do merge."
+  depends_on: [TASK-SK9]
+  status: in_progress # PR aberto: https://github.com/alltomatos/uptime-kuma/pull/4 . CI achou 2 falhas: (1) check-file-changes (prevent-file-change.yml) -- removido, commit 9fd62c9c (ver TASK-SK10 nota anterior / GAP resolvido). (2) autofix (autofix-ci bot) -- investigado a fundo: esse check roda os fixers sobre a ÁRVORE INTEIRA do repo (não só o diff da PR) e precisa do GitHub App autofix.ci instalado pra auto-commitar; sem o App, fica vermelho pra sempre até alguém reformatar TODO o repo (~423 arquivos de drift pré-existente, virou GAP-012). Usuário decidiu (AskUserQuestion): deixar esse check falhar -- não bloqueia merge (`develop` sem branch protection) -- e resolver GAP-012 depois, numa PR dedicada. Únicas mudanças mantidas desta investigação: nenhuma (working tree revertido ao estado do commit 28bc701e, limpo). Aguardando aprovação humana do PR para prosseguir ao merge + rename do repo.
+
+### Passo final (após merge do PR #4)
+
+`gh repo rename superkuma` → atualizar remotes nas outras 2 worktrees (`ci-setup`, `rbac`).

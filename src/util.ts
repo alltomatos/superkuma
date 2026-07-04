@@ -28,7 +28,7 @@ export const isNode = typeof process !== "undefined" && process?.versions?.node;
  */
 const dayjs = isNode ? require("dayjs") : dayjsFrontend;
 
-export const appName = "Uptime Kuma";
+export const appName = "SuperKuma";
 export const DOWN = 0;
 export const UP = 1;
 export const PENDING = 2;
@@ -203,7 +203,7 @@ export function ucfirst(str: string) {
 }
 
 /**
- * @deprecated Use log.debug (https://github.com/louislam/uptime-kuma/pull/910)
+ * @deprecated Use log.debug (https://github.com/alltomatos/superkuma/pull/910)
  * @param msg Message to write
  * @returns {void}
  */
@@ -213,7 +213,7 @@ export function debug(msg: unknown) {
 
 class Logger {
     /**
-     * UPTIME_KUMA_HIDE_LOG=debug_monitor,info_monitor
+     * SUPERKUMA_HIDE_LOG=debug_monitor,info_monitor
      *
      * Example:
      *  [
@@ -232,8 +232,8 @@ class Logger {
      *
      */
     constructor() {
-        if (typeof process !== "undefined" && process.env.UPTIME_KUMA_HIDE_LOG) {
-            const list = process.env.UPTIME_KUMA_HIDE_LOG.split(",").map((v) => v.toLowerCase());
+        if (typeof process !== "undefined" && process.env.SUPERKUMA_HIDE_LOG) {
+            const list = process.env.SUPERKUMA_HIDE_LOG.split(",").map((v) => v.toLowerCase());
 
             for (const pair of list) {
                 // split first "_" only
@@ -244,7 +244,7 @@ class Logger {
                 }
             }
 
-            this.debug("server", "UPTIME_KUMA_HIDE_LOG is set");
+            this.debug("server", "SUPERKUMA_HIDE_LOG is set");
             this.debug("server", this.hideLog);
         }
     }
@@ -275,7 +275,7 @@ class Logger {
             now = dayjs().format();
         }
 
-        if (process.env.UPTIME_KUMA_LOG_FORMAT === "json") {
+        if (process.env.SUPERKUMA_LOG_FORMAT === "json") {
             const msgString = msg
                 .map((m) => {
                     if (typeof m === "string") {

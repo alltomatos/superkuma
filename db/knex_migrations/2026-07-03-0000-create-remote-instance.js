@@ -2,7 +2,7 @@ exports.up = function (knex) {
     return knex.schema
         .createTable("remote_instance", function (table) {
             table.increments("id");
-            table.comment("A registered remote Uptime Kuma agent instance in a Master-Agent federation setup");
+            table.comment("A registered remote SuperKuma agent instance in a Master-Agent federation setup");
             table
                 .string("instance_id", 255)
                 .notNullable()

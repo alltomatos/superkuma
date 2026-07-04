@@ -1,4 +1,4 @@
-# PRD — Uptime Kuma Master-Agent (Federação)
+# PRD — SuperKuma Master-Agent (Federação)
 
 - **Status:** Draft / aprovado para planejamento
 - **Data:** 2026-07-03
@@ -9,7 +9,7 @@
 
 ## 1. Problema
 
-Um provedor gerencia monitoramento de **múltiplos clientes**, cada um rodando sua própria instância isolada do Uptime Kuma na infra local. Sem comunicação entre instâncias: cada uma é acessada individualmente → caos operacional e zero visibilidade central. Quando um serviço de um cliente cai, não há alerta centralizado imediato.
+Um provedor gerencia monitoramento de **múltiplos clientes**, cada um rodando sua própria instância isolada do SuperKuma na infra local. Sem comunicação entre instâncias: cada uma é acessada individualmente → caos operacional e zero visibilidade central. Quando um serviço de um cliente cai, não há alerta centralizado imediato.
 
 ## 2. Objetivo
 
@@ -25,7 +25,7 @@ Uma instância **Master** (do provedor) que recebe, em tempo real, o status de N
 1. Como MSP, vejo num painel único o status de todos os clientes, cada monitor rotulado pela instância de origem.
 2. Como MSP, sou notificado imediatamente quando um serviço de qualquer cliente cai.
 3. Como MSP, sou avisado quando um **Agent inteiro** fica offline (distinto de "serviços do cliente caíram").
-4. Como cliente, meu Uptime Kuma continua monitorando local em tempo real, e opcionalmente encaminha status ao Master com um `instance_id` único.
+4. Como cliente, meu SuperKuma continua monitorando local em tempo real, e opcionalmente encaminha status ao Master com um `instance_id` único.
 5. Como cliente, escolho se as notificações disparam localmente, só no Master, ou em ambos.
 6. Como MSP, o Master também monitora meus próprios serviços locais, lado a lado com os agregados.
 

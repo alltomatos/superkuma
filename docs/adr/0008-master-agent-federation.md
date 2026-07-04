@@ -6,13 +6,13 @@
 
 ## Contexto
 
-Gerenciamos monitoramento de múltiplos clientes, cada um rodando sua própria instância isolada do Uptime Kuma na infra local. Não há comunicação entre instâncias nem visão central — cada uma precisa ser acessada individualmente. Requisito decisivo: quando um serviço de um cliente cai, a notificação deve chegar **imediatamente** a uma instância central nossa.
+Gerenciamos monitoramento de múltiplos clientes, cada um rodando sua própria instância isolada do SuperKuma na infra local. Não há comunicação entre instâncias nem visão central — cada uma precisa ser acessada individualmente. Requisito decisivo: quando um serviço de um cliente cai, a notificação deve chegar **imediatamente** a uma instância central nossa.
 
-O Uptime Kuma já possui a peça fundamental: o endpoint `/api/push/:pushToken` (`server/routers/api-router.js:47`) é um pipeline completo de ingestão de heartbeat externo (determineStatus → UptimeCalculator → notificação → store → emit). E o `socket.io-client` já é dependência (usado hoje só no frontend).
+O SuperKuma já possui a peça fundamental: o endpoint `/api/push/:pushToken` (`server/routers/api-router.js:47`) é um pipeline completo de ingestão de heartbeat externo (determineStatus → UptimeCalculator → notificação → store → emit). E o `socket.io-client` já é dependência (usado hoje só no frontend).
 
 ## Decisão
 
-Adotar um modelo **Master-Agent (federação)** dentro do próprio Uptime Kuma, com as seguintes decisões:
+Adotar um modelo **Master-Agent (federação)** dentro do próprio SuperKuma, com as seguintes decisões:
 
 1. **Setting `federation.role`**: `standalone` (default, comportamento atual) · `agent` · `master`.
 2. **Monitor remoto = linha na tabela `monitor` com `remote_instance_id`** (NULL = local), alimentado externamente como um monitor `push`. Isso **reusa todo o pipeline downstream** (heartbeat, UptimeCalculator, status page, notificação, Prometheus) sem reescrita.
@@ -36,5 +36,5 @@ Adotar um modelo **Master-Agent (federação)** dentro do próprio Uptime Kuma, 
 ## Alternativas consideradas
 
 - **Push monitors manuais** (configurar cada monitor local do agente com uma push-URL apontando pro Master): funciona hoje, mas não escala (token por-monitor, sem `instance_id`, sem agregação nativa) — vira o _MVP_, não a solução final.
-- **Pull/polling** (Master consulta agentes): rejeitado — não é tempo real e o Uptime Kuma não expõe API REST rica de status.
-- **Ferramenta externa de agregação** (Grafana/Prometheus federando os `/metrics`): perde a UX nativa do Uptime Kuma (status pages, HeartbeatBar, incidentes) e não atende "notificação imediata via a própria ferramenta".
+- **Pull/polling** (Master consulta agentes): rejeitado — não é tempo real e o SuperKuma não expõe API REST rica de status.
+- **Ferramenta externa de agregação** (Grafana/Prometheus federando os `/metrics`): perde a UX nativa do SuperKuma (status pages, HeartbeatBar, incidentes) e não atende "notificação imediata via a própria ferramenta".

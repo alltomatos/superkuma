@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues e PRDs deste repo vivem como GitHub issues no fork `alltomatos/uptime-kuma`. Use o `gh` CLI para todas as operações.
+Issues e PRDs deste repo vivem como GitHub issues no fork `alltomatos/superkuma`. Use o `gh` CLI para todas as operações.
 
 ## Convenções
 

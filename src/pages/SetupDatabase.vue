@@ -3,7 +3,7 @@
         <form @submit.prevent="submit">
             <div>
                 <object width="64" height="64" data="/icon.svg" />
-                <div style="font-size: 28px; font-weight: bold; margin-top: 5px">Uptime Kuma</div>
+                <div style="font-size: 28px; font-weight: bold; margin-top: 5px">SuperKuma</div>
             </div>
 
             <div v-if="info.runningSetup" class="mt-5">
@@ -97,7 +97,7 @@
 
                     <div v-if="isProvidedMariaDBSocket" class="mt-1 short text-start">
                         <i18n-t keypath="mariadbSocketPathDetectedHelptext" tag="div" class="form-text">
-                            <code>UPTIME_KUMA_DB_SOCKET</code>
+                            <code>SUPERKUMA_DB_SOCKET</code>
                         </i18n-t>
                     </div>
 
