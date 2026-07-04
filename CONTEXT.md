@@ -9,14 +9,14 @@ SuperKuma é uma aplicação self-hosted de **monitoramento de disponibilidade**
 
 ## Subdomínios (bounded contexts)
 
-| Subdomínio | Responsabilidade | Código |
-|---|---|---|
-| **Monitoring** | Definir e executar verificações | `server/model/monitor.js`, `server/monitor-types/` |
-| **Uptime Statistics** | Agregar heartbeats em métricas | `server/uptime-calculator.js`, tabelas `stat_*` |
-| **Notifications** | Entregar alertas em canais | `server/notification.js`, `server/notification-providers/` |
-| **Status Pages** | Exposição pública de status | `server/model/status_page.js`, `server/routers/` |
-| **Maintenance** | Janelas de manutenção agendadas | `server/model/maintenance.js` |
-| **Access & Config** | Usuários, sessão, chaves, ajustes | `server/auth.js`, `server/2fa.js`, `server/settings.js` |
+| Subdomínio            | Responsabilidade                  | Código                                                     |
+| --------------------- | --------------------------------- | ---------------------------------------------------------- |
+| **Monitoring**        | Definir e executar verificações   | `server/model/monitor.js`, `server/monitor-types/`         |
+| **Uptime Statistics** | Agregar heartbeats em métricas    | `server/uptime-calculator.js`, tabelas `stat_*`            |
+| **Notifications**     | Entregar alertas em canais        | `server/notification.js`, `server/notification-providers/` |
+| **Status Pages**      | Exposição pública de status       | `server/model/status_page.js`, `server/routers/`           |
+| **Maintenance**       | Janelas de manutenção agendadas   | `server/model/maintenance.js`                              |
+| **Access & Config**   | Usuários, sessão, chaves, ajustes | `server/auth.js`, `server/2fa.js`, `server/settings.js`    |
 
 ---
 

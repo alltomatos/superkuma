@@ -31,16 +31,16 @@ All versions are upgradable to the latest version.
 
 ### Upgradable Docker Tags
 
-| Tag             | Supported           |
-| --------------- | -------------------- |
-| 2               | :white_check_mark:  |
-| 2-slim          | :white_check_mark:  |
-| next            | :white_check_mark:  |
-| next-slim       | :white_check_mark:  |
-| 2-rootless      | :white_check_mark:  |
-| 2-slim-rootless | :white_check_mark:  |
-| 1               | ⚠️ Deprecated       |
-| 1-debian        | ⚠️ Deprecated       |
-| latest          | ⚠️ Deprecated       |
-| debian          | ⚠️ Deprecated       |
-| All other tags  | ❌                  |
+| Tag             | Supported          |
+| --------------- | ------------------ |
+| 2               | :white_check_mark: |
+| 2-slim          | :white_check_mark: |
+| next            | :white_check_mark: |
+| next-slim       | :white_check_mark: |
+| 2-rootless      | :white_check_mark: |
+| 2-slim-rootless | :white_check_mark: |
+| 1               | ⚠️ Deprecated      |
+| 1-debian        | ⚠️ Deprecated      |
+| latest          | ⚠️ Deprecated      |
+| debian          | ⚠️ Deprecated      |
+| All other tags  | ❌                 |

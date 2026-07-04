@@ -83,7 +83,10 @@ async function findOrCreateMirroredMonitor(remoteInstance, agentMonitorId, name)
 
     await R.store(bean);
 
-    log.debug("federation", `Created mirrored monitor ${bean.id} for remote instance ${remoteInstance.id} (agentMonitorId=${agentMonitorId})`);
+    log.debug(
+        "federation",
+        `Created mirrored monitor ${bean.id} for remote instance ${remoteInstance.id} (agentMonitorId=${agentMonitorId})`
+    );
 
     return bean;
 }

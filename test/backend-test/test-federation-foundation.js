@@ -22,7 +22,10 @@ describe("Federation Foundation (F0 + M0)", () => {
 
     test("schema exists correctly", async () => {
         assert.ok(await R.knex.schema.hasTable("remote_instance"), "remote_instance table should exist");
-        assert.ok(await R.knex.schema.hasColumn("monitor", "remote_instance_id"), "monitor.remote_instance_id column should exist");
+        assert.ok(
+            await R.knex.schema.hasColumn("monitor", "remote_instance_id"),
+            "monitor.remote_instance_id column should exist"
+        );
         assert.ok(await R.knex.schema.hasTable("stat_monthly"), "stat_monthly table should exist");
     });
 
@@ -125,7 +128,10 @@ describe("Federation Foundation (F0 + M0)", () => {
         assert.strictEqual(json.active, true);
         assert.ok(!("token_hash" in json), "toJSON() must not include token_hash");
         assert.ok(!("tokenHash" in json), "toJSON() must not include tokenHash");
-        assert.ok(!JSON.stringify(json).includes("super-secret-hash"), "serialized JSON must not leak the token hash value");
+        assert.ok(
+            !JSON.stringify(json).includes("super-secret-hash"),
+            "serialized JSON must not leak the token hash value"
+        );
     });
 
     test("migration rollback (down) and re-apply (up) round-trip cleanly", async () => {
@@ -181,7 +187,11 @@ describe("Federation Foundation (F0 + M0)", () => {
             await remoteInstanceMigration.down(rawKnex);
 
             assert.strictEqual(await rawKnex.schema.hasTable("stat_monthly"), false, "stat_monthly should be dropped");
-            assert.strictEqual(await rawKnex.schema.hasTable("remote_instance"), false, "remote_instance should be dropped");
+            assert.strictEqual(
+                await rawKnex.schema.hasTable("remote_instance"),
+                false,
+                "remote_instance should be dropped"
+            );
             assert.strictEqual(
                 await rawKnex.schema.hasColumn("monitor", "remote_instance_id"),
                 false,
@@ -192,7 +202,10 @@ describe("Federation Foundation (F0 + M0)", () => {
             await remoteInstanceMigration.up(rawKnex);
             await statMonthlyMigration.up(rawKnex);
 
-            assert.ok(await rawKnex.schema.hasTable("remote_instance"), "remote_instance should exist again after re-apply");
+            assert.ok(
+                await rawKnex.schema.hasTable("remote_instance"),
+                "remote_instance should exist again after re-apply"
+            );
             assert.ok(
                 await rawKnex.schema.hasColumn("monitor", "remote_instance_id"),
                 "monitor.remote_instance_id should exist again after re-apply"

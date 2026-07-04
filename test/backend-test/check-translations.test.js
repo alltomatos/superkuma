@@ -126,8 +126,7 @@ describe("Check Translations", () => {
                 report += `\n     | ${arrow} unrecognized translation key`;
                 report += "\n     |";
                 report += `\n     = note: please register the translation key '${key}' in en.json so that our awesome team of translators can translate them`;
-                report +=
-                    "\n     = tip: if you want to contribute translations, please see src/lang/README.md\n";
+                report += "\n     = tip: if you want to contribute translations, please see src/lang/README.md\n";
             });
             report += "\n===============================";
             const fileCount = new Set(missingKeys.map((item) => item.filePath)).size;

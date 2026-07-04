@@ -269,7 +269,11 @@ describe("Federation Agent Forwarder (F2)", () => {
         // but deliberately use a bogus token so verifyRemoteInstanceToken
         // rejects the request (401) -- the forwarder must swallow this too.
         await registerRemoteInstance(userID, "agent-wrong-token", "Agent Wrong Token");
-        await configureFederation(`http://127.0.0.1:${masterPort}`, "ri999999_totally-wrong-secret", "agent-wrong-token");
+        await configureFederation(
+            `http://127.0.0.1:${masterPort}`,
+            "ri999999_totally-wrong-secret",
+            "agent-wrong-token"
+        );
 
         const monitor = fakeMonitor(505, "Wrong Token Service", "http");
 
