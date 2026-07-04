@@ -2,7 +2,7 @@ exports.up = function (knex) {
     return knex.schema
         .createTable("remote_instance", function (table) {
             table.increments("id");
-            table.comment("A registered remote Uptime Kuma agent instance in a Master-Agent federation setup");
+            table.comment("A registered remote SuperKuma agent instance in a Master-Agent federation setup");
             table.string("instance_id", 255).notNullable().unique().comment("Unique identifier the agent presents to the master");
             table.string("name", 255).notNullable().comment("Human-readable label for this instance");
             table.string("token_hash", 255).notNullable().comment("Hashed auth token (bcrypt, same convention as api_key)");

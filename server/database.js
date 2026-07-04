@@ -411,7 +411,7 @@ class Database {
      * @returns {Promise<void>}
      */
     static async patch(port = undefined, hostname = undefined) {
-        // Still need to keep this for old versions of Uptime Kuma
+        // Still need to keep this for old versions of SuperKuma
         if (Database.dbConfig.type === "sqlite") {
             await this.patchSqlite();
         }
