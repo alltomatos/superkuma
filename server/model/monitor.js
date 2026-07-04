@@ -53,6 +53,7 @@ const zlib = require("node:zlib");
 const { promisify } = require("node:util");
 const brotliCompress = promisify(zlib.brotliCompress);
 const DomainExpiry = require("./domain_expiry");
+const { forwardHeartbeatToMaster } = require("../federation/agent-forwarder");
 
 const rootCertificates = rootCertificatesFingerprints();
 
@@ -794,6 +795,10 @@ class Monitor extends BeanModel {
             // Store to database
             log.debug("monitor", `[${this.name}] Store`);
             await R.store(bean);
+
+            // Federation (Agent role): mirror this heartbeat to a configured
+            // Master, if any. No-op for standalone users (see agent-forwarder.js).
+            await forwardHeartbeatToMaster(this, bean);
 
             log.debug("monitor", `[${this.name}] prometheus.update`);
             const data24h = uptimeCalculator.get24Hour();
