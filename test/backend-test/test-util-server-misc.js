@@ -62,7 +62,7 @@ describe("misc.js: getTotalClientInRoom()", () => {
         const io = {
             sockets: {
                 adapter: {
-                    rooms: new Map([[ "room1", new Set([ "client-a", "client-b", "client-c" ]) ]]),
+                    rooms: new Map([["room1", new Set(["client-a", "client-b", "client-c"])]]),
                 },
             },
         };
@@ -83,10 +83,7 @@ describe("misc.js: allowAllOrigin()", () => {
 
         assert.strictEqual(headers["Access-Control-Allow-Origin"], "*");
         assert.strictEqual(headers["Access-Control-Allow-Methods"], "GET, PUT, POST, DELETE, OPTIONS");
-        assert.strictEqual(
-            headers["Access-Control-Allow-Headers"],
-            "Origin, X-Requested-With, Content-Type, Accept"
-        );
+        assert.strictEqual(headers["Access-Control-Allow-Headers"], "Origin, X-Requested-With, Content-Type, Accept");
     });
 });
 

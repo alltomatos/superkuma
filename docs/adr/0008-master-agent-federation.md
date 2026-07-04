@@ -35,6 +35,6 @@ Adotar um modelo **Master-Agent (federação)** dentro do próprio Uptime Kuma, 
 
 ## Alternativas consideradas
 
-- **Push monitors manuais** (configurar cada monitor local do agente com uma push-URL apontando pro Master): funciona hoje, mas não escala (token por-monitor, sem `instance_id`, sem agregação nativa) — vira o *MVP*, não a solução final.
+- **Push monitors manuais** (configurar cada monitor local do agente com uma push-URL apontando pro Master): funciona hoje, mas não escala (token por-monitor, sem `instance_id`, sem agregação nativa) — vira o _MVP_, não a solução final.
 - **Pull/polling** (Master consulta agentes): rejeitado — não é tempo real e o Uptime Kuma não expõe API REST rica de status.
 - **Ferramenta externa de agregação** (Grafana/Prometheus federando os `/metrics`): perde a UX nativa do Uptime Kuma (status pages, HeartbeatBar, incidentes) e não atende "notificação imediata via a própria ferramenta".

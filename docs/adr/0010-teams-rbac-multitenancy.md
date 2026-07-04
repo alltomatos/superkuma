@@ -17,36 +17,36 @@ A espinha dorsal é um **esqueleto aditivo com flag de dark-launch** (`rbacEnfor
 
 ### 1.1 Decisões-chave
 
-| # | Decisão | Justificativa |
-|---|---|---|
-| D1 | **MANTER `user_id`, ADD `team_id` nullable**. NÃO adicionar `created_by` como coluna nova nas tabelas de recurso — reusar `user_id` como principal de auditoria (ver R2). | redbean grava por nome de propriedade 1:1; zero precedente de rename; coluna-sombra `created_by` duplicaria semântica e quebra API keys (R2). |
-| D2 | `team_id` **nullable no DB**; NOT NULL garantido no bean-save hook + integrity check. | SQLite não faz ALTER→NOT NULL in-place na tabela `monitor` (60 colunas). |
-| D3 | `onDelete` de `team_id` = **RESTRICT** + tela superadmin de re-home. | CASCADE apaga monitores+histórico; SET NULL cria órfãos invisíveis. |
-| D4 | Flag `rbacEnforced` (dark-launch), caminho flag-ON usa eixo único. | Flag-OFF byte-idêntico = contrato de regressão testável sobre baseline ~14%. |
-| D5 | JWT: `token_version` + `exp` + claim `h` mantido; **claims ausentes tratados como versão 0** (R6). | `token_version` dá revogação por admin; grandfather evita logout de frota inteira no upgrade. |
-| D6 | **UM papel por (user, team) na v1** (`UNIQUE(team_id,user_id)`). | Simplifica `can()`/UI. TRAVAR antes de P0 (multi-papel exige 2ª migração). |
-| D7 | Adiar `resource_acl`/`parent_team_id`/nested teams. | Superfície de autz sem UI = risco de rot. |
-| D8 | **status_page** é team-scoped com flag `is_public`; **`group` NÃO recebe `team_id` nem `is_public`** — herda tenancy do `status_page` pai e reusa a coluna `public` existente (R1, R-med). | `group` não tem `user_id` (verificado knex_init_db.js:26-34) e já tem `public`; escopar `group` independente do pai cria split-brain. |
-| D9 | `/metrics` Prometheus: **gate superadmin-only** até redesenho por-team. | Singletons globais module-level; sem seam por-request. |
+| #   | Decisão                                                                                                                                                                                    | Justificativa                                                                                                                                 |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | **MANTER `user_id`, ADD `team_id` nullable**. NÃO adicionar `created_by` como coluna nova nas tabelas de recurso — reusar `user_id` como principal de auditoria (ver R2).                  | redbean grava por nome de propriedade 1:1; zero precedente de rename; coluna-sombra `created_by` duplicaria semântica e quebra API keys (R2). |
+| D2  | `team_id` **nullable no DB**; NOT NULL garantido no bean-save hook + integrity check.                                                                                                      | SQLite não faz ALTER→NOT NULL in-place na tabela `monitor` (60 colunas).                                                                      |
+| D3  | `onDelete` de `team_id` = **RESTRICT** + tela superadmin de re-home.                                                                                                                       | CASCADE apaga monitores+histórico; SET NULL cria órfãos invisíveis.                                                                           |
+| D4  | Flag `rbacEnforced` (dark-launch), caminho flag-ON usa eixo único.                                                                                                                         | Flag-OFF byte-idêntico = contrato de regressão testável sobre baseline ~14%.                                                                  |
+| D5  | JWT: `token_version` + `exp` + claim `h` mantido; **claims ausentes tratados como versão 0** (R6).                                                                                         | `token_version` dá revogação por admin; grandfather evita logout de frota inteira no upgrade.                                                 |
+| D6  | **UM papel por (user, team) na v1** (`UNIQUE(team_id,user_id)`).                                                                                                                           | Simplifica `can()`/UI. TRAVAR antes de P0 (multi-papel exige 2ª migração).                                                                    |
+| D7  | Adiar `resource_acl`/`parent_team_id`/nested teams.                                                                                                                                        | Superfície de autz sem UI = risco de rot.                                                                                                     |
+| D8  | **status_page** é team-scoped com flag `is_public`; **`group` NÃO recebe `team_id` nem `is_public`** — herda tenancy do `status_page` pai e reusa a coluna `public` existente (R1, R-med). | `group` não tem `user_id` (verificado knex_init_db.js:26-34) e já tem `public`; escopar `group` independente do pai cria split-brain.         |
+| D9  | `/metrics` Prometheus: **gate superadmin-only** até redesenho por-team.                                                                                                                    | Singletons globais module-level; sem seam por-request.                                                                                        |
 
 ### 1.2 Correções do red-team incorporadas (blockers/high — todas obrigatórias)
 
 Verificadas contra o código atual. Cada uma altera o design; não são caveats.
 
-| Ref | Correção incorporada | Onde |
-|---|---|---|
-| **R1** | `group` **removido** do backfill genérico `SET ... = user_id` e do add de `team_id`/`is_public`. `group` não tem coluna `user_id` (verificado): o UPDATE genérico **aborta a transação inteira** em qualquer install com status-page group. `group` herda tenancy do `status_page` pai. | §2.4, §5 |
-| **R2** | api_key usa **`user_id`** como principal (verificado: api_key.user_id NOT NULL CASCADE, knex_init_db.js). NÃO introduzir `created_by`-sombra. `buildActor({userId: key.user_id}, key.team_id)`. Sem isto, `key.created_by` fica NULL → toda key legada retorna 403 no flip. Legacy keys forçadas a papel **viewer** do Default Team; **actor de API key NUNCA faz short-circuit em is_superadmin do dono** (cap no `role_id`). | §2.3, §5, §8.4 |
-| **R3** | **`team_id` NUNCA é atribuído de payload de cliente em nenhum bean.** redbean freeze-mode `store()` grava o property-bag inteiro (verificado redbean-node.js) → a "invariante anti-escalação" NÃO é garantida pelo gate `can()` sozinha. Regra de código hard: `team_id` setado só server-side de `actor.activeTeamId` no create; no edit, re-afirmar `bean.team_id` ao valor carregado do DB antes de `store()`; excluir `team_id` do allowlist de field-copy; bean-save hook pina `team_id`. | §4.3 |
-| **R4** | **Inventário de gates re-derivado por "toca um recurso", não por "já filtra user_id".** Adicionados ~15+ handlers antes omitidos: `clearEvents`/`clearHeartbeats` (server.js:959/978), `getMonitorBeats` (:334), TODOS os handlers de status-page (saveStatusPage/deleteStatusPage/getStatusPage/*Incident), monitor_tag writes (:587/615/643), tags globais (:516/537/568), join-writes de maintenance (:77/109/176/200). | §3, §4.2 |
-| **R5** | **Validação de FK cross-resource** como requisito de 1ª classe: notificationIDList/proxyId/docker_host/remote_browser/parent aceitos do cliente no monitor add/edit devem passar por `can(actor,'<res>:read',{id})` antes de persistir; `updateMonitorNotification` filtra a lista às notifications do team do actor. | §4.4 |
-| **R6** | **Grandfather de claims JWT:** `(decoded.tv ?? 0) !== user.token_version` e política explícita de `exp` ausente. Sem isto, `undefined !== 0` desloga a frota inteira no primeiro reconnect pós-deploy. | §8.1 |
-| **R7** | **Federação:** `findOrCreateMirroredMonitor` seta `bean.team_id = remoteInstance.team_id` (verificado :79 hoje seta só `user_id`). bean-save NOT-NULL hook cobre o path do federation-router. `/api/push` e `/api/federation/heartbeat` emit sites adicionados explicitamente ao inventário atômico de room-refactor (verificado: :127/:129 emitem em `monitor.user_id`). | §5, §8.5, §9-P4 |
-| **R8** | **`isMonitorPublic` exige match de team:** um monitor é "público" só via grupo público **do team dono do monitor**. Fecha a cadeia badge-leak (anexar monitor de outro team a status page pública própria → `/api/badge` vaza). Landa na MESMA fase do gate de status-page. | §8.5 |
-| **R9** | **onDelete de `user_id` neutralizado** em api_key e remote_instance (hoje CASCADE): deletar um user destrói recursos do team. Trocar para SET NULL exige FK-alter → **rebuild de tabela sob PRAGMA foreign_keys=OFF no SQLite**. Isto CONTRADIZ a promessa "sem rebuild": ver R9-decisão em §5 e Decisão aberta. | §5, §12 |
-| **R10** | **Ordem explícita de createTable e seed** para paridade cross-engine FK (o window FK-OFF do SQLite mascara ordering bugs que quebram em Postgres/MySQL). Índices tratados como custo separado do column-add (não "instantâneo"); evitar índice duplicado do auto-`_id`-index do redbean. | §5 |
-| **R11** | **Tag tenancy** decidida (era D-decision faltante): `tag` recebe `team_id` (9ª tabela de recurso), `tag:manage` escopado por-team; monitor_tag writes exigem `monitor:update` no team do monitor. | §2.3, §3, §12 |
-| **R12** | **disableAuth auto-login determinístico:** `R.findOne("user", " is_superadmin = 1 ORDER BY id ASC ")` (verificado: findOne com clause vazia = `.first()` sem ORDER BY = row plan-dependent). Check single-user roda ANTES do findOne. | §6 |
+| Ref     | Correção incorporada                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Onde            |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| **R1**  | `group` **removido** do backfill genérico `SET ... = user_id` e do add de `team_id`/`is_public`. `group` não tem coluna `user_id` (verificado): o UPDATE genérico **aborta a transação inteira** em qualquer install com status-page group. `group` herda tenancy do `status_page` pai.                                                                                                                                                                                                        | §2.4, §5        |
+| **R2**  | api_key usa **`user_id`** como principal (verificado: api_key.user_id NOT NULL CASCADE, knex_init_db.js). NÃO introduzir `created_by`-sombra. `buildActor({userId: key.user_id}, key.team_id)`. Sem isto, `key.created_by` fica NULL → toda key legada retorna 403 no flip. Legacy keys forçadas a papel **viewer** do Default Team; **actor de API key NUNCA faz short-circuit em is_superadmin do dono** (cap no `role_id`).                                                                 | §2.3, §5, §8.4  |
+| **R3**  | **`team_id` NUNCA é atribuído de payload de cliente em nenhum bean.** redbean freeze-mode `store()` grava o property-bag inteiro (verificado redbean-node.js) → a "invariante anti-escalação" NÃO é garantida pelo gate `can()` sozinha. Regra de código hard: `team_id` setado só server-side de `actor.activeTeamId` no create; no edit, re-afirmar `bean.team_id` ao valor carregado do DB antes de `store()`; excluir `team_id` do allowlist de field-copy; bean-save hook pina `team_id`. | §4.3            |
+| **R4**  | **Inventário de gates re-derivado por "toca um recurso", não por "já filtra user_id".** Adicionados ~15+ handlers antes omitidos: `clearEvents`/`clearHeartbeats` (server.js:959/978), `getMonitorBeats` (:334), TODOS os handlers de status-page (saveStatusPage/deleteStatusPage/getStatusPage/\*Incident), monitor_tag writes (:587/615/643), tags globais (:516/537/568), join-writes de maintenance (:77/109/176/200).                                                                    | §3, §4.2        |
+| **R5**  | **Validação de FK cross-resource** como requisito de 1ª classe: notificationIDList/proxyId/docker_host/remote_browser/parent aceitos do cliente no monitor add/edit devem passar por `can(actor,'<res>:read',{id})` antes de persistir; `updateMonitorNotification` filtra a lista às notifications do team do actor.                                                                                                                                                                          | §4.4            |
+| **R6**  | **Grandfather de claims JWT:** `(decoded.tv ?? 0) !== user.token_version` e política explícita de `exp` ausente. Sem isto, `undefined !== 0` desloga a frota inteira no primeiro reconnect pós-deploy.                                                                                                                                                                                                                                                                                         | §8.1            |
+| **R7**  | **Federação:** `findOrCreateMirroredMonitor` seta `bean.team_id = remoteInstance.team_id` (verificado :79 hoje seta só `user_id`). bean-save NOT-NULL hook cobre o path do federation-router. `/api/push` e `/api/federation/heartbeat` emit sites adicionados explicitamente ao inventário atômico de room-refactor (verificado: :127/:129 emitem em `monitor.user_id`).                                                                                                                      | §5, §8.5, §9-P4 |
+| **R8**  | **`isMonitorPublic` exige match de team:** um monitor é "público" só via grupo público **do team dono do monitor**. Fecha a cadeia badge-leak (anexar monitor de outro team a status page pública própria → `/api/badge` vaza). Landa na MESMA fase do gate de status-page.                                                                                                                                                                                                                    | §8.5            |
+| **R9**  | **onDelete de `user_id` neutralizado** em api_key e remote_instance (hoje CASCADE): deletar um user destrói recursos do team. Trocar para SET NULL exige FK-alter → **rebuild de tabela sob PRAGMA foreign_keys=OFF no SQLite**. Isto CONTRADIZ a promessa "sem rebuild": ver R9-decisão em §5 e Decisão aberta.                                                                                                                                                                               | §5, §12         |
+| **R10** | **Ordem explícita de createTable e seed** para paridade cross-engine FK (o window FK-OFF do SQLite mascara ordering bugs que quebram em Postgres/MySQL). Índices tratados como custo separado do column-add (não "instantâneo"); evitar índice duplicado do auto-`_id`-index do redbean.                                                                                                                                                                                                       | §5              |
+| **R11** | **Tag tenancy** decidida (era D-decision faltante): `tag` recebe `team_id` (9ª tabela de recurso), `tag:manage` escopado por-team; monitor_tag writes exigem `monitor:update` no team do monitor.                                                                                                                                                                                                                                                                                              | §2.3, §3, §12   |
+| **R12** | **disableAuth auto-login determinístico:** `R.findOne("user", " is_superadmin = 1 ORDER BY id ASC ")` (verificado: findOne com clause vazia = `.first()` sem ORDER BY = row plan-dependent). Check single-user roda ANTES do findOne.                                                                                                                                                                                                                                                          | §6              |
 
 ---
 
@@ -96,6 +96,7 @@ ADD is_superadmin        BOOLEAN NOT NULL DEFAULT 0   -- flag global cross-team
 ADD token_version        INTEGER NOT NULL DEFAULT 0   -- bump = invalida TODOS os JWT do user (D5)
 ADD must_change_password BOOLEAN NOT NULL DEFAULT 0
 ```
+
 Cada ALTER emite DEFAULT literal ao nível do DB (`.notNullable().defaultTo(0)`) para popular rows existentes em Postgres/MySQL na mesma instrução (R-high).
 
 ### 2.3 ALTER — tabelas de recurso (9 tabelas, R11)
@@ -106,6 +107,7 @@ Cada ALTER emite DEFAULT literal ao nível do DB (`.notNullable().defaultTo(0)`)
 ADD team_id INTEGER NULL FK team(id) ON DELETE RESTRICT       -- eixo de autz/query (D3)
 INDEX(team_id)                                                 -- custo separado do add (R10)
 ```
+
 - **NÃO adicionar `created_by`.** `user_id` permanece e serve de auditoria (R2/D1). Onde `user_id` não existe (notification/proxy/docker_host não têm FK mas têm coluna; remote_browser tem coluna), o backfill checa existência por-tabela (R1).
 - `api_key` adicionalmente: `ADD role_id INTEGER NULL FK role(id)` (scoping §8.4).
 - **R9:** api_key.user_id e remote_instance.user_id trocam onDelete CASCADE→SET NULL (ver §5 e Decisão aberta).
@@ -116,6 +118,7 @@ INDEX(team_id)                                                 -- custo separado
 status_page  ADD team_id   INTEGER NULL FK team(id) ON DELETE RESTRICT
              ADD is_public BOOLEAN NOT NULL DEFAULT 1   -- status_page não tem coluna public hoje
 ```
+
 - **`group`:** sem `team_id`, sem `is_public`. Tenancy derivada transitivamente do `status_page_id` pai. Reusa a coluna `public` já existente (knex_init_db.js:30). O backfill NUNCA toca `group.user_id` (não existe).
 
 ---
@@ -125,6 +128,7 @@ status_page  ADD team_id   INTEGER NULL FK team(id) ON DELETE RESTRICT
 Seed idempotente de `server/permissions/catalog.js` (upsert por `action` no boot). Rows, não ENUM.
 
 **Team-scoped (`is_team_scoped=true`):**
+
 ```
 monitor:read monitor:create monitor:update monitor:delete monitor:manage_state
 maintenance:read maintenance:create maintenance:update maintenance:delete
@@ -134,6 +138,7 @@ remote_instance:read remote_instance:manage · status_page:read status_page:mana
 api_key:read api_key:manage · tag:read tag:manage           -- (R11: tag team-scoped)
 settings:read settings:manage · team:read team:manage team:member_manage
 ```
+
 **Global (`is_team_scoped=false`):** `user:manage · team:create · role:manage · audit:read`
 
 **Built-in (role.team_id NULL, is_system=1):** `superadmin` (is_superadmin=1, bypass), `owner`, `admin`, `editor`, `viewer`.
@@ -153,30 +158,37 @@ Permissões efetivas num team = UNIÃO de `role_permission` do `role_id` em `tea
 **Flag-OFF:** `can()`→true, `scopeFilter()`→`user_id = ?` (byte-idêntico).
 
 ### 4.1 checkOwner + gates de propriedade
+
 `checkOwner(userID, monitorID)` (server.js:1121) reescrito mantendo assinatura (callers :1210/:1243 intactos). Corpo: flag-ON → `require(ctx,"monitor:manage_state",{type:"monitor",id})`; flag-OFF → legado.
 
 Cada predicado `WHERE id=? AND user_id=?` (monitor.js:1725/1736; docker.js:25/51; proxy.js:24/71; notification.js:251/284; remote-browser.js:11/31/56; maintenance:146/235; api-key:81; remote-instance:94; monitor-socket:298/421) → `require(ctx,"<res>:<verb>",{type,id})` + write defensivo `WHERE id=? AND team_id=?`.
 
 ### 4.2 Gates OMITIDOS pelo plano anterior — agora incluídos (R4, verificados)
+
 Estes NÃO tinham predicado `user_id` hoje (leak por omissão), logo o plano antigo os deixava intocados:
+
 - **Monitor heartbeat:** `clearEvents` (server.js:959), `clearHeartbeats` (:978) — **destroem** dados; `getMonitorBeats` (monitor-socket:334) — **lê** histórico de outro team. → `require monitor:manage_state`/`monitor:read`.
-- **Status-page (TODOS checkLogin-only):** `saveStatusPage` (:292), `deleteStatusPage` (:482), `getStatusPage` (:268), `postIncident` (:34) e demais *Incident. Resolvem por slug, zero owner-check. → resolver a page, `require status_page:manage|read` com teamId da row.
+- **Status-page (TODOS checkLogin-only):** `saveStatusPage` (:292), `deleteStatusPage` (:482), `getStatusPage` (:268), `postIncident` (:34) e demais \*Incident. Resolvem por slug, zero owner-check. → resolver a page, `require status_page:manage|read` com teamId da row.
 - **Tags:** `addTag`/`editTag`/`deleteTag` (monitor-socket:516/537/568) e `addMonitorTag`/`editMonitorTag`/`deleteMonitorTag` (:587/615/643). → `require tag:manage` no team; monitor_tag exige `monitor:update` no team do monitorID.
 - **Maintenance join-writes/reads:** `addMonitorMaintenance` (:77), `addMaintenanceStatusPage` (:109), `getMonitorMaintenance` (:176), `getMaintenanceStatusPage` (:200). → `require maintenance:update|read` na maintenanceID + membership de cada id ligado.
 
-**CI sweep (regra durável):** falha se um `socket.on` que **referencia um *ID do cliente OU escreve um recurso** não tiver `require()`. Não é "lacks user_id" — é "touches a resource".
+**CI sweep (regra durável):** falha se um `socket.on` que **referencia um \*ID do cliente OU escreve um recurso** não tiver `require()`. Não é "lacks user_id" — é "touches a resource".
 
 ### 4.3 Regra hard de escrita de `team_id` (R3)
+
 redbean roda em freeze-mode; `R.store(bean)` grava o property-bag inteiro. Logo:
+
 1. `team_id` **nunca** copiado de payload de cliente.
 2. No **create**: `bean.team_id = actor.activeTeamId` (server-side).
 3. No **edit**: antes de `store()`, `bean.team_id = <valor carregado do DB>` (re-afirmação); `team_id` fora do allowlist de field-copy.
 4. **bean-save hook** (`beforeUpdate`/`beforeStore`) pina `team_id` ao valor da row — cobre inclusive o path do federation-router (R7).
 
 ### 4.4 Validação FK cross-resource (R5)
+
 No monitor add/edit, todo id aceito do cliente passa por `can(actor,'<res>:read',{id})` antes de persistir: `notificationIDList`, `proxyId`, `docker_host`, `remote_browser`, `parent`. `updateMonitorNotification` (server.js:1101) filtra `notificationIDList` às notifications do team do actor. Sem isto, um user anexa proxy/notification de outro team ao próprio monitor (exfiltração/enumeração).
 
 ### 4.5 List queries + rooms
+
 `getMonitorJSONList` e `sendXList` trocam por `scopeFilter(actor)`. **Além disso (R-med):** auditar TODO `R.getAll/getRow/findOne` que retorna recurso ou filho (heartbeat, monitor_group, monitor_maintenance) — `getMonitorBeats`, join-reads de maintenance — e rotear por `scopeFilter`/`require` no id-pai. Rooms migram `io.to(userID)`→`io.to("team:"+teamId)` por ÚLTIMO (P4), atômico com TODOS emit sites incluindo `/api/push` (:127/:129), federation receptor (:175/:177), cloudflared (:49-51). Flag-OFF mantém `io.to(userID)`.
 
 ---
@@ -220,6 +232,7 @@ No monitor add/edit, todo id aceito do cliente passa por `can(actor,'<res>:read'
 ## 7. Frontend
 
 ### 7.1 Telas
+
 1. **Manage Users** (`user:manage`): criar (username+senha temp), desativar, reset senha, force-logout (bump token_version), toggle superadmin (doubleCheckPassword + audit).
 2. **Manage Teams** (`team:create`/`team:manage`): criar/renomear/desativar; delete bloqueado com recursos (RESTRICT) → tela de re-home.
 3. **Team Members** (`team:member_manage`): add/remove + dropdown de papel (`assignTeamRole`).
@@ -231,6 +244,7 @@ No monitor add/edit, todo id aceito do cliente passa por `can(actor,'<res>:read'
 9. Tabs de `Settings.vue` (:86-125), rotas filho `/settings` (router.js:87-138), Manage top-level (:149) permission-gated.
 
 ### 7.2 Renderização role-gated
+
 Mixin `src/mixins/permissions.js` (root, junto de socket.js) expõe `$root.can(action)` lendo `permissions` do payload `info`. `v-if="$root.can('monitor:create')"`; route guards `meta.permission` em `beforeEach`. **Gating é UX-only** — server-side é a fronteira. Flag-OFF concede set completo (UI byte-idêntica).
 
 ---
@@ -238,21 +252,27 @@ Mixin `src/mixins/permissions.js` (root, junto de socket.js) expõe `$root.can(a
 ## 8. Segurança
 
 ### 8.1 JWT + sessão (GAP-002, R6)
+
 `createJWT` (user.js:41) inclui `exp` (default 8h, configurável), `iat`, `sub=user.id`, `tv=token_version`, mantendo `h=shake256(password)`. `loginByToken` (server.js:412) rejeita se `exp` passou OU **`(decoded.tv ?? 0) !== user.token_version`** (grandfather: tokens pré-upgrade sem `tv` = versão 0, evita logout de frota — R6). `exp` ausente: decidir explicitamente grandfather (aceitar) vs forçar re-login; padrão = aceitar por uma janela de graça e re-emitir com exp no próximo refresh. Bump `token_version` em: troca de senha (:747), troca de papel, force-logout. **Permissões NÃO vão no JWT** — resolvidas por conexão (loginByToken re-consulta o user).
 
 ### 8.2 Payload `info` (buildActor unificado)
+
 `buildActor()` produz `socket.actor`/`req.actor` E o payload `info` da MESMA query. `sendInfo` (client.js:145-163, hoje só version/timezone) estende:
+
 ```json
 { "currentUser": {"id","username","isSuperadmin","mustChangePassword"},
   "teams": [{"id","name","slug","role","permissions":["monitor:read", ...]}],
   "activeTeamId": <id> }
 ```
+
 Troca de membership/papel do socket conectado → re-emite `info` (live). `socket.js` (:122) armazena; `$root.can()` lê daí.
 
 ### 8.4 API-key scoping (GAP-008, R2)
+
 `verifyAPIKey` (auth.js:41-63) hoje **descarta o bean** (verificado :50-62) → passa a **retornar o bean**. `attachActor` monta `req.actor` com **`userId = key.user_id`** (não created_by — R2), `team_id`, `role_id` da key. **A key é capada ao `role_id`; o actor de API key NUNCA faz short-circuit em `is_superadmin` do dono** (R2 — senão re-concede superadmin a keys de um dono superadmin). Re-limitada às permissões do dono no momento do uso (demote do dono → cap imediato), MAS sempre ≤ `role_id` da key e sem superadmin. Timing enum GAP-008: `login()` roda bcrypt contra hash dummy quando user não existe.
 
 ### 8.5 Isolamento de tenant — leak-paths
+
 1. Lists → `scopeFilter` `team_id IN (...)`; TODO `R.*` ad-hoc auditado (R-med).
 2. Gates (§4.1+§4.2) → `require` + `WHERE id=? AND team_id=?`.
 3. Rooms `io.to(userID)`→`io.to("team:"+id)`.
@@ -264,30 +284,33 @@ Troca de membership/papel do socket conectado → re-emite `info` (live). `socke
 9. Superadmin = única identidade cross-tenant, explícita e audit-logada.
 
 ### 8.6 Outros
+
 `audit_log` write-only em ação privilegiada. Mutações privilegiadas exigem `doubleCheckPassword`. Guard contra remover último superadmin. CI sweep (§4.2) é a defesa durável contra gate esquecido.
 
 ---
 
 ## 9. Roadmap faseado
 
-| Fase | Título | Tier | Go? |
-|---|---|---|---|
-| P0 | ADR + catálogo + authz.js (unit-tested, sem schema/behavior) | T2 | — |
-| P1 | Migração schema + backfill (dark) — inclui R1/R2/R9/R10/R11 | T3 | **SIM** |
-| P2 | buildActor login/HTTP + JWT hardening (R6) + info payload (flag-OFF) | T3 | **SIM** |
-| P3 | Enforcement: checkOwner + gates re-derivados (R4) + FK-validation (R5) + list scoping | T3 | **SIM** |
-| P4 | HTTP/API/federação (R7) + isMonitorPublic (R8) + team rooms + flip | T3 | **SIM** |
-| P5 | Frontend admin + role-gated UI | T2 | — |
-| P6 | Hardening/cleanup: constant-time login, /metrics gate, integrity check, E2E negativos | T2 | — |
+| Fase | Título                                                                                | Tier | Go?     |
+| ---- | ------------------------------------------------------------------------------------- | ---- | ------- |
+| P0   | ADR + catálogo + authz.js (unit-tested, sem schema/behavior)                          | T2   | —       |
+| P1   | Migração schema + backfill (dark) — inclui R1/R2/R9/R10/R11                           | T3   | **SIM** |
+| P2   | buildActor login/HTTP + JWT hardening (R6) + info payload (flag-OFF)                  | T3   | **SIM** |
+| P3   | Enforcement: checkOwner + gates re-derivados (R4) + FK-validation (R5) + list scoping | T3   | **SIM** |
+| P4   | HTTP/API/federação (R7) + isMonitorPublic (R8) + team rooms + flip                    | T3   | **SIM** |
+| P5   | Frontend admin + role-gated UI                                                        | T2   | —       |
+| P6   | Hardening/cleanup: constant-time login, /metrics gate, integrity check, E2E negativos | T2   | —       |
 
 **R8 (isMonitorPublic) e o gate de status-page landam na MESMA fase (P4/P3-status)** — não deferir. **R5 (FK-validation) é parte de P3, não opcional.**
 
 ---
 
 ## 10. Riscos residuais e mitigações
+
 Ver `topRisks`. Mitigação transversal: **testes negativos cross-tenant** (viewer-não-muta; team-A-não-lê/escreve team-B via socket/HTTP/push/federação/badge/tag/maintenance-join) como **gate de merge obrigatório**; TDD do authz.js e de cada leak-path antes de fiar handlers; migração validada em 4 engines com FKs ON via testcontainers.
 
 ## 11. Caveats (medium/low do red-team, não-bloqueantes)
+
 - **Índice em tabela grande** (R-med): `CREATE INDEX` na `monitor`/`heartbeat` não é instantâneo; usar online DDL / índice pós-migração. Já em §5.
 - **Skew schema/código no down()** (R-high, tratado como caveat operacional): down() só seguro com downgrade de binário simultâneo; reads de coluna nova atrás de existence-check.
 - **`group.public` vs `is_public`** (R-med): resolvido não adicionando `is_public` a group (§2.4).
@@ -295,20 +318,19 @@ Ver `topRisks`. Mitigação transversal: **testes negativos cross-tenant** (view
 
 ## 12. Decisões abertas — ver campo dedicado.
 
-
 ---
 
 ## Anexo A — Roadmap faseado (estruturado)
 
-| Fase | Título | Tier | Precisa "Go"? | Entregável |
-|---|---|---|---|---|
-| P0 | ADR + permission catalog + central authz.js (sem schema, sem behavior change) | T2 | — | Este ADR FINAL aprovado; server/permissions/catalog.js (vocabulario com tag:read/tag:manage team-scoped) + server/security/authz.js com buildActor/can/require/scopeFilter, unit-tested contra fixtures. Nao fiado em handler. Baseline verde. |
-| P1 | Migracao de schema + backfill (dark-launch) — com correcoes R1/R2/R9/R10/R11 | T3 | **SIM** | 1 migracao Knex idempotente ordem-explicita (permission->role->team->role_permission->team_user->audit_log). Cria tabelas; altera user (3 cols DEFAULT literal) + 9 tabelas de recurso (inclui tag, R11) + status_page (team_id+is_public); api_key.role_id. group NAO alterado (herda do status_page pai, R1). NAO adiciona created_by (reusa user_id, R2). Backfill por-tabela checando existencia de coluna (group sem user_id nao aborta, R1). api_key legacy forcada a viewer (R2). FK-alter api_key/remote_instance user_id CASCADE->SET NULL (R9, unico rebuild SQLite, ou decisao alternativa do dono). Default Team runtime-id + memberships + MIN(id)=superadmin. Indice tratado como custo (R10). rbacEnforced=false. Validado 4 engines FKs-ON via testcontainers. Zero runtime le tabelas novas. |
-| P2 | buildActor login/HTTP + JWT hardening (R6) + info payload (flag-OFF) | T3 | **SIM** | buildActor popula socket.actor em afterLogin e req.actor nos middlewares; verifyAPIKey RETORNA o bean, actor de key usa key.user_id capado ao role_id SEM superadmin do dono (R2); sendInfo emite currentUser/teams/permissions; JWT ganha exp+iat+sub+tv, loginByToken grandfather (decoded.tv ?? 0) (R6) evitando logout de frota; disableAuth auto-login determinístico is_superadmin ORDER BY id (R12). Nenhum require() enforça. Regressao single-user identica (flag-OFF set completo). |
-| P3 | Enforcement socket: gates RE-DERIVADOS (R4) + FK-validation (R5) + list scoping | T3 | **SIM** | checkOwner reescrito; predicados AND user_id=? viram require()+WHERE team_id=?; ALEM disso os ~15 handlers antes omitidos (R4): clearEvents/clearHeartbeats/getMonitorBeats, TODOS status-page (save/delete/get/*Incident), monitor_tag writes, tags globais, maintenance join writes/reads. FK cross-resource validada (R5): notificationIDList/proxyId/docker_host/remote_browser/parent passam por can(:read); updateMonitorNotification filtra ao team. Regra hard §4.3: team_id nunca de payload, re-afirmado no store (freeze-mode, R3). getMonitorJSONList/sendXList + R.* ad-hoc usam scopeFilter. CI sweep FALHA se socket.on que TOCA recurso (nao 'lacks user_id') sem require(). Flag-OFF byte-identico. |
-| P4 | HTTP/API/federacao (R7) + isMonitorPublic (R8) + team rooms + flip | T3 | **SIM** | attachActor middleware; /metrics superadmin-only; isMonitorPublic exige team match monitor==status_page (R8, fecha badge-leak, MESMA fase do gate status-page); /push confia so no token e emite io.to('team:'+monitor.team_id) (R7); federacao: findOrCreateMirroredMonitor seta bean.team_id=remoteInstance.team_id (R7), bean-save hook cobre o path, cap monitores/instancia; io.to(userID)->team rooms ATOMICO com TODOS emit sites (inclui /api/push :127/:129, federation receptor :175/:177, cloudflared :49-51). Fixture E2E 2-teams cobre monitor push E federado. Flip rbacEnforced=true (reversivel) + last-superadmin guard + doubleCheckPassword. Testes por leak-path como gate. |
-| P5 | Frontend admin + role-gated UI | T2 | — | Handlers socket + telas Vue Manage Users/Teams/Members/Roles/Audit; src/mixins/permissions.js com $root.can; tabs Settings + nav filtrados; router meta.permission guards; team switcher; force-change-password gate. Backend ja enforça, UI e UX. |
-| P6 | Hardening + cleanup | T2 | — | constant-time login (bcrypt dummy), setup rate-limit, disableAuth->single-user warning, audit_log em todas privilegiadas, integrity check team_id IS NULL periodico, re-emit info on role change, deprecar caminhos user_id-only pos-flip, suite E2E negativa cross-tenant (secure-e2e) incluindo tag/maintenance-join/badge/push/federacao. |
+| Fase | Título                                                                          | Tier | Precisa "Go"? | Entregável                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---- | ------------------------------------------------------------------------------- | ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0   | ADR + permission catalog + central authz.js (sem schema, sem behavior change)   | T2   | —             | Este ADR FINAL aprovado; server/permissions/catalog.js (vocabulario com tag:read/tag:manage team-scoped) + server/security/authz.js com buildActor/can/require/scopeFilter, unit-tested contra fixtures. Nao fiado em handler. Baseline verde.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| P1   | Migracao de schema + backfill (dark-launch) — com correcoes R1/R2/R9/R10/R11    | T3   | **SIM**       | 1 migracao Knex idempotente ordem-explicita (permission->role->team->role_permission->team_user->audit_log). Cria tabelas; altera user (3 cols DEFAULT literal) + 9 tabelas de recurso (inclui tag, R11) + status_page (team_id+is_public); api_key.role_id. group NAO alterado (herda do status_page pai, R1). NAO adiciona created_by (reusa user_id, R2). Backfill por-tabela checando existencia de coluna (group sem user_id nao aborta, R1). api_key legacy forcada a viewer (R2). FK-alter api_key/remote_instance user_id CASCADE->SET NULL (R9, unico rebuild SQLite, ou decisao alternativa do dono). Default Team runtime-id + memberships + MIN(id)=superadmin. Indice tratado como custo (R10). rbacEnforced=false. Validado 4 engines FKs-ON via testcontainers. Zero runtime le tabelas novas. |
+| P2   | buildActor login/HTTP + JWT hardening (R6) + info payload (flag-OFF)            | T3   | **SIM**       | buildActor popula socket.actor em afterLogin e req.actor nos middlewares; verifyAPIKey RETORNA o bean, actor de key usa key.user_id capado ao role_id SEM superadmin do dono (R2); sendInfo emite currentUser/teams/permissions; JWT ganha exp+iat+sub+tv, loginByToken grandfather (decoded.tv ?? 0) (R6) evitando logout de frota; disableAuth auto-login determinístico is_superadmin ORDER BY id (R12). Nenhum require() enforça. Regressao single-user identica (flag-OFF set completo).                                                                                                                                                                                                                                                                                                                 |
+| P3   | Enforcement socket: gates RE-DERIVADOS (R4) + FK-validation (R5) + list scoping | T3   | **SIM**       | checkOwner reescrito; predicados AND user_id=? viram require()+WHERE team_id=?; ALEM disso os ~15 handlers antes omitidos (R4): clearEvents/clearHeartbeats/getMonitorBeats, TODOS status-page (save/delete/get/_Incident), monitor_tag writes, tags globais, maintenance join writes/reads. FK cross-resource validada (R5): notificationIDList/proxyId/docker_host/remote_browser/parent passam por can(:read); updateMonitorNotification filtra ao team. Regra hard §4.3: team_id nunca de payload, re-afirmado no store (freeze-mode, R3). getMonitorJSONList/sendXList + R._ ad-hoc usam scopeFilter. CI sweep FALHA se socket.on que TOCA recurso (nao 'lacks user_id') sem require(). Flag-OFF byte-identico.                                                                                          |
+| P4   | HTTP/API/federacao (R7) + isMonitorPublic (R8) + team rooms + flip              | T3   | **SIM**       | attachActor middleware; /metrics superadmin-only; isMonitorPublic exige team match monitor==status_page (R8, fecha badge-leak, MESMA fase do gate status-page); /push confia so no token e emite io.to('team:'+monitor.team_id) (R7); federacao: findOrCreateMirroredMonitor seta bean.team_id=remoteInstance.team_id (R7), bean-save hook cobre o path, cap monitores/instancia; io.to(userID)->team rooms ATOMICO com TODOS emit sites (inclui /api/push :127/:129, federation receptor :175/:177, cloudflared :49-51). Fixture E2E 2-teams cobre monitor push E federado. Flip rbacEnforced=true (reversivel) + last-superadmin guard + doubleCheckPassword. Testes por leak-path como gate.                                                                                                               |
+| P5   | Frontend admin + role-gated UI                                                  | T2   | —             | Handlers socket + telas Vue Manage Users/Teams/Members/Roles/Audit; src/mixins/permissions.js com $root.can; tabs Settings + nav filtrados; router meta.permission guards; team switcher; force-change-password gate. Backend ja enforça, UI e UX.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| P6   | Hardening + cleanup                                                             | T2   | —             | constant-time login (bcrypt dummy), setup rate-limit, disableAuth->single-user warning, audit_log em todas privilegiadas, integrity check team_id IS NULL periodico, re-emit info on role change, deprecar caminhos user_id-only pos-flip, suite E2E negativa cross-tenant (secure-e2e) incluindo tag/maintenance-join/badge/push/federacao.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ## Anexo B — Decisões que o dono precisa travar
 
@@ -327,7 +349,7 @@ Ver `topRisks`. Mitigação transversal: **testes negativos cross-tenant** (view
 ## Anexo C — Riscos residuais (top)
 
 1. Migracao/backfill errada = atribuicao cross-tenant silenciosa (pior falha). VERIFICADO E CORRIGIDO: o backfill generico 'SET created_by=user_id' abortava a transacao inteira em installs com status-page group (group NAO tem coluna user_id — verificado knex_init_db.js:26-34). Fix: backfill por-tabela com check de existencia; group herda do pai; created_by removido (reusa user_id, R1/R2). Mitigacao restante: idempotencia hasTable/hasColumn, Default Team id runtime, cobre rows user_id ja NULL, testcontainers 4 engines FKs-ON incluindo join tables PK composta.
-2. Inventario de gates derivado de 'ja filtra user_id' era estruturalmente UNSOUND: perde TODOS os handlers que vazam hoje por omissao. VERIFICADO: status-page (todos checkLogin-only, sem coluna de dono), monitor_tag writes, maintenance join-writes/reads, clearEvents/clearHeartbeats/getMonitorBeats — ~15 handlers antes intocados que no flip-ON ficariam ABERTOS cross-tenant (ler/destruir dados de outro team). Fix R4: inventario re-derivado por 'toca um recurso'; CI sweep por client-*ID/write, nao por user_id.
+2. Inventario de gates derivado de 'ja filtra user_id' era estruturalmente UNSOUND: perde TODOS os handlers que vazam hoje por omissao. VERIFICADO: status-page (todos checkLogin-only, sem coluna de dono), monitor_tag writes, maintenance join-writes/reads, clearEvents/clearHeartbeats/getMonitorBeats — ~15 handlers antes intocados que no flip-ON ficariam ABERTOS cross-tenant (ler/destruir dados de outro team). Fix R4: inventario re-derivado por 'toca um recurso'; CI sweep por client-\*ID/write, nao por user_id.
 3. team_id de payload de cliente NAO e bloqueado pelo gate can() — redbean freeze-mode store() grava o property-bag inteiro (verificado). A 'invariante anti-escalacao' so protegia LEITURA. Fix R3: regra hard — team_id nunca de cliente, re-afirmado ao valor do DB antes do store, bean-save hook pina. Sem isto, um unico Object.assign(bean, payload) escala o recurso para outro team.
 4. Federacao criava monitor espelhado com team_id=NULL a CADA agente (nao so na migracao): findOrCreateMirroredMonitor seta bean.user_id, nunca team_id (verificado :79) -> orfao cross-tenant-invisivel continuo + integrity check disparando a cada heartbeat. Fix R7: setar bean.team_id=remoteInstance.team_id, bean-save hook cobre o path, /api/push e federation emit sites (verificado :127/:129 em user_id) no inventario atomico de room-refactor.
 5. Cadeia badge-leak: isMonitorPublic (api-router.js:626) retorna true se QUALQUER user poe o monitor em QUALQUER grupo publico; combinado com saveStatusPage sem owner-check, um user baixo-privilegio torna monitor privado de outro team publico e le uptime/ping/cert via /api/badge. Fix R8: isMonitorPublic exige team_id do monitor == team_id do status_page, MESMA fase do gate status-page.

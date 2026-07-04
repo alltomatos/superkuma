@@ -32,6 +32,7 @@ Uma instância **Master** (do provedor) que recebe, em tempo real, o status de N
 ## 5. Escopo
 
 **Dentro:**
+
 - Papel de instância (`standalone`/`agent`/`master`).
 - Registro de Agent no Master com `instance_id` + token.
 - Encaminhamento de heartbeats Agent→Master (REST no MVP, Socket.io na v2).
@@ -41,6 +42,7 @@ Uma instância **Master** (do provedor) que recebe, em tempo real, o status de N
 - Keepalive/detecção de Agent offline.
 
 **Fora (por ora):**
+
 - Controle remoto (Master editar/pausar monitores no Agent) — só leitura/agregação.
 - Multi-tenancy com isolamento por-usuário no Master.
 - Balanceamento/HA de múltiplos Masters.
@@ -54,14 +56,14 @@ Uma instância **Master** (do provedor) que recebe, em tempo real, o status de N
 
 ## 7. Rollout faseado (Epics)
 
-| Epic | Entrega | Tier |
-|---|---|---|
-| **F0** Fundação | migration `remote_instance` + `monitor.remote_instance_id` + model + setting `federation.role` | T3 |
-| **F1** Receptor (Master, MVP) | `/api/push` generalizado p/ `instance_id`+`agent_monitor_id`; espelha monitores | T2 |
-| **F2** Forwarder (Agent, MVP) | hook no `beat()` + config master/token; ponta-a-ponta REST | T2 |
-| **F3** UI unificada | badge de instância, agrupamento no dashboard, página de config | T2 |
-| **F4** Federação Socket.io (v2) | `agent-client.js` persistente + keepalive + detecção "agente caiu" | T3 |
-| **F5** Robustez | buffering offline, versionamento de protocolo, política de notificação configurável, sync rename/delete | T2 |
+| Epic                            | Entrega                                                                                                 | Tier |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------- | ---- |
+| **F0** Fundação                 | migration `remote_instance` + `monitor.remote_instance_id` + model + setting `federation.role`          | T3   |
+| **F1** Receptor (Master, MVP)   | `/api/push` generalizado p/ `instance_id`+`agent_monitor_id`; espelha monitores                         | T2   |
+| **F2** Forwarder (Agent, MVP)   | hook no `beat()` + config master/token; ponta-a-ponta REST                                              | T2   |
+| **F3** UI unificada             | badge de instância, agrupamento no dashboard, página de config                                          | T2   |
+| **F4** Federação Socket.io (v2) | `agent-client.js` persistente + keepalive + detecção "agente caiu"                                      | T3   |
+| **F5** Robustez                 | buffering offline, versionamento de protocolo, política de notificação configurável, sync rename/delete | T2   |
 
 ## 8. Métricas de sucesso
 
