@@ -220,6 +220,17 @@ class SuperKumaClient {
     }
 
     /**
+     * Return all status pages, refreshing the cache from the server first.
+     * @returns {Promise<Array<object>>} Array of status page objects.
+     * @throws {Error} If the refresh request fails.
+     */
+    async listStatusPages() {
+        await this.request("getStatusPageList");
+        const list = this.statusPages;
+        return Array.isArray(list) ? list : Object.values(list || {});
+    }
+
+    /**
      * Close the socket connection.
      * @returns {void}
      */

@@ -22,6 +22,11 @@ function registerInfoTools(server, client, config) {
                 deleteEnabled: config.allowDelete,
                 monitorCount: Object.keys(client.monitors).length,
                 notificationCount: (client.notifications || []).length,
+                statusPageCount: Object.keys(client.statusPages || {}).length,
+                maintenanceCount: (Array.isArray(client.maintenances)
+                    ? client.maintenances
+                    : Object.keys(client.maintenances || {})
+                ).length,
                 server: client.info,
             };
         },

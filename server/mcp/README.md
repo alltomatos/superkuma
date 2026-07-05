@@ -109,4 +109,29 @@ AI agent  ──stdio (MCP)──▶  superkuma-mcp  ──socket.io (API key)�
 | `remove_monitor_tag` | write       | Detach a tag from a monitor.                     |
 | `delete_tag`         | destructive | Delete a tag (needs delete gate + `confirm`).    |
 
-Status-page and maintenance tools are planned for the next phase (P3).
+**Status pages**
+
+| Tool                  | Kind        | Purpose                                              |
+| --------------------- | ----------- | ---------------------------------------------------- |
+| `list_status_pages`   | read        | Summaries (id, slug, title, published).              |
+| `get_status_page`     | read        | Full config of one status page by slug.              |
+| `create_status_page`  | write       | Create a status page (title + slug).                 |
+| `post_incident`       | write       | Post/pin an incident on a status page.               |
+| `resolve_incident`    | write       | Unpin/resolve the pinned incident.                   |
+| `delete_status_page`  | destructive | Delete a status page (needs delete gate + `confirm`).|
+
+**Maintenance**
+
+| Tool                  | Kind        | Purpose                                                  |
+| --------------------- | ----------- | -------------------------------------------------------- |
+| `list_maintenances`   | read        | Summaries (id, title, strategy, active, status).         |
+| `get_maintenance`     | read        | Full config of one maintenance window.                   |
+| `create_maintenance`  | write       | Create a maintenance (defaults to the `manual` strategy). |
+| `update_maintenance`  | write       | Update a maintenance (fetch-merge-save).                 |
+| `pause_maintenance`   | write       | Pause a maintenance window.                              |
+| `resume_maintenance`  | write       | Resume a maintenance window.                             |
+| `delete_maintenance`  | destructive | Delete a maintenance (needs delete gate + `confirm`).    |
+
+All read/write/destructive tools honour the same gating: read-only by default,
+writes need `SUPERKUMA_ALLOW_MUTATIONS=true`, deletes need `SUPERKUMA_ALLOW_DELETE=true`
+plus a per-call `confirm: true`.
