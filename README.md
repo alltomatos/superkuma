@@ -105,6 +105,7 @@ SuperKuma ships a built-in [MCP (Model Context Protocol)](https://modelcontextpr
 
 - **Read-only by default.** Writes and deletes are opt-in via environment variables; deletes also require a per-call confirmation.
 - **Authenticates with an API key** (no password), scoped by the same Teams/RBAC as the dashboard.
+- **Two transports.** Run it locally over stdio, or enable the built-in **remote HTTP endpoint** (`/mcp`) so a client connects to your instance directly (e.g. via `mcp-remote`).
 
 See [`server/mcp/README.md`](server/mcp/README.md) for setup, and [ADR-0011](docs/adr/0011-mcp-server-for-agent-configuration.md) for the design.
 
