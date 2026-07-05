@@ -33,7 +33,24 @@ function parseIntEnv(value, fallback) {
 }
 
 /**
- * Load and validate the MCP configuration from the environment.
+ * Load the capability gates and connection tunables shared by every transport.
+ * These do NOT require an API key: the stdio server gets the key from the
+ * environment, while the embedded HTTP endpoint takes it per-request from the
+ * Authorization header.
+ * @returns {object} The resolved gates ({ allowMutations, allowDelete, insecureTls, requestTimeout }).
+ */
+function loadGates() {
+    return {
+        allowMutations: parseBool(process.env.SUPERKUMA_ALLOW_MUTATIONS),
+        allowDelete: parseBool(process.env.SUPERKUMA_ALLOW_DELETE),
+        insecureTls: parseBool(process.env.SUPERKUMA_INSECURE_TLS),
+        requestTimeout: parseIntEnv(process.env.SUPERKUMA_REQUEST_TIMEOUT, 10000),
+    };
+}
+
+/**
+ * Load and validate the MCP configuration for the stdio server from the
+ * environment (requires SUPERKUMA_API_KEY).
  * @returns {object} The resolved configuration object.
  * @throws {Error} If the required API key is missing.
  */
@@ -51,15 +68,13 @@ function loadConfig() {
     return {
         url,
         apiKey,
-        allowMutations: parseBool(process.env.SUPERKUMA_ALLOW_MUTATIONS),
-        allowDelete: parseBool(process.env.SUPERKUMA_ALLOW_DELETE),
-        insecureTls: parseBool(process.env.SUPERKUMA_INSECURE_TLS),
-        requestTimeout: parseIntEnv(process.env.SUPERKUMA_REQUEST_TIMEOUT, 10000),
+        ...loadGates(),
     };
 }
 
 module.exports = {
     loadConfig,
+    loadGates,
     parseBool,
     parseIntEnv,
 };
