@@ -735,7 +735,24 @@ let needSetup = false;
                 let user = R.dispense("user");
                 user.username = username;
                 user.password = await passwordHash.generate(password);
+                // ADR-0010: the P1 migration's backfill only promotes the lowest-id
+                // user to superadmin + Default Team owner for installs that already
+                // had a user row at migration time. A brand-new install has no user
+                // yet when migrations run, so the setup wizard must grant the same
+                // standing here -- otherwise this account would hold zero RBAC
+                // permissions the moment enforcement is ever turned on.
+                user.is_superadmin = true;
                 await R.store(user);
+
+                const defaultTeam = await R.knex("team").where("slug", "default").first();
+                const ownerRole = await R.knex("role").whereNull("team_id").andWhere("slug", "owner").first();
+                if (defaultTeam && ownerRole) {
+                    await R.knex("team_user").insert({
+                        team_id: defaultTeam.id,
+                        user_id: user.id,
+                        role_id: ownerRole.id,
+                    });
+                }
 
                 needSetup = false;
 
