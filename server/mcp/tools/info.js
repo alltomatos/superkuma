@@ -21,6 +21,7 @@ function registerInfoTools(server, client, config) {
                 mutationsEnabled: config.allowMutations,
                 deleteEnabled: config.allowDelete,
                 monitorCount: Object.keys(client.monitors).length,
+                notificationCount: (client.notifications || []).length,
                 server: client.info,
             };
         },

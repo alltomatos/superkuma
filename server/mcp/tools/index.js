@@ -1,6 +1,7 @@
 const { registerInfoTools } = require("./info");
 const { registerMonitorTools } = require("./monitors");
 const { registerTagTools } = require("./tags");
+const { registerNotificationTools } = require("./notifications");
 
 /**
  * Register every MCP tool on the server. Individual tools self-gate on the
@@ -14,6 +15,7 @@ function registerAllTools(server, client, config) {
     registerInfoTools(server, client, config);
     registerMonitorTools(server, client, config);
     registerTagTools(server, client, config);
+    registerNotificationTools(server, client, config);
 }
 
 module.exports = { registerAllTools };

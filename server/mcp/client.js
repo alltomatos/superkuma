@@ -28,6 +28,27 @@ class SuperKumaClient {
          * @type {object|null}
          */
         this.info = null;
+
+        /**
+         * Live cache of notifications (array), refreshed from the "notificationList"
+         * push (sent on login and after each notification mutation).
+         * @type {Array<object>}
+         */
+        this.notifications = [];
+
+        /**
+         * Live cache of maintenances, refreshed from the "maintenanceList" push
+         * (sent on login, after mutations, and on getMaintenanceList).
+         * @type {object|Array<object>}
+         */
+        this.maintenances = {};
+
+        /**
+         * Live cache of status pages, refreshed from the "statusPageList" push
+         * (sent on login).
+         * @type {object|Array<object>}
+         */
+        this.statusPages = {};
     }
 
     /**
@@ -101,6 +122,18 @@ class SuperKumaClient {
         this.socket.on("info", (info) => {
             this.info = info || null;
         });
+
+        this.socket.on("notificationList", (list) => {
+            this.notifications = Array.isArray(list) ? list : [];
+        });
+
+        this.socket.on("maintenanceList", (list) => {
+            this.maintenances = list || {};
+        });
+
+        this.socket.on("statusPageList", (list) => {
+            this.statusPages = list || {};
+        });
     }
 
     /**
@@ -173,6 +206,17 @@ class SuperKumaClient {
     async listMonitors() {
         await this.request("getMonitorList");
         return Object.values(this.monitors);
+    }
+
+    /**
+     * Return all maintenances, refreshing the cache from the server first.
+     * @returns {Promise<Array<object>>} Array of maintenance objects.
+     * @throws {Error} If the refresh request fails.
+     */
+    async listMaintenances() {
+        await this.request("getMaintenanceList");
+        const list = this.maintenances;
+        return Array.isArray(list) ? list : Object.values(list || {});
     }
 
     /**
