@@ -77,12 +77,12 @@ to review the appropriate one for your contribution.
 
   Please add **all** strings that are translatable to `src/lang/en.json`. If translation keys are omitted, they cannot be translated. **Do not include any other languages in your initial pull request** (even if it is your mother tongue) to avoid merge conflicts between Weblate and `master`. Once your PR is merged into `master`, the strings can be translated by awesome people donating their language skills.
 
-  If you want to help translate SuperKuma into your language, please see [these instructions](https://github.com/alltomatos/superkuma/blob/master/src/lang/README.md).
+  If you want to help translate SuperKuma into your language, please see [these instructions](https://github.com/alltomatos/superkuma/blob/main/src/lang/README.md).
 
   There are some cases where a change requires a PR:
   - A text may not yet be localisable. In this case, **adding a new language key** via `{{ $t("Translation key") }}` or [`<i18n-t keypath="Translation key">`](https://vue-i18n.intlify.dev/guide/advanced/component.html) might be necessary.
   - Language keys need to be **added to `en.json`** first, so translators have something to translate.
-  - **Adding a new language** requires creating a new file. See [these instructions](https://github.com/alltomatos/superkuma/blob/master/src/lang/README.md).
+  - **Adding a new language** requires creating a new file. See [these instructions](https://github.com/alltomatos/superkuma/blob/main/src/lang/README.md).
 
   <sub>Because maintainer time is precious, junior maintainers may merge uncontroversial PRs in this area.</sub>
 
@@ -402,7 +402,7 @@ The data and socket logic are in `src/mixins/socket.js`.
 
 ## Database Migration
 
-See: <https://github.com/alltomatos/superkuma/tree/master/db/knex_migrations>
+See: <https://github.com/alltomatos/superkuma/tree/main/db/knex_migrations>
 
 ## Unit Test
 
