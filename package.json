@@ -42,6 +42,7 @@
         "build-docker-base-slim": "docker buildx build -f docker/debian-base.dockerfile --platform linux/amd64,linux/arm64,linux/arm/v7 -t alltomatos/superkuma:base2-slim --target base2-slim . --push",
         "build-docker-builder-go": "docker buildx build -f docker/builder-go.dockerfile --platform linux/amd64,linux/arm64,linux/arm/v7 -t alltomatos/superkuma:builder-go . --push",
         "build-docker-nightly-local": "npm run build && docker build -f docker/dockerfile -t alltomatos/superkuma:nightly2 --target nightly .",
+        "docker-build": "docker build -f Dockerfile -t ronaldodavi/superkuma:local .",
         "build-docker-pr-test": "docker buildx build -f docker/dockerfile --platform linux/amd64,linux/arm64 -t alltomatos/superkuma:pr-test2 --target pr-test2 . --push",
         "upload-artifacts": "node extra/release/upload-artifacts.mjs",
         "upload-artifacts-beta": "node extra/release/upload-artifacts-beta.mjs",
