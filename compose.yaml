@@ -1,6 +1,9 @@
 services:
   superkuma:
-    image: alltomatos/superkuma:2
+    image: ronaldodavi/superkuma:2
+    # To build the image locally instead of pulling it, comment out `image:`
+    # above and uncomment the next line:
+    # build: .
     restart: unless-stopped
     volumes:
       - ./data:/app/data

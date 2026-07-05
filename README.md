@@ -47,7 +47,7 @@ SuperKuma is now running on all network interfaces (e.g. http://localhost:3001 o
 ### 🐳 Docker Command
 
 ```bash
-docker run -d --restart=always -p 3001:3001 -v superkuma:/app/data --name superkuma alltomatos/superkuma:2
+docker run -d --restart=always -p 3001:3001 -v superkuma:/app/data --name superkuma ronaldodavi/superkuma:2
 ```
 
 SuperKuma is now running on all network interfaces (e.g. http://localhost:3001 or http://your-ip:3001).
@@ -57,6 +57,22 @@ If you want to limit exposure to localhost only:
 ```bash
 docker run ... -p 127.0.0.1:3001:3001 ...
 ```
+
+### 🛠️ Build the image yourself
+
+The repo ships a **self-contained `Dockerfile`** (repo root) that builds everything in one
+step — no pre-published base images required:
+
+```bash
+git clone https://github.com/alltomatos/superkuma.git
+cd superkuma
+docker build -t superkuma .        # or: npm run docker-build
+docker run -d --restart=always -p 3001:3001 -v superkuma:/app/data --name superkuma superkuma
+```
+
+> The published `ronaldodavi/superkuma` image is built from this same `Dockerfile` and
+> pushed by the [Release Docker workflow](.github/workflows/release-docker.yml) on each
+> version tag.
 
 ### 💪🏻 Non-Docker
 
