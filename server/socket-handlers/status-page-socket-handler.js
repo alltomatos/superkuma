@@ -310,6 +310,26 @@ module.exports.statusPageSocketHandler = (socket) => {
         }
     });
 
+    // Push the current status page list to the requesting client. Mirrors the
+    // getMonitorList/getMaintenanceList convention so authenticated clients
+    // (e.g. the MCP server) can refresh their list on demand rather than only
+    // receiving it once at login.
+    socket.on("getStatusPageList", async (callback) => {
+        try {
+            checkLogin(socket);
+            const server = SuperKumaServer.getInstance();
+            await StatusPage.sendStatusPageList(server.io, socket);
+            callback({
+                ok: true,
+            });
+        } catch (error) {
+            callback({
+                ok: false,
+                msg: error.message,
+            });
+        }
+    });
+
     // Save Status Page
     // imgDataUrl Only Accept PNG!
     socket.on("saveStatusPage", async (slug, config, imgDataUrl, publicGroupList, callback) => {
