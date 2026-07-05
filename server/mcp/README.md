@@ -1,9 +1,11 @@
 # SuperKuma MCP Server
 
 An [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server that lets an
-AI agent inspect and configure a running SuperKuma instance — list and read monitors,
-create/update/pause/resume/delete monitors, and read tags — through a safe, gated
-tool surface.
+AI agent inspect and configure a running SuperKuma instance — **monitors, notifications,
+tags, status pages and maintenance windows** — through a safe, gated set of **33 tools**.
+
+It runs in two ways: as a local **stdio** process, or as a **remote HTTP endpoint** hosted
+by the instance itself. Design rationale: [ADR-0011](../../docs/adr/0011-mcp-server-for-agent-configuration.md).
 
 ## How it works
 
@@ -117,8 +119,8 @@ the API key in the `Authorization` header.
 | ---------------------------- | -------- | ----------------------- | ----------------------------------------------------------------------------------------------- |
 | `SUPERKUMA_URL`              | no       | `http://localhost:3001` | URL of the running SuperKuma server (`http(s)://` or `ws(s)://`).                               |
 | `SUPERKUMA_API_KEY`          | **yes**  | —                       | API key (`uk<id>_<secret>`) used to authenticate.                                               |
-| `SUPERKUMA_ALLOW_MUTATIONS`  | no       | `false`                 | Set `true` to enable write tools (create/update/pause/resume).                                  |
-| `SUPERKUMA_ALLOW_DELETE`     | no       | `false`                 | Set `true` to enable destructive tools (`delete_monitor`).                                      |
+| `SUPERKUMA_ALLOW_MUTATIONS`  | no       | `false`                 | Set `true` to enable all write tools (create/update/pause/resume/post/test across every area).  |
+| `SUPERKUMA_ALLOW_DELETE`     | no       | `false`                 | Set `true` to enable the destructive `delete_*` tools.                                          |
 | `SUPERKUMA_INSECURE_TLS`     | no       | `false`                 | Set `true` to skip TLS verification (self-signed certs; best effort).                           |
 | `SUPERKUMA_REQUEST_TIMEOUT`  | no       | `10000`                 | Per-request timeout in milliseconds.                                                            |
 | `SUPERKUMA_MCP_HTTP_ENABLED` | no       | `false`                 | **Server-side.** Set `true` on the SuperKuma instance to serve the remote `/mcp` HTTP endpoint. |
@@ -129,12 +131,16 @@ the API key in the `Authorization` header.
 
 ## Safety model
 
-- **Read-only by default.** Without `SUPERKUMA_ALLOW_MUTATIONS=true`, only read tools
-  (`list_monitors`, `get_monitor`, `get_monitor_beats`, `list_tags`, `get_info`) are
-  registered.
-- **Deletes are double-gated.** `delete_monitor` requires both `SUPERKUMA_ALLOW_DELETE=true`
-  _and_ a per-call `confirm: true`; otherwise it returns a dry-run description.
-- **Least privilege.** The MCP inherits exactly what the API key's user/role/team can do.
+- **Read-only by default.** Without `SUPERKUMA_ALLOW_MUTATIONS=true`, only the read tools
+  (every `list_*` / `get_*` plus `get_info`) are registered; write and delete tools are not
+  even exposed.
+- **Deletes are double-gated.** The `delete_*` tools require both `SUPERKUMA_ALLOW_DELETE=true`
+  _and_ a per-call `confirm: true`; without `confirm` they return a dry-run description instead
+  of deleting.
+- **Secrets stay hidden.** `list_notifications` returns only id/name/type — never the provider
+  credentials stored in the notification config.
+- **Least privilege.** The MCP inherits exactly what the API key's user/role/team can do; the
+  key never inherits the owner's super-admin (ADR-0010 R2).
 
 ## Tools
 
