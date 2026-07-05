@@ -1,9 +1,9 @@
 name: Build PR Test Docker Image
 
 on:
-  schedule:
-    # Runs at 2:00 AM UTC on the 1st of every month
-    - cron: "0 2 1 * *"
+  # Manual only: the scheduled run was removed because this legacy image builds
+  # from the retired alltomatos/superkuma:base2 base (see the self-contained
+  # root Dockerfile + release-docker.yml instead).
   workflow_dispatch: # Allow manual trigger
 
 permissions: {}
