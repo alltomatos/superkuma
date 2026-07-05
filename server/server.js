@@ -389,6 +389,10 @@ let needSetup = false;
     const federationRouter = require("./routers/federation-router");
     app.use(federationRouter);
 
+    // Embedded HTTP MCP endpoint (/mcp). Disabled unless SUPERKUMA_MCP_HTTP_ENABLED=true.
+    const mcpRouter = require("./routers/mcp-router");
+    app.use(mcpRouter);
+
     // Universal Route Handler, must be at the end of all express routes.
     app.get("*", async (_request, response) => {
         if (_request.originalUrl.startsWith("/upload/")) {

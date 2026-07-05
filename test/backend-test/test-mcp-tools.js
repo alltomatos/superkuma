@@ -1,7 +1,8 @@
 const { describe, test } = require("node:test");
 const assert = require("node:assert");
 
-const { parseBool, parseIntEnv, loadConfig } = require("../../server/mcp/config");
+const { parseBool, parseIntEnv, loadConfig, loadGates } = require("../../server/mcp/config");
+const mcpRouter = require("../../server/routers/mcp-router");
 const { MONITOR_DEFAULTS, buildMonitorPayload, summarizeMonitor } = require("../../server/mcp/monitor-template");
 const {
     MAINTENANCE_DEFAULTS,
@@ -367,5 +368,53 @@ describe("MCP tool behaviour", () => {
         assert.strictEqual(notification.type, "telegram");
         assert.strictEqual(notification.telegramBotToken, "T");
         assert.strictEqual(call.args[1], null, "notificationID is null for create");
+    });
+});
+
+describe("MCP config gates", () => {
+    test("loadGates reads the mutation/delete gates without an API key", () => {
+        const saved = { ...process.env };
+        process.env.SUPERKUMA_ALLOW_MUTATIONS = "true";
+        process.env.SUPERKUMA_ALLOW_DELETE = "1";
+        delete process.env.SUPERKUMA_API_KEY;
+        const gates = loadGates();
+        assert.strictEqual(gates.allowMutations, true);
+        assert.strictEqual(gates.allowDelete, true);
+        assert.strictEqual(typeof gates.requestTimeout, "number");
+        assert.ok(!("apiKey" in gates), "gates must not require/return an API key");
+        process.env = saved;
+    });
+});
+
+describe("MCP HTTP endpoint helpers", () => {
+    test("getApiKey extracts the Bearer token (case-insensitive)", () => {
+        assert.strictEqual(mcpRouter.getApiKey({ headers: { authorization: "Bearer uk1_abc" } }), "uk1_abc");
+        assert.strictEqual(mcpRouter.getApiKey({ headers: { authorization: "bearer  uk2_x " } }), "uk2_x");
+    });
+
+    test("getApiKey returns null when the header is missing or malformed", () => {
+        assert.strictEqual(mcpRouter.getApiKey({ headers: {} }), null);
+        assert.strictEqual(mcpRouter.getApiKey({ headers: { authorization: "Basic abc" } }), null);
+    });
+
+    test("isEnabled only true for true/1", () => {
+        const saved = process.env.SUPERKUMA_MCP_HTTP_ENABLED;
+        process.env.SUPERKUMA_MCP_HTTP_ENABLED = "true";
+        assert.strictEqual(mcpRouter.isEnabled(), true);
+        process.env.SUPERKUMA_MCP_HTTP_ENABLED = "false";
+        assert.strictEqual(mcpRouter.isEnabled(), false);
+        delete process.env.SUPERKUMA_MCP_HTTP_ENABLED;
+        assert.strictEqual(mcpRouter.isEnabled(), false);
+        if (saved !== undefined) {
+            process.env.SUPERKUMA_MCP_HTTP_ENABLED = saved;
+        }
+    });
+
+    test("jsonRpcError builds a valid JSON-RPC envelope", () => {
+        assert.deepStrictEqual(mcpRouter.jsonRpcError(-32001, "nope"), {
+            jsonrpc: "2.0",
+            error: { code: -32001, message: "nope" },
+            id: null,
+        });
     });
 });

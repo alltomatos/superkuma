@@ -18,7 +18,7 @@ Restrições do que já existe:
 O servidor MCP é um **cliente Socket.io** independente em `server/mcp/`, que autentica em uma instância SuperKuma em execução e aciona os handlers de socket já existentes. Ele **não adiciona nenhuma superfície de autorização própria**: herda `checkLogin` + RBAC de cada handler.
 
 - **Autenticação headless:** adicionamos o evento de socket `loginByApiKey`, que reutiliza `verifyAPIKey` (agora exportado de `server/auth.js`) e escopa a sessão via `buildActorForApiKey` (least-privilege; nunca herda o superadmin do dono — ADR-0010 R2). O agente guarda um token de API key (`uk<id>_<secret>`), nunca uma senha; a key é revogável e expirável.
-- **Transporte:** stdio (o host do agente sobe o MCP como processo filho). HTTP/SSE fica para o futuro.
+- **Transporte:** stdio (o host do agente sobe o MCP como processo filho) **e HTTP remoto** — a própria instância expõe um endpoint `/mcp` (Streamable HTTP, router Express montado em `server/server.js`), desligado por padrão via `SUPERKUMA_MCP_HTTP_ENABLED`. O endpoint HTTP autentica por `Authorization: Bearer <api-key>` e abre uma sessão Socket.io loopback (`loginByApiKey`) por conexão, reusando os mesmos tools. Consome-se via `mcp-remote` (o diálogo de conector nativo do Claude usa OAuth, não header — fora do escopo por ora).
 - **SDK:** `@modelcontextprotocol/sdk` (dual CJS/ESM); `zod` define os schemas de entrada (dupla função: schema MCP + validação em runtime). `socket.io-client` e `zod` já eram dependências.
 - **Segurança por padrão:** read-only por padrão; escrita exige `SUPERKUMA_ALLOW_MUTATIONS=true`; delete exige `SUPERKUMA_ALLOW_DELETE=true` **e** `confirm:true` por chamada.
 - **Complemento mínimo:** adicionamos o evento `getStatusPageList` (read-only), pois as status pages eram a única área sem evento de refresh de lista sob demanda, diferente de `getMonitorList`/`getMaintenanceList`.
@@ -32,6 +32,7 @@ O servidor MCP é um **cliente Socket.io** independente em `server/mcp/`, que au
 - (−) `loginByApiKey` é um **novo caminho de autenticação** (Tier T3): tocou o modelo de auth e exigiu "Go" humano.
 - (−) O cliente MCP depende do servidor estar no ar e acessível via Socket.io (`ws(s)://`/`http(s)://`).
 - (−) `list_notifications`/`list_status_pages` refletem o estado do cache (login + mutações da própria sessão + refresh sob demanda quando há evento), não um snapshot transacional multi-cliente.
+- (−) O endpoint HTTP `/mcp` é uma superfície externa capaz de mutação, protegida só pela API key no header — por isso vem **desligada por padrão** e deve ficar atrás de TLS + proxy confiável. Cada sessão abre uma conexão Socket.io loopback (indireto, mas reusa 100% do código dos tools).
 
 ## Alternativas consideradas
 
