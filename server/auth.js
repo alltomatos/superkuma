@@ -64,6 +64,12 @@ async function verifyAPIKey(key) {
     return passwordHash.verify(clear, hash.key) ? hash : false;
 }
 
+// Exposed so the Socket.io `loginByApiKey` handler (headless/MCP agents) can
+// authenticate a socket session with the same API key it would use for the
+// HTTP `/metrics` basic-auth path, reusing the identical hash/expiry/active
+// checks instead of duplicating them.
+exports.verifyAPIKey = verifyAPIKey;
+
 /**
  * Validate a provided remote instance (federation agent) token
  * @param {string} token Remote instance token to verify
