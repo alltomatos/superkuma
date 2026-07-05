@@ -150,7 +150,7 @@ const { initBackgroundJobs, stopBackgroundJobs } = require("./jobs");
 const { loginRateLimiter, twoFaRateLimiter } = require("./rate-limiter");
 
 const { apiAuth, attachActor, requireSuperadmin } = require("./auth");
-const { login } = require("./auth");
+const { login, verifyAPIKey } = require("./auth");
 const passwordHash = require("./password-hash");
 
 const { Prometheus } = require("./prometheus");
@@ -540,6 +540,76 @@ let needSetup = false;
                 callback({
                     ok: false,
                     msg: "authIncorrectCreds",
+                    msgi18n: true,
+                });
+            }
+        });
+
+        // Headless login for automation/agents (e.g. the SuperKuma MCP server).
+        // Authenticates a socket session with an existing API key (uk<id>_<secret>)
+        // instead of a username/password, so the agent never holds a plaintext
+        // password and access can be revoked/expired per key. Reuses verifyAPIKey
+        // (the same check as the /metrics HTTP path) and scopes the session to the
+        // key's own role/team via buildActorForApiKey (ADR-0010 R2).
+        socket.on("loginByApiKey", async (apiKey, callback) => {
+            const clientIP = await server.getClientIP(socket);
+
+            log.info("auth", `Login by API key. IP=${clientIP}`);
+
+            if (typeof callback !== "function") {
+                return;
+            }
+
+            // Reuse the password-login rate limiter to throttle brute-force attempts.
+            if (!(await loginRateLimiter.pass(callback))) {
+                log.info("auth", `Too many failed login requests. IP=${clientIP}`);
+                return;
+            }
+
+            try {
+                const keyBean = await verifyAPIKey(apiKey);
+
+                if (!keyBean) {
+                    log.warn("auth", `Invalid API key. IP=${clientIP}`);
+                    loginRateLimiter.removeTokens(1);
+                    callback({
+                        ok: false,
+                        msg: "authInvalidToken",
+                        msgi18n: true,
+                    });
+                    return;
+                }
+
+                const user = await R.findOne("user", " id = ? AND active = 1 ", [keyBean.user_id]);
+
+                if (!user) {
+                    log.info("auth", `API key owner inactive or deleted. IP=${clientIP}`);
+                    callback({
+                        ok: false,
+                        msg: "authUserInactiveOrDeleted",
+                        msgi18n: true,
+                    });
+                    return;
+                }
+
+                const { buildActorForApiKey } = require("./security/actor-repository");
+                const actor = await buildActorForApiKey(keyBean);
+
+                await afterLogin(socket, user, actor);
+
+                log.info("auth", `Successfully logged in via API key. User=${user.username} IP=${clientIP}`);
+
+                callback({
+                    ok: true,
+                });
+            } catch (error) {
+                log.error("auth", `API key login error. IP=${clientIP}`);
+                if (error.message) {
+                    log.error("auth", error.message, `IP=${clientIP}`);
+                }
+                callback({
+                    ok: false,
+                    msg: "authInvalidToken",
                     msgi18n: true,
                 });
             }
@@ -1197,16 +1267,20 @@ async function checkOwner(userID, monitorID) {
  * This function is used to send the heartbeat list of a monitor.
  * @param {Socket} socket Socket.io instance
  * @param {object} user User object
+ * @param {object} actorOverride Pre-built RBAC actor to attach instead of the
+ * user's full actor. Used by the `loginByApiKey` path to scope the session to
+ * the API key's own role/team (least-privilege, ADR-0010 R2). Defaults to null,
+ * preserving the original behaviour for password/token logins.
  * @returns {Promise<void>}
  */
-async function afterLogin(socket, user) {
+async function afterLogin(socket, user, actorOverride = null) {
     socket.userID = user.id;
 
     // Dark-launch (ADR-0010 P2): attach the RBAC actor + permission payload.
     // Must never break login while enforcement is OFF.
     try {
         const { buildActorForUser, buildPermissionPayload } = require("./security/actor-repository");
-        socket.actor = await buildActorForUser(user);
+        socket.actor = actorOverride || (await buildActorForUser(user));
         socket.permissionPayload = await buildPermissionPayload(user, socket.actor);
     } catch (e) {
         // Fall back to a minimal actor carrying the correct userId (never null)
