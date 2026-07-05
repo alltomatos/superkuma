@@ -24,7 +24,7 @@ class Flowtriq extends NotificationProvider {
             }
 
             let data = {
-                source: "uptime-kuma",
+                source: "superkuma",
                 status: status,
                 monitor: monitorName,
                 msg: msg,

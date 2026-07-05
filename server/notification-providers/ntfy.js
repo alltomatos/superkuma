@@ -34,7 +34,7 @@ class Ntfy extends NotificationProvider {
             // If heartbeatJSON is null, assume non monitoring notification (Certificate warning) or testing.
             if (heartbeatJSON == null) {
                 // Default values for test notification
-                let title = (monitorJSON?.name || notification.ntfytopic) + " [Uptime-Kuma]";
+                let title = (monitorJSON?.name || notification.ntfytopic) + " [SuperKuma]";
                 let message = msg;
 
                 // Apply custom templates from notification settings if enabled
@@ -88,7 +88,7 @@ class Ntfy extends NotificationProvider {
             }
 
             // Default values
-            let title = monitorJSON.name + " " + status + " [Uptime-Kuma]";
+            let title = monitorJSON.name + " " + status + " [SuperKuma]";
             let message = heartbeatJSON.msg;
 
             // Apply custom templates from notification settings if enabled

@@ -167,20 +167,20 @@ class Database {
 
         let config = {};
 
-        let parsedMaxPoolConnections = parseInt(process.env.UPTIME_KUMA_DB_POOL_MAX_CONNECTIONS);
+        let parsedMaxPoolConnections = parseInt(process.env.SUPERKUMA_DB_POOL_MAX_CONNECTIONS);
 
-        if (!process.env.UPTIME_KUMA_DB_POOL_MAX_CONNECTIONS) {
+        if (!process.env.SUPERKUMA_DB_POOL_MAX_CONNECTIONS) {
             parsedMaxPoolConnections = 10;
         } else if (Number.isNaN(parsedMaxPoolConnections)) {
             log.warn(
                 "db",
-                "Max database connections defaulted to 10 because UPTIME_KUMA_DB_POOL_MAX_CONNECTIONS was invalid."
+                "Max database connections defaulted to 10 because SUPERKUMA_DB_POOL_MAX_CONNECTIONS was invalid."
             );
             parsedMaxPoolConnections = 10;
         } else if (parsedMaxPoolConnections < 1) {
             log.warn(
                 "db",
-                "Max database connections defaulted to 10 because UPTIME_KUMA_DB_POOL_MAX_CONNECTIONS was less than 1."
+                "Max database connections defaulted to 10 because SUPERKUMA_DB_POOL_MAX_CONNECTIONS was less than 1."
             );
             parsedMaxPoolConnections = 10;
         } else if (parsedMaxPoolConnections > 100) {
@@ -217,7 +217,7 @@ class Database {
 
             // Default is still single connection.
             // Multiple connection could run into "SQLITE_BUSY: database is locked" error.
-            if (process.env.UPTIME_KUMA_SQLITE_SINGLE_CONNECTION !== "false") {
+            if (process.env.SUPERKUMA_SQLITE_SINGLE_CONNECTION !== "false") {
                 log.info("db", "Using single connection for SQLite");
                 poolConfig = {
                     min: 1,
@@ -411,7 +411,7 @@ class Database {
      * @returns {Promise<void>}
      */
     static async patch(port = undefined, hostname = undefined) {
-        // Still need to keep this for old versions of Uptime Kuma
+        // Still need to keep this for old versions of SuperKuma
         if (Database.dbConfig.type === "sqlite") {
             await this.patchSqlite();
         }
@@ -440,7 +440,7 @@ class Database {
             // Allow missing patch files for downgrade or testing pr.
             if (e.message.includes("the following files are missing:")) {
                 log.warn("db", e.message);
-                log.warn("db", "Database migration failed, you may be downgrading Uptime Kuma.");
+                log.warn("db", "Database migration failed, you may be downgrading SuperKuma.");
             } else {
                 log.error("db", "Database migration failed");
                 throw e;
@@ -491,10 +491,10 @@ class Database {
                 await Database.close();
 
                 log.error("db", ex);
-                log.error("db", "Start Uptime-Kuma failed due to issue patching the database");
+                log.error("db", "Start SuperKuma failed due to issue patching the database");
                 log.error(
                     "db",
-                    "Please submit a bug report if you still encounter the problem after restart: https://github.com/louislam/uptime-kuma/issues"
+                    "Please submit a bug report if you still encounter the problem after restart: https://github.com/alltomatos/superkuma/issues"
                 );
 
                 process.exit(1);
@@ -535,10 +535,10 @@ class Database {
             await Database.close();
 
             log.error("db", ex);
-            log.error("db", "Start Uptime-Kuma failed due to issue patching the database");
+            log.error("db", "Start SuperKuma failed due to issue patching the database");
             log.error(
                 "db",
-                "Please submit the bug report if you still encounter the problem after restart: https://github.com/louislam/uptime-kuma/issues"
+                "Please submit the bug report if you still encounter the problem after restart: https://github.com/alltomatos/superkuma/issues"
             );
 
             process.exit(1);

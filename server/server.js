@@ -1,9 +1,9 @@
 /*
- * Uptime Kuma Server
+ * SuperKuma Server
  * node "server/server.js"
  * DO NOT require("./server") in other modules, it likely creates circular dependency!
  */
-console.log("Welcome to Uptime Kuma");
+console.log("Welcome to SuperKuma");
 
 // As the log function need to use dayjs, it should be very top
 const dayjs = require("dayjs");
@@ -28,7 +28,7 @@ const requiredNodeVersionsComma = requiredNodeVersions
     .map((version) => version.trim())
     .join(", ");
 
-// Exit Uptime Kuma immediately if the Node.js version is banned
+// Exit SuperKuma immediately if the Node.js version is banned
 if (semver.satisfies(nodeVersion, bannedNodeVersions)) {
     console.error(
         "\x1b[31m%s\x1b[0m",
@@ -49,7 +49,7 @@ const args = require("args-parser")(process.argv);
 const { sleep, log, getRandomInt, genSecret, isDev } = require("../src/util");
 const config = require("./config");
 
-process.title = "uptime-kuma";
+process.title = "superkuma";
 
 log.debug("server", "Arguments");
 log.debug("server", args);
@@ -58,25 +58,25 @@ if (!process.env.NODE_ENV) {
     process.env.NODE_ENV = "production";
 }
 
-if (!process.env.UPTIME_KUMA_WS_ORIGIN_CHECK) {
-    process.env.UPTIME_KUMA_WS_ORIGIN_CHECK = "cors-like";
+if (!process.env.SUPERKUMA_WS_ORIGIN_CHECK) {
+    process.env.SUPERKUMA_WS_ORIGIN_CHECK = "cors-like";
 }
 
 log.info("server", "Env: " + process.env.NODE_ENV);
-log.debug("server", "Inside Container: " + (process.env.UPTIME_KUMA_IS_CONTAINER === "1"));
+log.debug("server", "Inside Container: " + (process.env.SUPERKUMA_IS_CONTAINER === "1"));
 
-if (process.env.UPTIME_KUMA_WS_ORIGIN_CHECK === "bypass") {
-    log.warn("server", "WebSocket Origin Check: " + process.env.UPTIME_KUMA_WS_ORIGIN_CHECK);
+if (process.env.SUPERKUMA_WS_ORIGIN_CHECK === "bypass") {
+    log.warn("server", "WebSocket Origin Check: " + process.env.SUPERKUMA_WS_ORIGIN_CHECK);
 }
 
-if (isDev || process.env.UPTIME_KUMA_DEBUG_INSPECTOR === "1") {
+if (isDev || process.env.SUPERKUMA_DEBUG_INSPECTOR === "1") {
     const inspector = require("inspector");
     let inspectorHost = "127.0.0.1";
 
     log.warn("server", "Node.js Inspector is enabled. You can connect to it via Chrome DevTools or VSCode.");
     log.warn("server", "Node.js Inspector is listening on:", inspector.url());
 
-    if (process.env.UPTIME_KUMA_IS_CONTAINER === "1") {
+    if (process.env.SUPERKUMA_IS_CONTAINER === "1") {
         log.warn(
             "server",
             "You need to expose the port 9229:9229 in your docker command or docker compose, and ssh tunneling in order to connect to it."
@@ -88,7 +88,7 @@ if (isDev || process.env.UPTIME_KUMA_DEBUG_INSPECTOR === "1") {
 }
 
 const checkVersion = require("./check-version");
-log.info("server", "Uptime Kuma Version:", checkVersion.version);
+log.info("server", "SuperKuma Version:", checkVersion.version);
 
 log.info("server", "Loading modules");
 
@@ -110,8 +110,8 @@ log.debug("server", "Importing 2FA Modules");
 const notp = require("notp");
 const base32 = require("thirty-two");
 
-const { UptimeKumaServer } = require("./uptime-kuma-server");
-const server = UptimeKumaServer.getInstance();
+const { SuperKumaServer } = require("./superkuma-server");
+const server = SuperKumaServer.getInstance();
 const io = (module.exports.io = server.io);
 const app = server.app;
 
@@ -136,6 +136,9 @@ const {
 log.debug("server", "Importing Notification");
 const { Notification } = require("./notification");
 Notification.init();
+
+const { requireResource } = require("./security/authz");
+const { teamIdLoader } = require("./security/team-id-loaders");
 log.debug("server", "Importing Web-Push");
 const webpush = require("web-push");
 
@@ -146,8 +149,8 @@ log.debug("server", "Importing Background Jobs");
 const { initBackgroundJobs, stopBackgroundJobs } = require("./jobs");
 const { loginRateLimiter, twoFaRateLimiter } = require("./rate-limiter");
 
-const { apiAuth } = require("./auth");
-const { login } = require("./auth");
+const { apiAuth, attachActor, requireSuperadmin } = require("./auth");
+const { login, verifyAPIKey } = require("./auth");
 const passwordHash = require("./password-hash");
 
 const { Prometheus } = require("./prometheus");
@@ -162,8 +165,8 @@ if (hostname) {
 const port = config.port;
 
 const disableFrameSameOrigin =
-    !!process.env.UPTIME_KUMA_DISABLE_FRAME_SAMEORIGIN || args["disable-frame-sameorigin"] || false;
-const cloudflaredToken = args["cloudflared-token"] || process.env.UPTIME_KUMA_CLOUDFLARED_TOKEN || undefined;
+    !!process.env.SUPERKUMA_DISABLE_FRAME_SAMEORIGIN || args["disable-frame-sameorigin"] || false;
+const cloudflaredToken = args["cloudflared-token"] || process.env.SUPERKUMA_CLOUDFLARED_TOKEN || undefined;
 
 // 2FA / notp verification defaults
 const twoFAVerifyOptions = {
@@ -273,14 +276,14 @@ let needSetup = false;
 
         log.debug("entry", `Request Domain: ${hostname}`);
 
-        const uptimeKumaEntryPage = server.entryPage;
+        const superKumaEntryPage = server.entryPage;
         if (hostname in StatusPage.domainMappingList) {
             log.debug("entry", "This is a status page domain");
 
             let slug = StatusPage.domainMappingList[hostname];
             await StatusPage.handleStatusPageResponse(response, server.indexHTML, slug);
-        } else if (uptimeKumaEntryPage && uptimeKumaEntryPage.startsWith("statusPage-")) {
-            response.redirect("/status/" + uptimeKumaEntryPage.replace("statusPage-", ""));
+        } else if (superKumaEntryPage && superKumaEntryPage.startsWith("statusPage-")) {
+            response.redirect("/status/" + superKumaEntryPage.replace("statusPage-", ""));
         } else {
             response.redirect("/dashboard");
         }
@@ -353,7 +356,12 @@ let needSetup = false;
 
     // Prometheus API metrics  /metrics
     // With Basic Auth using the first user's username/password
-    app.get("/metrics", apiAuth, prometheusAPIMetrics());
+    // ADR-0010 D9: gated to super admins only. Metrics are process-wide
+    // singletons (not team-scoped), so any authenticated user seeing them
+    // would see every team's data -- until a per-team metrics registry
+    // exists, restrict to the one role that is already meant to see
+    // everything.
+    app.get("/metrics", apiAuth, attachActor, requireSuperadmin, prometheusAPIMetrics());
 
     app.use(
         "/",
@@ -366,7 +374,7 @@ let needSetup = false;
     app.use("/upload", express.static(Database.uploadDir));
 
     app.get("/.well-known/change-password", async (_, response) => {
-        response.redirect("https://github.com/louislam/uptime-kuma/wiki/Reset-Password-via-CLI");
+        response.redirect("https://github.com/alltomatos/superkuma/wiki/Reset-Password-via-CLI");
     });
 
     // API Router
@@ -419,6 +427,11 @@ let needSetup = false;
                     // Check if the password changed
                     if (decoded.h !== shake256(user.password, SHAKE256_LENGTH)) {
                         throw new Error("The token is invalid due to password change or old token");
+                    }
+
+                    // Grandfather tokens issued before token_version existed as v0 (ADR-0010 R6).
+                    if ((decoded.tv ?? 0) !== (user.token_version ?? 0)) {
+                        throw new Error("The token has been revoked");
                     }
 
                     log.debug("auth", "afterLogin");
@@ -482,7 +495,7 @@ let needSetup = false;
 
                     callback({
                         ok: true,
-                        token: User.createJWT(user, server.jwtSecret),
+                        token: await User.createSignedToken(user, server.jwtSecret),
                     });
                 }
 
@@ -509,7 +522,7 @@ let needSetup = false;
 
                         callback({
                             ok: true,
-                            token: User.createJWT(user, server.jwtSecret),
+                            token: await User.createSignedToken(user, server.jwtSecret),
                         });
                     } else {
                         log.warn("auth", `Invalid token provided for user ${data.username}. IP=${clientIP}`);
@@ -527,6 +540,76 @@ let needSetup = false;
                 callback({
                     ok: false,
                     msg: "authIncorrectCreds",
+                    msgi18n: true,
+                });
+            }
+        });
+
+        // Headless login for automation/agents (e.g. the SuperKuma MCP server).
+        // Authenticates a socket session with an existing API key (uk<id>_<secret>)
+        // instead of a username/password, so the agent never holds a plaintext
+        // password and access can be revoked/expired per key. Reuses verifyAPIKey
+        // (the same check as the /metrics HTTP path) and scopes the session to the
+        // key's own role/team via buildActorForApiKey (ADR-0010 R2).
+        socket.on("loginByApiKey", async (apiKey, callback) => {
+            const clientIP = await server.getClientIP(socket);
+
+            log.info("auth", `Login by API key. IP=${clientIP}`);
+
+            if (typeof callback !== "function") {
+                return;
+            }
+
+            // Reuse the password-login rate limiter to throttle brute-force attempts.
+            if (!(await loginRateLimiter.pass(callback))) {
+                log.info("auth", `Too many failed login requests. IP=${clientIP}`);
+                return;
+            }
+
+            try {
+                const keyBean = await verifyAPIKey(apiKey);
+
+                if (!keyBean) {
+                    log.warn("auth", `Invalid API key. IP=${clientIP}`);
+                    loginRateLimiter.removeTokens(1);
+                    callback({
+                        ok: false,
+                        msg: "authInvalidToken",
+                        msgi18n: true,
+                    });
+                    return;
+                }
+
+                const user = await R.findOne("user", " id = ? AND active = 1 ", [keyBean.user_id]);
+
+                if (!user) {
+                    log.info("auth", `API key owner inactive or deleted. IP=${clientIP}`);
+                    callback({
+                        ok: false,
+                        msg: "authUserInactiveOrDeleted",
+                        msgi18n: true,
+                    });
+                    return;
+                }
+
+                const { buildActorForApiKey } = require("./security/actor-repository");
+                const actor = await buildActorForApiKey(keyBean);
+
+                await afterLogin(socket, user, actor);
+
+                log.info("auth", `Successfully logged in via API key. User=${user.username} IP=${clientIP}`);
+
+                callback({
+                    ok: true,
+                });
+            } catch (error) {
+                log.error("auth", `API key login error. IP=${clientIP}`);
+                if (error.message) {
+                    log.error("auth", error.message, `IP=${clientIP}`);
+                }
+                callback({
+                    ok: false,
+                    msg: "authInvalidToken",
                     msgi18n: true,
                 });
             }
@@ -563,7 +646,7 @@ let needSetup = false;
 
                     // Google authenticator doesn't like equal signs
                     // The fix is found at https://github.com/guyht/notp
-                    // Related issue: https://github.com/louislam/uptime-kuma/issues/486
+                    // Related issue: https://github.com/alltomatos/superkuma/issues/486
                     encodedSecret = encodedSecret.toString().replace(/=/g, "");
 
                     let uri = `otpauth://totp/Uptime%20Kuma:${user.username}?secret=${encodedSecret}`;
@@ -715,14 +798,31 @@ let needSetup = false;
 
                 if ((await R.knex("user").count("id as count").first()).count !== 0) {
                     throw new Error(
-                        "Uptime Kuma has been initialized. If you want to run setup again, please delete the database."
+                        "SuperKuma has been initialized. If you want to run setup again, please delete the database."
                     );
                 }
 
                 let user = R.dispense("user");
                 user.username = username;
                 user.password = await passwordHash.generate(password);
+                // ADR-0010: the P1 migration's backfill only promotes the lowest-id
+                // user to superadmin + Default Team owner for installs that already
+                // had a user row at migration time. A brand-new install has no user
+                // yet when migrations run, so the setup wizard must grant the same
+                // standing here -- otherwise this account would hold zero RBAC
+                // permissions the moment enforcement is ever turned on.
+                user.is_superadmin = true;
                 await R.store(user);
+
+                const defaultTeam = await R.knex("team").where("slug", "default").first();
+                const ownerRole = await R.knex("role").whereNull("team_id").andWhere("slug", "owner").first();
+                if (defaultTeam && ownerRole) {
+                    await R.knex("team_user").insert({
+                        team_id: defaultTeam.id,
+                        user_id: user.id,
+                        role_id: ownerRole.id,
+                    });
+                }
 
                 needSetup = false;
 
@@ -763,7 +863,7 @@ let needSetup = false;
 
                 callback({
                     ok: true,
-                    token: User.createJWT(user, server.jwtSecret),
+                    token: await User.createSignedToken(user, server.jwtSecret),
                     msg: "successAuthChangePassword",
                     msgi18n: true,
                 });
@@ -817,11 +917,30 @@ let needSetup = false;
                     server.disconnectAllSocketClients(socket.userID, socket.id);
                 }
 
+                // ADR-0010 P4: refuse to enable RBAC enforcement if no active
+                // superadmin exists -- otherwise nobody could act with global
+                // admin authority once the dark-launch bypass is turned off.
+                if (data.rbacEnforced) {
+                    const { hasActiveSuperadmin } = require("./security/actor-repository");
+                    if (!(await hasActiveSuperadmin())) {
+                        throw new Error("Cannot enable RBAC enforcement: no active superadmin exists.");
+                    }
+                }
+
                 const previousChromeExecutable = await Settings.get("chromeExecutable");
                 const previousNSCDStatus = await Settings.get("nscd");
 
                 await setSettings("general", data);
                 server.entryPage = data.entryPage;
+
+                // ADR-0010 P4: apply the enforcement flag immediately, like the
+                // other settings below. Only when the field is actually present
+                // in the payload -- forms that don't know about this key yet
+                // must not silently reset an already-enabled flag back to OFF.
+                if (Object.prototype.hasOwnProperty.call(data, "rbacEnforced")) {
+                    const { setEnforcementEnabled } = require("./security/authz");
+                    setEnforcementEnabled(data.rbacEnforced);
+                }
 
                 // Also need to apply timezone globally
                 if (data.serverTimezone) {
@@ -864,7 +983,12 @@ let needSetup = false;
             try {
                 checkLogin(socket);
 
-                let notificationBean = await Notification.save(notification, notificationID, socket.userID);
+                let notificationBean = await Notification.save(
+                    notification,
+                    notificationID,
+                    socket.userID,
+                    socket.actor
+                );
                 await sendNotificationList(socket);
 
                 callback({
@@ -885,7 +1009,7 @@ let needSetup = false;
             try {
                 checkLogin(socket);
 
-                await Notification.delete(notificationID, socket.userID);
+                await Notification.delete(notificationID, socket.userID, socket.actor);
                 await sendNotificationList(socket);
 
                 callback({
@@ -959,6 +1083,7 @@ let needSetup = false;
         socket.on("clearEvents", async (monitorID, callback) => {
             try {
                 checkLogin(socket);
+                await requireResource(socket.actor, "monitor:manage_state", "monitor", monitorID, teamIdLoader);
 
                 log.info("manage", `Clear Events Monitor: ${monitorID} User ID: ${socket.userID}`);
 
@@ -978,6 +1103,7 @@ let needSetup = false;
         socket.on("clearHeartbeats", async (monitorID, callback) => {
             try {
                 checkLogin(socket);
+                await requireResource(socket.actor, "monitor:manage_state", "monitor", monitorID, teamIdLoader);
 
                 log.info("manage", `Clear Heartbeats Monitor: ${monitorID} User ID: ${socket.userID}`);
 
@@ -1058,7 +1184,9 @@ let needSetup = false;
         log.debug("auth", "check auto login");
         if (await setting("disableAuth")) {
             log.info("auth", "Disabled Auth: auto login to admin");
-            await afterLogin(socket, await R.findOne("user"));
+            // Deterministic auto-login (ADR-0010 R12): lowest-id active user
+            // (which the backfill made the super admin), not a plan-dependent row.
+            await afterLogin(socket, await R.findOne("user", " active = 1 ORDER BY id ASC "));
             socket.emit("autoLogin");
         } else {
             socket.emit("loginRequired");
@@ -1096,13 +1224,21 @@ let needSetup = false;
  * @param {number} monitorID ID of monitor to update
  * @param {number[]} notificationIDList List of new notification
  * providers to add
+ * @param {object} actor The RBAC actor performing the update (optional; when
+ * given, each linked notification is validated to belong to the actor's team
+ * before being linked -- a no-op while enforcement is OFF). Closes the
+ * cross-tenant hole where a client could link a monitor to a notification it
+ * does not own (ADR-0010 §4.4).
  * @returns {Promise<void>}
  */
-async function updateMonitorNotification(monitorID, notificationIDList) {
+async function updateMonitorNotification(monitorID, notificationIDList, actor) {
     await R.exec("DELETE FROM monitor_notification WHERE monitor_id = ? ", [monitorID]);
 
     for (let notificationID in notificationIDList) {
         if (notificationIDList[notificationID]) {
+            if (actor) {
+                await requireResource(actor, "notification:read", "notification", notificationID, teamIdLoader);
+            }
             let relation = R.dispense("monitor_notification");
             relation.monitor_id = monitorID;
             relation.notification_id = notificationID;
@@ -1131,11 +1267,37 @@ async function checkOwner(userID, monitorID) {
  * This function is used to send the heartbeat list of a monitor.
  * @param {Socket} socket Socket.io instance
  * @param {object} user User object
+ * @param {object} actorOverride Pre-built RBAC actor to attach instead of the
+ * user's full actor. Used by the `loginByApiKey` path to scope the session to
+ * the API key's own role/team (least-privilege, ADR-0010 R2). Defaults to null,
+ * preserving the original behaviour for password/token logins.
  * @returns {Promise<void>}
  */
-async function afterLogin(socket, user) {
+async function afterLogin(socket, user, actorOverride = null) {
     socket.userID = user.id;
-    socket.join(user.id);
+
+    // Dark-launch (ADR-0010 P2): attach the RBAC actor + permission payload.
+    // Must never break login while enforcement is OFF.
+    try {
+        const { buildActorForUser, buildPermissionPayload } = require("./security/actor-repository");
+        socket.actor = actorOverride || (await buildActorForUser(user));
+        socket.permissionPayload = await buildPermissionPayload(user, socket.actor);
+    } catch (e) {
+        // Fall back to a minimal actor carrying the correct userId (never null)
+        // so scopeFilter()'s OFF-path -- which reads actor.userId directly,
+        // matching legacy "WHERE user_id = ?" queries -- keeps working exactly
+        // as before. Empty memberships also make this actor fail closed (deny
+        // everything) if enforcement is ever ON, the safe default for an error.
+        const { buildActor } = require("./security/authz");
+        socket.actor = buildActor({ userId: user.id, isSuperadmin: false }, []);
+        socket.permissionPayload = null;
+        log.warn("auth", "RBAC actor build skipped (dark-launch): " + e.message);
+    }
+
+    // ADR-0010 P4: join the room AFTER the actor is resolved, since roomFor()
+    // needs socket.actor.activeTeamId to route correctly once enforcement is ON.
+    const { roomFor } = require("./security/rooms");
+    socket.join(roomFor(user.id, socket.actor.activeTeamId));
 
     let monitorList = await server.sendMonitorList(socket);
     await Promise.allSettled([
@@ -1191,7 +1353,7 @@ async function initDatabase(testMode = false) {
         log.debug("server", "Load JWT secret from database.");
     }
 
-    // If there is no record in user table, it is a new Uptime Kuma instance, need to setup
+    // If there is no record in user table, it is a new SuperKuma instance, need to setup
     if ((await R.knex("user").count("id as count").first()).count === 0) {
         log.info("server", "No user, need setup");
         needSetup = true;
@@ -1323,8 +1485,8 @@ gracefulShutdown(server.httpServer, {
 // Catch unexpected errors here
 let unexpectedErrorHandler = (error, promise) => {
     console.trace(error);
-    UptimeKumaServer.errorLog(error, false);
-    console.error("If you keep encountering errors, please report to https://github.com/louislam/uptime-kuma/issues");
+    SuperKumaServer.errorLog(error, false);
+    console.error("If you keep encountering errors, please report to https://github.com/alltomatos/superkuma/issues");
 };
 process.addListener("unhandledRejection", unexpectedErrorHandler);
 process.addListener("uncaughtException", unexpectedErrorHandler);

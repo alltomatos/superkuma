@@ -1,10 +1,8 @@
 # Project Info
 
-First of all, I want to thank everyone who has submitted issues or shared pull
-requests for Uptime Kuma. I never thought the GitHub community would be so nice!
-Because of this, I also never thought that other people would actually read and
-edit my code. Parts of the code are not very well-structured or commented, sorry
-about that.
+First of all, we want to thank everyone who has submitted issues or shared pull
+requests for SuperKuma. Parts of the code are not very well-structured or
+commented, sorry about that.
 
 Before you start, please read our [Code of Conduct](CODE_OF_CONDUCT.md) to understand our community standards.
 
@@ -29,7 +27,7 @@ development, we run vite in development mode on another port.
 - `src` (Frontend source code)
 - `test` (unit test)
 
-## Can I Create a Pull Request for Uptime Kuma?
+## Can I Create a Pull Request for SuperKuma?
 
 Whether or not you can create a pull request depends on the nature of your
 contribution. We value both your time and our maintainers' time, so we want to
@@ -53,8 +51,8 @@ to review the appropriate one for your contribution.
   parts like the documentation.
   [**PLEASE SEE OUR SECURITY POLICY.**](SECURITY.md)
 
-  [advisory]: https://github.com/louislam/uptime-kuma/security/advisories/new
-  [issue]: https://github.com/louislam/uptime-kuma/issues/new?template=security_issue.yml
+  [advisory]: https://github.com/alltomatos/superkuma/security/advisories/new
+  [issue]: https://github.com/alltomatos/superkuma/issues/new?template=security_issue.yml
 
   </p>
   </details>
@@ -79,12 +77,12 @@ to review the appropriate one for your contribution.
 
   Please add **all** strings that are translatable to `src/lang/en.json`. If translation keys are omitted, they cannot be translated. **Do not include any other languages in your initial pull request** (even if it is your mother tongue) to avoid merge conflicts between Weblate and `master`. Once your PR is merged into `master`, the strings can be translated by awesome people donating their language skills.
 
-  We use Weblate to localise this project into many languages. If you want to help translate Uptime Kuma into your language, please see [these instructions on how to translate using Weblate](https://github.com/louislam/uptime-kuma/blob/master/src/lang/README.md).
+  If you want to help translate SuperKuma into your language, please see [these instructions](https://github.com/alltomatos/superkuma/blob/master/src/lang/README.md).
 
-  There are some cases where a change cannot be done directly in Weblate and requires a PR:
+  There are some cases where a change requires a PR:
   - A text may not yet be localisable. In this case, **adding a new language key** via `{{ $t("Translation key") }}` or [`<i18n-t keypath="Translation key">`](https://vue-i18n.intlify.dev/guide/advanced/component.html) might be necessary.
-  - Language keys need to be **added to `en.json`** to appear in Weblate. If this has not been done, a PR is appreciated.
-  - **Adding a new language** requires creating a new file. See [these instructions](https://github.com/louislam/uptime-kuma/blob/master/src/lang/README.md).
+  - Language keys need to be **added to `en.json`** first, so translators have something to translate.
+  - **Adding a new language** requires creating a new file. See [these instructions](https://github.com/alltomatos/superkuma/blob/master/src/lang/README.md).
 
   <sub>Because maintainer time is precious, junior maintainers may merge uncontroversial PRs in this area.</sub>
 
@@ -177,7 +175,7 @@ to review the appropriate one for your contribution.
     - in the unhappy-path: throw an `Error` for each fault that is detected with an actionable error message.
     - NEVER set `heartbeat.status = DOWN` unless you want to explicitly ignore retries.
 
-  - `server/uptime-kuma-server.js` is where the monitoring backend needs to be
+  - `server/superkuma-server.js` is where the monitoring backend needs to be
     registered. _If you have an idea how we can skip this step, we would love to
     hear about it ^^_
 
@@ -213,11 +211,11 @@ to review the appropriate one for your contribution.
   <p>
 
   Contributing is easy and fun. We will guide you through the process:
-  1. **Fork** the [Uptime-Kuma repository](https://github.com/louislam/uptime-kuma/) and **clone** it to your local machine.
+  1. **Fork** the [SuperKuma repository](https://github.com/alltomatos/superkuma/) and **clone** it to your local machine.
   2. **Create a new branch** for your changes (e.g., `signal-notification-provider`).
   3. **Make your changes** and **commit** them with a clear message.
   4. **Push** your changes to your forked repository.
-  5. **Open a pull request** to the `master` branch of the Uptime Kuma repository.
+  5. **Open a pull request** to the `master` branch of the SuperKuma repository.
      - For large changes, please open a **draft pull request** first to discuss the changes with the maintainers.
   6. **Provide a clear and concise description** of the changes you've made and link any related issues.
   7. **Complete the PR checklist** and make sure all CI checks pass.
@@ -249,7 +247,7 @@ to review the appropriate one for your contribution.
   not get merged / not get merged quickly. Such changes require a major version
   release.
 - **Test your code** before submitting a PR. Buggy PRs will not be merged.
-- Make sure the **UI/UX is close to Uptime Kuma**.
+- Make sure the **UI/UX is close to SuperKuma**.
 - **Think about the maintainability**: Don't add functionality that is
   completely **out of scope**. Keep in mind that we need to be able to maintain
   the functionality.
@@ -264,11 +262,11 @@ All pull requests must pass our continuous integration checks. These checks incl
 - **Formatting**: We use Prettier for code formatting. You can format your code with `npm run fmt` (or CI will do this for you)
 - **Testing**: We use Playwright for end-to-end tests and have a suite of backend tests. You can run the tests locally with `npm test`.
 
-I ([@louislam](https://github.com/louislam)) have the final say.
-If your pull request does not meet my expectations, I will reject it, no matter how much time
+The maintainers have the final say.
+If your pull request does not meet our expectations, it will be rejected, no matter how much time
 you spent on it.
 
-We will assign your pull request to a [milestone](https://github.com/louislam/uptime-kuma/milestones), if we plan to review and merge it.
+We will assign your pull request to a [milestone](https://github.com/alltomatos/superkuma/milestones), if we plan to review and merge it.
 
 Please don't rush or ask for an ETA.
 We have to understand the pull request, make sure it has no breaking changes and stick to the vision of this project, especially for large pull requests.
@@ -283,8 +281,8 @@ are stuck on. We are here to help.
 
 ## Project Style
 
-I personally do not like something that requires a lot of configuration before
-you can finally start the app. The goal is to make the Uptime Kuma installation
+We do not like something that requires a lot of configuration before
+you can finally start the app. The goal is to make the SuperKuma installation
 as easy as installing a mobile app.
 
 - Easy to install for non-Docker users
@@ -319,8 +317,8 @@ as easy as installing a mobile app.
 - [`Node.js`](https://nodejs.org/) >= 20.4.0
 - [`npm`](https://www.npmjs.com/) >= 9.3
 - [`git`](https://git-scm.com/)
-- IDE that supports [`ESLint`](https://eslint.org/) and EditorConfig (I am using
-  [`IntelliJ IDEA`](https://www.jetbrains.com/idea/))
+- IDE that supports [`ESLint`](https://eslint.org/) and EditorConfig (e.g.
+  [`IntelliJ IDEA`](https://www.jetbrains.com/idea/) or VS Code)
 - A SQLite GUI tool (f.ex.
   [`SQLite Expert Personal`](https://www.sqliteexpert.com/download.html) or
   [`DBeaver Community`](https://dbeaver.io/download/))
@@ -379,7 +377,7 @@ in the `socket.io` handlers. `express.js` is also used to serve:
 - `routers/` (Express Routers)
 - `socket-handler/` (Socket.io Handlers)
 - `server.js` (Server entry point)
-- `uptime-kuma-server.js` (UptimeKumaServer class, main logic should be here,
+- `superkuma-server.js` (SuperKumaServer class, main logic should be here,
   but some still in `server.js`)
 
 ## Frontend Dev Server
@@ -393,7 +391,7 @@ You can use Vue.js devtools Chrome extension for debugging.
 
 ### Frontend Details
 
-Uptime Kuma Frontend is a single page application (SPA). Most paths are handled
+SuperKuma Frontend is a single page application (SPA). Most paths are handled
 by Vue Router.
 
 The router is in `src/router.js`
@@ -404,7 +402,7 @@ The data and socket logic are in `src/mixins/socket.js`.
 
 ## Database Migration
 
-See: <https://github.com/louislam/uptime-kuma/tree/master/db/knex_migrations>
+See: <https://github.com/alltomatos/superkuma/tree/master/db/knex_migrations>
 
 ## Unit Test
 
@@ -441,64 +439,14 @@ changes need to be checked by the person proposing the change.
 ## Spelling & Grammar
 
 Feel free to correct the spelling and grammar in the documentation or code.
-English is not the native language of the maintainers.
-
-## Wiki
-
-Since there is no way to make a pull request to the wiki, I have set up another
-repo to do that.
-
-<https://github.com/louislam/uptime-kuma-wiki>
 
 ## Maintainer
 
-### What is a maintainer and what are their roles?
-
-This project has multiple maintainers who specialise in different areas.
-Currently, there are 3 maintainers:
-
-| Person            | Role              | Main Area        |
-| ----------------- | ----------------- | ---------------- |
-| `@louislam`       | senior maintainer | major features   |
-| `@chakflying`     | junior maintainer | fixing bugs      |
-| `@commanderstorm` | junior maintainer | issue-management |
+This project has one or more maintainers who review and merge pull requests.
 
 ### Procedures
 
 We have a few procedures we follow. These are documented here:
-
-- <details><summary><b>Set up a Docker Builder</b> (click to expand)</summary>
-  <p>
-  - amd64, armv7 using local.
-  - arm64 using remote arm64 cpu, as the emulator is too slow and can no longer
-    pass the `npm ci` command.
-  1. Add the public key to the remote server.
-  2. Add the remote context. The remote machine must be arm64 and installed
-     Docker CE.
-
-  ```bash
-  docker context create oracle-arm64-jp --docker "host=ssh://root@100.107.174.88"
-  ```
-
-  3. Create a new builder.
-
-     ```bash
-     docker buildx create --name kuma-builder --platform linux/amd64,linux/arm/v7
-     docker buildx use kuma-builder
-     docker buildx inspect --bootstrap
-     ```
-
-  4. Append the remote context to the builder.
-
-     ```bash
-     docker buildx create --append --name kuma-builder --platform linux/arm64 oracle-arm64-jp
-     ```
-
-  5. Verify the builder and check if the builder is using `kuma-builder`.
-     `docker buildx inspect kuma-builder docker buildx ls`
-
-  </p>
-  </details>
 
 - <details><summary><b>Release</b> (click to expand)</summary>
   <p>
@@ -511,11 +459,9 @@ We have a few procedures we follow. These are documented here:
   6. `git push`
   7. Publish the release note as `1.X.X`
   8. Press any key to continue
-  9. Deploy to the demo server: `npm run deploy-demo-server`
 
   These Items need to be checked:
-  - [ ] Check all tags is fine on
-        <https://hub.docker.com/r/louislam/uptime-kuma/tags>
+  - [ ] Check all tags are fine on our Docker registry
   - [ ] Try the Docker image with tag 1.X.X (Clean install / amd64 / arm64 /
         armv7)
   - [ ] Try clean installation with Node.js
@@ -531,27 +477,6 @@ We have a few procedures we follow. These are documented here:
   4. Wait until the `Press any key to continue`
   5. Publish the release note as `1.X.X-beta.X`
   6. Press any key to continue
-
-  </p>
-  </details>
-
-- <details><summary><b>Release Wiki</b> (click to expand)</summary>
-  <p>
-
-  **Setup Repo**
-
-  ```bash
-  git clone https://github.com/louislam/uptime-kuma-wiki.git
-  cd uptime-kuma-wiki
-  git remote add production https://github.com/louislam/uptime-kuma.wiki.git
-  ```
-
-  **Push to Production Wiki**
-
-  ```bash
-  git pull
-  git push production master
-  ```
 
   </p>
   </details>

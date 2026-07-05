@@ -1,4 +1,4 @@
-process.env.UPTIME_KUMA_HIDE_LOG = ["info_db", "info_server"].join(",");
+process.env.SUPERKUMA_HIDE_LOG = ["info_db", "info_server"].join(",");
 
 const { describe, test, before, after, beforeEach } = require("node:test");
 const assert = require("node:assert");
@@ -269,7 +269,11 @@ describe("Federation Agent Forwarder (F2)", () => {
         // but deliberately use a bogus token so verifyRemoteInstanceToken
         // rejects the request (401) -- the forwarder must swallow this too.
         await registerRemoteInstance(userID, "agent-wrong-token", "Agent Wrong Token");
-        await configureFederation(`http://127.0.0.1:${masterPort}`, "ri999999_totally-wrong-secret", "agent-wrong-token");
+        await configureFederation(
+            `http://127.0.0.1:${masterPort}`,
+            "ri999999_totally-wrong-secret",
+            "agent-wrong-token"
+        );
 
         const monitor = fakeMonitor(505, "Wrong Token Service", "http");
 

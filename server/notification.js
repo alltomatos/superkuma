@@ -1,5 +1,7 @@
 const { R } = require("redbean-node");
 const { log } = require("../src/util");
+const { requireResource } = require("./security/authz");
+const { teamIdLoader } = require("./security/team-id-loaders");
 const Alerta = require("./notification-providers/alerta");
 const AlertNow = require("./notification-providers/alertnow");
 const AliyunSms = require("./notification-providers/aliyun-sms");
@@ -242,12 +244,17 @@ class Notification {
      * @param {object} notification Notification to save
      * @param {?number} notificationID ID of notification to update
      * @param {number} userID ID of user who adds notification
+     * @param {object} actor The RBAC actor performing the save (optional; a
+     * no-op while enforcement is OFF -- ADR-0010 phase P3)
      * @returns {Promise<Bean>} Notification that was saved
      */
-    static async save(notification, notificationID, userID) {
+    static async save(notification, notificationID, userID, actor) {
         let bean;
 
         if (notificationID) {
+            if (actor) {
+                await requireResource(actor, "notification:manage", "notification", notificationID, teamIdLoader);
+            }
             bean = await R.findOne("notification", " id = ? AND user_id = ? ", [notificationID, userID]);
 
             if (!bean) {
@@ -278,9 +285,14 @@ class Notification {
      * Delete a notification
      * @param {number} notificationID ID of notification to delete
      * @param {number} userID ID of user who created notification
+     * @param {object} actor The RBAC actor performing the delete (optional; a
+     * no-op while enforcement is OFF -- ADR-0010 phase P3)
      * @returns {Promise<void>}
      */
-    static async delete(notificationID, userID) {
+    static async delete(notificationID, userID, actor) {
+        if (actor) {
+            await requireResource(actor, "notification:manage", "notification", notificationID, teamIdLoader);
+        }
         let bean = await R.findOne("notification", " id = ? AND user_id = ? ", [notificationID, userID]);
 
         if (!bean) {

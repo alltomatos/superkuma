@@ -3,7 +3,7 @@ const { R } = require("redbean-node");
 const Monitor = require("../model/monitor");
 const dayjs = require("dayjs");
 const { UP, DOWN, MAINTENANCE, flipStatus, log } = require("../../src/util");
-const { UptimeKumaServer } = require("../uptime-kuma-server");
+const { SuperKumaServer } = require("../superkuma-server");
 const { Prometheus } = require("../prometheus");
 const { UptimeCalculator } = require("../uptime-calculator");
 const { verifyRemoteInstanceToken } = require("../auth");
@@ -12,7 +12,7 @@ const { validate } = require("../validation");
 
 let router = express.Router();
 
-const server = UptimeKumaServer.getInstance();
+const server = SuperKumaServer.getInstance();
 let io = server.io;
 
 // Sensible defaults matching a regular push-type monitor created via the UI
@@ -77,13 +77,20 @@ async function findOrCreateMirroredMonitor(remoteInstance, agentMonitorId, name)
     bean.remote_instance_id = remoteInstance.id;
     bean.remote_monitor_id = agentMonitorId;
     bean.user_id = remoteInstance.user_id;
+    // ADR-0010 R7: without this, every mirrored monitor is born with
+    // team_id=NULL -- a cross-tenant-invisible orphan created on every single
+    // heartbeat from every agent, not just at migration time.
+    bean.team_id = remoteInstance.team_id;
     bean.active = true;
     bean.interval = DEFAULT_INTERVAL;
     bean.retryInterval = DEFAULT_RETRY_INTERVAL;
 
     await R.store(bean);
 
-    log.debug("federation", `Created mirrored monitor ${bean.id} for remote instance ${remoteInstance.id} (agentMonitorId=${agentMonitorId})`);
+    log.debug(
+        "federation",
+        `Created mirrored monitor ${bean.id} for remote instance ${remoteInstance.id} (agentMonitorId=${agentMonitorId})`
+    );
 
     return bean;
 }
@@ -172,9 +179,12 @@ router.post("/api/federation/heartbeat", async (request, response) => {
 
         await R.store(bean);
 
-        io.to(monitor.user_id).emit("heartbeat", bean.toJSON());
+        {
+            const { roomFor } = require("../security/rooms");
+            io.to(roomFor(monitor.user_id, monitor.team_id)).emit("heartbeat", bean.toJSON());
+        }
 
-        Monitor.sendStats(io, monitor.id, monitor.user_id);
+        Monitor.sendStats(io, monitor.id, monitor.user_id, monitor.team_id);
 
         try {
             new Prometheus(monitor, await monitor.getTags()).update(bean, undefined);

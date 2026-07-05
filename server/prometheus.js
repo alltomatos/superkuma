@@ -98,7 +98,7 @@ class Prometheus {
 
     /**
      * Sanitize a string to ensure it can be used as a Prometheus label or value.
-     * See https://github.com/louislam/uptime-kuma/pull/4704#issuecomment-2366524692
+     * See https://github.com/alltomatos/superkuma/pull/4704#issuecomment-2366524692
      * @param {string} text The text to sanitize
      * @returns {string} The sanitized text
      */

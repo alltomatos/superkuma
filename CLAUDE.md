@@ -1,13 +1,13 @@
-# Regras de Desenvolvimento — alltomatos/uptime-kuma
+# Regras de Desenvolvimento — alltomatos/superkuma
 
-> Fork privado do Uptime Kuma. Este arquivo define como humanos e agentes de código trabalham neste repo.
+> SuperKuma é um projeto independente de monitoramento self-hosted, com raízes no [Uptime Kuma](https://github.com/louislam/uptime-kuma) (créditos no README). Este arquivo define como humanos e agentes de código trabalham neste repo.
 > Governança do orchestrator: [`ORCHESTRATOR-ROADMAP.md`](ORCHESTRATOR-ROADMAP.md) · [`.claude/ESTADO_ORQUESTRATOR.md`](.claude/ESTADO_ORQUESTRATOR.md) · [`docs/agents/`](docs/agents).
 
 ---
 
 ## 1. Projeto
 
-Uptime Kuma — ferramenta self-hosted de monitoramento. Stack:
+SuperKuma — ferramenta self-hosted de monitoramento. Stack:
 
 - **Frontend:** Vue 3 + Vite (estado via mixins globais em `src/mixins/`, sem Vuex/Pinia).
 - **Backend:** Node.js (>= 20.4) + Express + Socket.io.
@@ -16,23 +16,23 @@ Uptime Kuma — ferramenta self-hosted de monitoramento. Stack:
 
 ### Mapa de arquitetura
 
-| Área | Caminho | Nota |
-|---|---|---|
-| Bootstrap backend | `server/server.js` | monólito (2k linhas) — evitar crescer |
-| Modelo de monitor | `server/model/monitor.js` | god-object (2k) — extrair ao mexer |
-| Tipos de monitor | `server/monitor-types/` | **padrão de plugin** — 1 tipo por arquivo |
-| Notificações | `server/notification-providers/` | **padrão de plugin** — 1 provider por arquivo |
-| Handlers socket | `server/socket-handlers/` | protegidos por `checkLogin(socket)` |
-| Rotas HTTP públicas | `server/routers/` | badges, push, status-page |
-| Agregação de uptime | `server/uptime-calculator.js` | janelas em memória + persistência `stat_*` |
-| Migrations | `db/knex_migrations/` | Knex é o caminho oficial (patches SQL legados = deprecados) |
-| Frontend | `src/pages/`, `src/components/`, `src/mixins/` | `EditMonitor.vue` é o maior (4k) |
+| Área                | Caminho                                        | Nota                                                        |
+| ------------------- | ---------------------------------------------- | ----------------------------------------------------------- |
+| Bootstrap backend   | `server/server.js`                             | monólito (2k linhas) — evitar crescer                       |
+| Modelo de monitor   | `server/model/monitor.js`                      | god-object (2k) — extrair ao mexer                          |
+| Tipos de monitor    | `server/monitor-types/`                        | **padrão de plugin** — 1 tipo por arquivo                   |
+| Notificações        | `server/notification-providers/`               | **padrão de plugin** — 1 provider por arquivo               |
+| Handlers socket     | `server/socket-handlers/`                      | protegidos por `checkLogin(socket)`                         |
+| Rotas HTTP públicas | `server/routers/`                              | badges, push, status-page                                   |
+| Agregação de uptime | `server/uptime-calculator.js`                  | janelas em memória + persistência `stat_*`                  |
+| Migrations          | `db/knex_migrations/`                          | Knex é o caminho oficial (patches SQL legados = deprecados) |
+| Frontend            | `src/pages/`, `src/components/`, `src/mixins/` | `EditMonitor.vue` é o maior (4k)                            |
 
 ---
 
-## 2. Política do fork
+## 2. Política do projeto
 
-- **Fork privado.** Nenhum PR gerado por agente vai para o upstream `louislam/uptime-kuma`.
+- **Projeto próprio.** `alltomatos/superkuma` segue seu próprio caminho — não enviamos PRs para o `louislam/uptime-kuma` original.
 - **Revisão obrigatória.** Toda mudança de código é entendida, revisada e **testada manualmente** antes de qualquer `push`. Não submeter código gerado + descrição de LLM sem revisar.
 - **Nunca** trabalhar direto no `master`: sempre branch. **Nunca** `git push --force` nem `git reset --hard` sem pedido explícito.
 
@@ -89,11 +89,11 @@ Definido por `.prettierrc.js` e `.eslintrc.js` — **rode `npm run fmt` antes de
 
 ## 7. Política de mudanças por Tier (orchestrator)
 
-| Tier | O que é | Autonomia |
-|---|---|---|
-| **T1** | lint, fmt, typo, docs simples | executa direto, loga no estado |
-| **T2** | testes, refactor localizado sem breaking change, ADRs | executa em lote sob rede de testes, reporta no fim |
-| **T3** | **schema de DB, autenticação, arquitetura macro, API pública** | **PARA e pede "Go" humano** |
+| Tier   | O que é                                                        | Autonomia                                          |
+| ------ | -------------------------------------------------------------- | -------------------------------------------------- |
+| **T1** | lint, fmt, typo, docs simples                                  | executa direto, loga no estado                     |
+| **T2** | testes, refactor localizado sem breaking change, ADRs          | executa em lote sob rede de testes, reporta no fim |
+| **T3** | **schema de DB, autenticação, arquitetura macro, API pública** | **PARA e pede "Go" humano**                        |
 
 Refactor pesado (>1 arquivo grande, mudança de esquema) → rodar em **git worktree isolada**. O estado da fila (DAG) vive em [`.claude/ESTADO_ORQUESTRATOR.md`](.claude/ESTADO_ORQUESTRATOR.md).
 

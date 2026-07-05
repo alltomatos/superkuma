@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   build:
-    if: github.repository == 'louislam/uptime-kuma'
+    if: github.repository == 'alltomatos/superkuma'
     name: Hello new contributor
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -24,9 +24,9 @@ jobs:
         with:
           pr-reactions: rocket
           pr-opened-msg: >
-            Hello and thanks for lending a paw to Uptime Kuma! 🐻👋
+            Hello and thanks for lending a paw to SuperKuma! 🐻👋
 
-            As this is your first contribution, please be sure to check out our [Pull Request guidelines](https://github.com/louislam/uptime-kuma/blob/master/CONTRIBUTING.md#can-i-create-a-pull-request-for-uptime-kuma).
+            As this is your first contribution, please be sure to check out our [Pull Request guidelines](https://github.com/alltomatos/superkuma/blob/master/CONTRIBUTING.md#can-i-create-a-pull-request-for-superkuma).
 
             In particular:
             - Mark your PR as Draft while you’re still making changes
@@ -34,7 +34,7 @@ jobs:
 
             If you have any design or process questions, feel free to ask them right here in this pull request - unclear documentation is a bug too.
           pr-merged-msg: >
-            @{fc-author} congrats on your first contribution to Uptime Kuma! 🐻
+            @{fc-author} congrats on your first contribution to SuperKuma! 🐻
 
             We hope you enjoy contributing to our project and look forward to seeing more of your work in the future!
-            If you want to see your contribution in action, please see our [nightly builds here](https://hub.docker.com/layers/louislam/uptime-kuma/nightly2).
+            If you want to see your contribution in action, please see our [nightly builds here](https://hub.docker.com/layers/alltomatos/superkuma/nightly2).

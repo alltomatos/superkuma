@@ -1,22 +1,22 @@
-# CONTEXT — Uptime Kuma (linguagem de domínio)
+# CONTEXT — SuperKuma (linguagem de domínio)
 
 > Glossário e modelo de domínio do projeto. Use estes termos (não sinônimos) em issues, refactors, testes e ADRs.
 > Decisões de arquitetura em [`docs/adr/`](docs/adr). Regras de dev em [`CLAUDE.md`](CLAUDE.md).
 
-Uptime Kuma é uma aplicação self-hosted de **monitoramento de disponibilidade**. O núcleo bate periodicamente em alvos, registra o resultado, agrega estatísticas e notifica em mudanças de estado.
+SuperKuma é uma aplicação self-hosted de **monitoramento de disponibilidade**. O núcleo bate periodicamente em alvos, registra o resultado, agrega estatísticas e notifica em mudanças de estado.
 
 ---
 
 ## Subdomínios (bounded contexts)
 
-| Subdomínio | Responsabilidade | Código |
-|---|---|---|
-| **Monitoring** | Definir e executar verificações | `server/model/monitor.js`, `server/monitor-types/` |
-| **Uptime Statistics** | Agregar heartbeats em métricas | `server/uptime-calculator.js`, tabelas `stat_*` |
-| **Notifications** | Entregar alertas em canais | `server/notification.js`, `server/notification-providers/` |
-| **Status Pages** | Exposição pública de status | `server/model/status_page.js`, `server/routers/` |
-| **Maintenance** | Janelas de manutenção agendadas | `server/model/maintenance.js` |
-| **Access & Config** | Usuários, sessão, chaves, ajustes | `server/auth.js`, `server/2fa.js`, `server/settings.js` |
+| Subdomínio            | Responsabilidade                  | Código                                                     |
+| --------------------- | --------------------------------- | ---------------------------------------------------------- |
+| **Monitoring**        | Definir e executar verificações   | `server/model/monitor.js`, `server/monitor-types/`         |
+| **Uptime Statistics** | Agregar heartbeats em métricas    | `server/uptime-calculator.js`, tabelas `stat_*`            |
+| **Notifications**     | Entregar alertas em canais        | `server/notification.js`, `server/notification-providers/` |
+| **Status Pages**      | Exposição pública de status       | `server/model/status_page.js`, `server/routers/`           |
+| **Maintenance**       | Janelas de manutenção agendadas   | `server/model/maintenance.js`                              |
+| **Access & Config**   | Usuários, sessão, chaves, ajustes | `server/auth.js`, `server/2fa.js`, `server/settings.js`    |
 
 ---
 
@@ -64,7 +64,7 @@ Uptime Kuma é uma aplicação self-hosted de **monitoramento de disponibilidade
 
 > Feature nova; design em [ADR-0008](docs/adr/0008-master-agent-federation.md) + [PRD](docs/prd/master-agent.md).
 
-- **Instância** — uma instalação do Uptime Kuma. Tem um **papel (role)**: `standalone` (default), `agent`, ou `master`.
+- **Instância** — uma instalação do SuperKuma. Tem um **papel (role)**: `standalone` (default), `agent`, ou `master`.
 - **Agent** — instância no cliente que monitora local e encaminha status ao Master.
 - **Master** — instância central (do provedor) que agrega o status de N Agents; pode também monitorar local (**híbrido**).
 - **`instance_id`** — identificador único de uma instância Agent perante o Master.

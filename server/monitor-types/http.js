@@ -1,6 +1,12 @@
 const { MonitorType } = require("./monitor-type");
 const { UP, evaluateJsonQuery, log } = require("../../src/util");
-const { checkCertificate, checkCertificateHostname, checkStatusCode, encodeBase64, axiosAbortSignal } = require("../util-server");
+const {
+    checkCertificate,
+    checkCertificateHostname,
+    checkStatusCode,
+    encodeBase64,
+    axiosAbortSignal,
+} = require("../util-server");
 const { R } = require("redbean-node");
 const { Proxy } = require("../proxy");
 const dayjs = require("dayjs");
@@ -47,8 +53,7 @@ class HttpMonitorType extends MonitorType {
                     monitor.oauthAccessToken = await monitor.makeOidcTokenClientCredentialsRequest();
                 }
                 oauth2AuthHeader = {
-                    Authorization:
-                        monitor.oauthAccessToken.token_type + " " + monitor.oauthAccessToken.access_token,
+                    Authorization: monitor.oauthAccessToken.token_type + " " + monitor.oauthAccessToken.access_token,
                 };
             } catch (e) {
                 throw new Error("The oauth config is invalid. " + e.message);
@@ -219,7 +224,7 @@ class HttpMonitorType extends MonitorType {
         }
 
         // eslint-disable-next-line eqeqeq
-        if (process.env.UPTIME_KUMA_LOG_RESPONSE_BODY_MONITOR_ID == monitor.id) {
+        if (process.env.SUPERKUMA_LOG_RESPONSE_BODY_MONITOR_ID == monitor.id) {
             log.info("monitor", res.data);
         }
 
@@ -243,12 +248,7 @@ class HttpMonitorType extends MonitorType {
                     data = data.substring(0, 47) + "...";
                 }
                 throw new Error(
-                    heartbeat.msg +
-                        ", but keyword is " +
-                        (keywordFound ? "present" : "not") +
-                        " in [" +
-                        data +
-                        "]"
+                    heartbeat.msg + ", but keyword is " + (keywordFound ? "present" : "not") + " in [" + data + "]"
                 );
             }
         } else if (monitor.type === "json-query") {

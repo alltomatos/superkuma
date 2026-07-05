@@ -10,8 +10,7 @@ permissions: {}
 
 jobs:
   build-docker-push:
-    # Only run on the original repository, not on forks
-    if: github.repository == 'louislam/uptime-kuma'
+    if: github.repository == 'alltomatos/superkuma'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
@@ -45,5 +44,5 @@ jobs:
         run: npm install -g cross-env
 
       - name: Build and push Docker image
-        working-directory: extra/uptime-kuma-push
+        working-directory: extra/superkuma-push
         run: npm run build-docker

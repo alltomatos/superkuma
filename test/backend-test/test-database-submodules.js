@@ -104,7 +104,7 @@ describe("database/legacy-patches.js: patchList structural integrity", () => {
     });
 
     test("every value is either boolean true, boolean false, or an object with a parents array", () => {
-        for (const [ key, value ] of entries) {
+        for (const [key, value] of entries) {
             const isBoolean = typeof value === "boolean";
             const isParentsShape =
                 typeof value === "object" &&
@@ -112,15 +112,12 @@ describe("database/legacy-patches.js: patchList structural integrity", () => {
                 Array.isArray(value.parents) &&
                 value.parents.every((p) => typeof p === "string");
 
-            assert.ok(
-                isBoolean || isParentsShape,
-                `Entry "${key}" has unexpected shape: ${JSON.stringify(value)}`
-            );
+            assert.ok(isBoolean || isParentsShape, `Entry "${key}" has unexpected shape: ${JSON.stringify(value)}`);
         }
     });
 
     test("every 'parents' reference points to a key that also exists in patchList", () => {
-        for (const [ key, value ] of entries) {
+        for (const [key, value] of entries) {
             if (typeof value === "object" && value !== null && Array.isArray(value.parents)) {
                 for (const parent of value.parents) {
                     assert.ok(
