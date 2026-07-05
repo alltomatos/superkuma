@@ -4,7 +4,7 @@
 
 # SuperKuma
 
-SuperKuma is an easy-to-use self-hosted monitoring tool, with built-in Master-Agent federation and multi-tenant Teams/RBAC for managing monitoring across multiple instances and teams.
+SuperKuma is an easy-to-use self-hosted monitoring tool, with built-in Master-Agent federation, multi-tenant Teams/RBAC, and a built-in **MCP server** that lets AI agents configure and manage your monitoring — across multiple instances and teams.
 
 <a target="_blank" href="https://github.com/alltomatos/superkuma"><img src="https://img.shields.io/github/stars/alltomatos/superkuma?style=flat" /></a> <a target="_blank" href="https://github.com/alltomatos/superkuma"><img src="https://img.shields.io/github/last-commit/alltomatos/superkuma" /></a>
 
@@ -14,9 +14,9 @@ SuperKuma is an easy-to-use self-hosted monitoring tool, with built-in Master-Ag
 
 - Monitoring uptime for HTTP(s) / TCP / HTTP(s) Keyword / HTTP(s) Json Query / Websocket / Ping / DNS Record / Push / Steam Game Server / Docker Containers
 - Fancy, Reactive, Fast UI/UX
-- Notifications via Telegram, Discord, Gotify, Slack, Pushover, Email (SMTP), and [90+ notification services, click here for the full list](https://github.com/alltomatos/superkuma/tree/master/src/components/notifications)
+- Notifications via Telegram, Discord, Gotify, Slack, Pushover, Email (SMTP), and [90+ notification services, click here for the full list](https://github.com/alltomatos/superkuma/tree/main/src/components/notifications)
 - 20-second intervals
-- [Multi Languages](https://github.com/alltomatos/superkuma/tree/master/src/lang)
+- [Multi Languages](https://github.com/alltomatos/superkuma/tree/main/src/lang)
 - Multiple status pages
 - Map status pages to specific domains
 - Ping chart
@@ -25,6 +25,8 @@ SuperKuma is an easy-to-use self-hosted monitoring tool, with built-in Master-Ag
 - 2FA support
 - Master-Agent federation for multi-instance monitoring
 - Long-term monthly metrics history
+- Multi-tenant **Teams** with granular **role-based access control (RBAC)**
+- Built-in **MCP server** — let an AI agent add/edit monitors, notifications, tags, status pages and maintenance ([docs](server/mcp/README.md))
 
 ## 🔧 How to Install
 
@@ -33,7 +35,7 @@ SuperKuma is an easy-to-use self-hosted monitoring tool, with built-in Master-Ag
 ```bash
 mkdir superkuma
 cd superkuma
-curl -o compose.yaml https://raw.githubusercontent.com/alltomatos/superkuma/master/compose.yaml
+curl -o compose.yaml https://raw.githubusercontent.com/alltomatos/superkuma/main/compose.yaml
 docker compose up -d
 ```
 
@@ -97,6 +99,15 @@ pm2 monit
 pm2 startup && pm2 save
 ```
 
+## 🤖 AI Agents (MCP)
+
+SuperKuma ships a built-in [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server, so an AI assistant can inspect and configure your instance — create/edit monitors, manage notifications, tags, status pages and maintenance windows — through a safe, gated set of tools.
+
+- **Read-only by default.** Writes and deletes are opt-in via environment variables; deletes also require a per-call confirmation.
+- **Authenticates with an API key** (no password), scoped by the same Teams/RBAC as the dashboard.
+
+See [`server/mcp/README.md`](server/mcp/README.md) for setup, and [ADR-0011](docs/adr/0011-mcp-server-for-agent-configuration.md) for the design.
+
 ## 🆕 What's Next?
 
 Requests/issues are assigned to upcoming milestones.
@@ -118,7 +129,7 @@ If you find SuperKuma useful, consider giving it a ⭐ — and if you'd like to 
 ### Create Pull Requests
 
 Pull requests are awesome.
-To keep reviews fast and effective, please make sure you've [read our pull request guidelines](https://github.com/alltomatos/superkuma/blob/master/CONTRIBUTING.md#can-i-create-a-pull-request-for-superkuma).
+To keep reviews fast and effective, please make sure you've [read our pull request guidelines](https://github.com/alltomatos/superkuma/blob/main/CONTRIBUTING.md#can-i-create-a-pull-request-for-superkuma).
 
 ### Test Beta Version
 
@@ -130,7 +141,7 @@ If you want to report a bug or request a new feature, feel free to open a [new i
 
 ### Translations
 
-If you want to translate SuperKuma into your language, please visit [the translations readme](https://github.com/alltomatos/superkuma/blob/master/src/lang/README.md).
+If you want to translate SuperKuma into your language, please visit [the translations readme](https://github.com/alltomatos/superkuma/blob/main/src/lang/README.md).
 
 ### Spelling & Grammar
 

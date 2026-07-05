@@ -26,7 +26,7 @@ jobs:
           pr-opened-msg: >
             Hello and thanks for lending a paw to SuperKuma! 🐻👋
 
-            As this is your first contribution, please be sure to check out our [Pull Request guidelines](https://github.com/alltomatos/superkuma/blob/master/CONTRIBUTING.md#can-i-create-a-pull-request-for-superkuma).
+            As this is your first contribution, please be sure to check out our [Pull Request guidelines](https://github.com/alltomatos/superkuma/blob/main/CONTRIBUTING.md#can-i-create-a-pull-request-for-superkuma).
 
             In particular:
             - Mark your PR as Draft while you’re still making changes
