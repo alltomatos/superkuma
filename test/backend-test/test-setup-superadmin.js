@@ -2,11 +2,12 @@ process.env.UPTIME_KUMA_HIDE_LOG = ["info_db", "info_server"].join(",");
 
 const { describe, test, before, after } = require("node:test");
 const assert = require("node:assert");
-const { spawn, execFileSync } = require("node:child_process");
+const { spawn } = require("node:child_process");
 const path = require("node:path");
 const fs = require("node:fs");
 const http = require("node:http");
 const ioClient = require("socket.io-client");
+const knex = require("knex");
 
 /**
  * The "setup" socket event is registered inline inside server.js's connection
@@ -125,21 +126,34 @@ describe("setup wizard grants the first user superadmin + Default Team owner (AD
             setTimeout(resolve, 5000);
         });
 
+        // Inspect the resulting sqlite file via a standalone knex connection --
+        // not the "sqlite3" CLI, which isn't installed on every CI runner (it
+        // ships on this developer's machine but not, e.g., GitHub's Windows
+        // images). @louislam/sqlite3 is already a project dependency.
+        const Dialect = require("knex/lib/dialects/sqlite3/index.js");
+        Dialect.prototype._driver = () => require("@louislam/sqlite3");
         const dbPath = path.join(DATA_DIR, "kuma.db");
+        const inspectDb = knex({
+            client: Dialect,
+            connection: { filename: dbPath },
+            useNullAsDefault: true,
+        });
 
-        const userRow = execFileSync("sqlite3", [dbPath, "SELECT username, is_superadmin FROM user;"])
-            .toString()
-            .trim();
-        assert.strictEqual(userRow, "setup-test-user|1", "the setup user must be flagged as superadmin");
+        try {
+            const user = await inspectDb("user").select("username", "is_superadmin").first();
+            assert.strictEqual(user.username, "setup-test-user");
+            assert.strictEqual(Boolean(user.is_superadmin), true, "the setup user must be flagged as superadmin");
 
-        const membershipRow = execFileSync("sqlite3", [
-            dbPath,
-            "SELECT t.slug, r.slug FROM team_user tu " +
-                "JOIN team t ON t.id = tu.team_id " +
-                "JOIN role r ON r.id = tu.role_id;",
-        ])
-            .toString()
-            .trim();
-        assert.strictEqual(membershipRow, "default|owner", "the setup user must own the Default Team");
+            const membership = await inspectDb("team_user as tu")
+                .join("team as t", "t.id", "tu.team_id")
+                .join("role as r", "r.id", "tu.role_id")
+                .select("t.slug as teamSlug", "r.slug as roleSlug")
+                .first();
+            assert.ok(membership, "the setup user must have a team_user membership row");
+            assert.strictEqual(membership.teamSlug, "default");
+            assert.strictEqual(membership.roleSlug, "owner", "the setup user must own the Default Team");
+        } finally {
+            await inspectDb.destroy();
+        }
     });
 });
