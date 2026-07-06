@@ -1,20 +1,19 @@
 /**
  * Bundled status-page themes.
  *
- * Each theme only sets CSS custom properties on `.status-page-root` (the
- * semantic contract StatusPage.vue exposes -- see its <style> block) plus,
- * occasionally, a couple of structural tweaks. Themes never hardcode
- * SuperKuma's internal class names directly, so they keep working across
- * upgrades even if internal markup changes -- unlike hand-written CSS that
- * targets `.shadow-box`/`.item` etc, which breaks the moment those rename.
+ * Each theme is just a preset of values for the semantic CSS variable
+ * contract StatusPageThemeCustomizer.vue exposes as structured controls (see
+ * build-css.js). Themes never hardcode SuperKuma's internal class names, so
+ * they keep working across upgrades even if internal markup changes --
+ * unlike hand-written CSS that targets `.shadow-box`/`.item` etc, which
+ * breaks the moment those rename.
  *
- * "Use this theme" writes `css` into the status page's existing customCSS
- * field (see ThemeGallery.vue) -- there is no separate schema/column for
- * this, so it works with the status page save flow as-is and the user can
- * still hand-edit the result afterwards.
+ * Picking a theme just loads its `vars` into the customizer's controls --
+ * from there it's no different from a manually-tweaked look, and the user
+ * can keep adjusting sliders/pickers on top of it.
  *
- * To add a theme: append an entry here. `id` must be unique and stable
- * (used as the marker in the generated CSS, see ThemeGallery.vue).
+ * To add a theme: append an entry here with a `vars` object using only keys
+ * from DEFAULT_VARS (see build-css.js). `id` must be unique.
  */
 
 export const statusPageThemes = [
@@ -23,56 +22,58 @@ export const statusPageThemes = [
         name: "Alta Densidade",
         description: "Menos espaço em branco, fonte menor -- cabe muito mais monitores na tela sem rolar.",
         swatch: ["#5cdd8b", "#dc3545", "#0d1117"],
-        css: `.status-page-root {
-    --sk-gap: 0.5rem;
-    --sk-card-padding: 4px 8px;
-    --sk-card-radius: 6px;
-    --sk-font-size-base: 0.85rem;
-}`,
+        vars: {
+            gap: "0.5rem",
+            cardPadding: "4px 8px",
+            cardRadius: "6px",
+            fontSizeBase: "0.85rem",
+        },
     },
     {
         id: "noc-dark",
         name: "NOC Escuro",
         description: "Fundo escuro fixo e cores de status bem saturadas -- feito para telão de sala de operação.",
         swatch: ["#22c55e", "#ef4444", "#0a0e14"],
-        css: `.status-page-root {
-    --sk-bg: #0a0e14;
-    --sk-text-color: #e6edf3;
-    --sk-card-padding: 10px 14px;
-    --sk-card-radius: 8px;
-    --sk-card-shadow: none;
-    --sk-font-size-base: 1.05rem;
-    --sk-color-up: #22c55e;
-    --sk-color-down: #ef4444;
-    --sk-color-pending: #f59e0b;
-    --sk-color-maintenance: #3b82f6;
-}`,
+        vars: {
+            bg: "#0a0e14",
+            textColor: "#e6edf3",
+            cardPadding: "10px 14px",
+            cardRadius: "8px",
+            cardShadow: "none",
+            fontSizeBase: "1.05rem",
+            colorUp: "#22c55e",
+            colorDown: "#ef4444",
+            colorPending: "#f59e0b",
+            colorMaintenance: "#3b82f6",
+        },
     },
     {
         id: "tv-wall",
         name: "Painel de TV",
-        description: "Fonte grande e bastante espaçamento -- pensado para ser lido de longe, num monitor na parede.",
+        description:
+            "Fonte grande, bastante espaçamento e colunas -- pensado para ser lido de longe, num monitor na parede.",
         swatch: ["#5cdd8b", "#dc3545", "#f8f9fa"],
-        css: `.status-page-root {
-    --sk-gap: 2rem;
-    --sk-card-padding: 16px 20px;
-    --sk-card-radius: 14px;
-    --sk-font-size-base: 1.3rem;
-}`,
+        vars: {
+            gap: "2rem",
+            cardPadding: "16px 20px",
+            cardRadius: "14px",
+            fontSizeBase: "1.3rem",
+            columns: "2",
+        },
     },
     {
         id: "minimal",
         name: "Minimalista",
         description: "Sem sombra, bordas finas, paleta neutra -- para embutir a página dentro de outro site.",
         swatch: ["#111827", "#6b7280", "#f3f4f6"],
-        css: `.status-page-root {
-    --sk-gap: 0.75rem;
-    --sk-card-padding: 8px 12px;
-    --sk-card-radius: 2px;
-    --sk-card-shadow: none;
-    --sk-color-up: #111827;
-    --sk-color-down: #6b7280;
-}`,
+        vars: {
+            gap: "0.75rem",
+            cardPadding: "8px 12px",
+            cardRadius: "2px",
+            cardShadow: "none",
+            colorUp: "#111827",
+            colorDown: "#6b7280",
+        },
     },
 ];
 
