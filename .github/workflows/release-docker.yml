@@ -7,13 +7,9 @@ name: Release Docker Image
 #   DOCKERHUB_USERNAME - the Docker Hub account/namespace (e.g. ronaldodavi)
 #   DOCKERHUB_TOKEN    - a Docker Hub access token with write scope
 #
-# amd64-only for now (see ADR-0012): this job runs on a self-hosted runner whose
-# Docker daemon is a nested dind sidecar, and QEMU/binfmt registration for arm64
-# emulation does not propagate into that nested daemon the way it does on a
-# plain host -- so cross-arch (arm64) builds hang waiting for an unsupported
-# platform. gnr-kvm's hardware is amd64, so amd64-only builds natively without
-# needing emulation at all. Re-add arm64 if/when that's solved (or by building
-# it on a real arm64 runner instead of QEMU emulation).
+# amd64-only for now (see ADR-0012): arm64/QEMU support on the self-hosted
+# runner hasn't been tried yet. Re-add multi-arch once that's verified (or by
+# building arm64 on a real arm64 runner instead of QEMU emulation).
 
 on:
   push:
@@ -33,12 +29,13 @@ env:
 jobs:
   release-docker:
     if: github.repository == 'alltomatos/superkuma'
-    # Self-hosted runner (isolated Docker container + dind sidecar on gnr-kvm,
-    # see docs/self-hosted-runner.md). Only THIS maintainer/tag-triggered
-    # workflow is routed here -- PR-triggered workflows (Auto Test, etc.) stay
-    # on GitHub-hosted runners so untrusted contributor code never executes on
+    # Self-hosted runner on omniroute, the org's dedicated CI host (see
+    # ADR-0012) -- registered specifically against this repo, so it only ever
+    # runs superkuma jobs. Only THIS maintainer/tag-triggered workflow is
+    # routed here -- PR-triggered workflows (Auto Test, etc.) stay on
+    # GitHub-hosted runners so untrusted contributor code never executes on
     # our infrastructure.
-    runs-on: [self-hosted, gnr-docker]
+    runs-on: [self-hosted, omniroute]
     timeout-minutes: 120
     permissions:
       contents: read
