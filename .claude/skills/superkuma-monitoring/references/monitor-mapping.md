@@ -6,25 +6,26 @@ How to turn each discovered asset/service into `create_monitor` calls. Defaults:
 
 ## Service → monitor type
 
-| Discovered service                             | Monitor type                                               | Key fields                                                                                                             |
-| ---------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Host reachability (any device)                 | `ping`                                                     | `hostname`                                                                                                             |
-| Web app / admin UI (HTTP/S)                    | `http`                                                     | `url`; `acceptedStatusCodes: ["200-299"]`; `ignoreTls: true` for self-signed; `expiryNotification: true` on public TLS |
-| Page must contain text                         | `keyword`                                                  | `url`, `keyword` (or `invertKeyword: true`)                                                                            |
-| JSON/health endpoint                           | `json-query`                                               | `url`, `jsonPath`, `expectedValue`                                                                                     |
-| Generic TCP service (SSH/RDP/LDAP/SMTP/VPN)    | `port`                                                     | `hostname`, `port`                                                                                                     |
-| DNS server                                     | `dns`                                                      | `hostname`, `port: 53`, `dns_resolve_type: "A"`, a known record in `keyword`/`url`                                     |
-| Databases (PostgreSQL/MySQL/MSSQL/Mongo/Redis) | `postgres`/`mysql`/`sqlserver`/`mongodb`/`redis` or `port` | connection string, or just `port` for reachability                                                                     |
-| SNMP device (switch/router/UPS)                | `snmp`                                                     | `hostname`, `snmpVersion`, `snmpOid`, community                                                                        |
-| Docker container                               | `docker`                                                   | container name + a configured Docker host in SuperKuma                                                                 |
-| Push-only host (agent behind NAT)              | `push`                                                     | host runs a cron that pings the generated push URL                                                                     |
-| Host metrics (CPU/RAM/disk I/O, SQL Server)    | `prometheus`                                               | `url` (Prometheus), `promql`, `conditionOperator`, `expectedValue` — see below                                         |
-| Certificate expiry                             | `http`                                                     | `expiryNotification: true` (fires ahead of expiry)                                                                     |
+| Discovered service                             | Monitor type                                               | Key fields                                                                                                                            |
+| ---------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Host reachability (any device)                 | `ping`                                                     | `hostname`                                                                                                                            |
+| Web app / admin UI (HTTP/S)                    | `http`                                                     | `url`; `acceptedStatusCodes: ["200-299"]`; `ignoreTls: true` for self-signed; `expiryNotification: true` on public TLS                |
+| Page must contain text                         | `keyword`                                                  | `url`, `keyword` (or `invertKeyword: true`)                                                                                           |
+| JSON/health endpoint                           | `json-query`                                               | `url`, `jsonPath`, `expectedValue`                                                                                                    |
+| Generic TCP service (SSH/RDP/LDAP/SMTP/VPN)    | `port`                                                     | `hostname`, `port`                                                                                                                    |
+| DNS server                                     | `dns`                                                      | `hostname` = the **record to resolve** (e.g. a domain), `dns_resolve_server` = the DNS server IP, `port: 53`, `dns_resolve_type: "A"` |
+| Databases (PostgreSQL/MySQL/MSSQL/Mongo/Redis) | `postgres`/`mysql`/`sqlserver`/`mongodb`/`redis` or `port` | connection string, or just `port` for reachability                                                                                    |
+| SNMP device (switch/router/UPS)                | `snmp`                                                     | `hostname`, `snmpVersion`, `snmpOid`, community                                                                                       |
+| Docker container                               | `docker`                                                   | container name + a configured Docker host in SuperKuma                                                                                |
+| Push-only host (agent behind NAT)              | `push`                                                     | host runs a cron that pings the generated push URL                                                                                    |
+| Host metrics (CPU/RAM/disk I/O, SQL Server)    | `prometheus`                                               | `url` (Prometheus), `promql`, `conditionOperator`, `expectedValue` — see below                                                        |
+| Certificate expiry                             | `http`                                                     | `expiryNotification: true` (fires ahead of expiry)                                                                                    |
 
 ## Per-platform recipe
 
-- **Domain controller:** `ping`; `port` 389/636/88/3268; `dns` resolving a known A record. Tag
-  `role:dc`, `criticality:critical`.
+- **Domain controller:** `ping`; `port` 389/636/88/3268; `dns` with `dns_resolve_server` set to
+  the DC's IP and `hostname` set to a known domain record (e.g. the AD domain name itself) to
+  confirm the DC actually resolves it. Tag `role:dc`, `criticality:critical`.
 - **Proxmox node:** `ping`; `http` `https://node:8006` (`ignoreTls: true`); `port` 22. Guests →
   `ping` (+ service ports for important VMs).
 - **Linux server:** `ping`; `port` 22; one monitor per listening service (80/443 → `http`, DB
@@ -114,6 +115,13 @@ self-signed TLS. The query must return a single number — add label filters lik
 // Domain controller — LDAPS reachability, critical
 { "type": "port", "name": "dc01 — LDAPS", "hostname": "10.0.0.10", "port": 636,
   "interval": 60, "maxretries": 2, "parent": <hqGroupId>, "notificationIds": [<notifId>] }
+
+// Domain controller — DNS resolution check. NOTE: hostname is the RECORD being
+// resolved, dns_resolve_server is the DNS SERVER being queried — do not swap
+// them (verified against server/monitor-types/dns.js; a wrong assumption here
+// was caught during a real deployment).
+{ "type": "dns", "name": "dc01 — DNS", "hostname": "corp.local", "dns_resolve_server": "10.0.0.10",
+  "port": 53, "dns_resolve_type": "A", "parent": <hqGroupId> }
 
 // Proxmox node web UI (self-signed TLS)
 { "type": "http", "name": "pve01 — web", "url": "https://10.0.0.20:8006",

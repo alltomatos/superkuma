@@ -36,11 +36,35 @@ Get-DnsServerResourceRecord -ZoneName "corp.local" -RRType A |
   Select HostName, @{n='IP';e={$_.RecordData.IPv4Address}}
 ```
 
-If no Windows host is available, query LDAP read-only:
-`ldapsearch -x -H ldap://dc.corp.local -b "dc=corp,dc=local" "(objectClass=computer)" name dNSHostName`.
+If no Windows host is available, query LDAP read-only from any Linux box (install
+`openldap-clients`/`ldap-utils` if missing). Many DCs (Windows AD **and** Samba-based AD, which
+this skill has been used against in the field) reject unencrypted simple binds — use **LDAPS**
+(port 636) rather than plain `ldap://`, and disable cert validation for a self-signed AD cert:
+
+```bash
+# RootDSE (often readable anonymously) — confirms the real base DN before you guess it
+LDAPTLS_REQCERT=never ldapsearch -x -H ldaps://dc.corp.local -b "" -s base "(objectClass=*)" defaultNamingContext
+
+# Authenticated query (UPN bind format; NetBIOS DOMAIN\user is a fallback to try).
+# Pass the password via -y <file> (chmod 600, delete right after) instead of -w on the
+# command line, to avoid it showing up in `ps`. If a bind fails, STOP after 2-3 tries —
+# don't brute-force formats, AD lockout policies can lock the account.
+LDAPTLS_REQCERT=never ldapsearch -x -H ldaps://dc.corp.local \
+  -D "readonly-user@corp.local" -y /tmp/.ldappw \
+  -b "dc=corp,dc=local" "(objectClass=computer)" dNSHostName operatingSystem
+```
+
+Cross-reference `dNSHostName` results against DNS (`dig +short @dc.corp.local <name> A`) and then
+against **ARP** (`arp -n` after a ping) — a computer object existing in AD does not mean the host
+is live. In the field, several AD-registered servers turned out to have stale/incomplete ARP
+entries (decommissioned or re-IP'd machines); don't create monitors for them without confirming
+with the client, or they'll sit permanently DOWN.
 
 **Monitor on each DC:** `ping`; `port` 389 (LDAP), 636 (LDAPS), 88 (Kerberos), 3268 (GC), 53
-(DNS), 445; `dns` (resolve a known record). Flag DCs as **critical**.
+(DNS), 445; `dns` with `dns_resolve_server` = the DC's IP and `hostname` = a known record (e.g.
+the domain itself) — see
+[monitor-mapping.md](monitor-mapping.md#service--monitor-type) for the exact field mapping (easy
+to get backwards). Flag DCs as **critical**.
 
 ## 2. Proxmox VE
 
