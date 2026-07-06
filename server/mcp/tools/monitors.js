@@ -5,7 +5,9 @@ const { MONITOR_DEFAULTS, buildMonitorPayload, summarizeMonitor } = require("../
 const TYPE_HELP =
     "Monitor type. Common values: http, port, ping, dns, keyword, json-query, push, docker, group, " +
     "grpc-keyword, steam, gamedig, mqtt, postgres, mysql, mongodb, redis, sqlserver, radius, snmp, " +
-    "real-browser, kafka-producer, rabbitmq, tailscale-ping. The server validates the type.";
+    "prometheus, real-browser, kafka-producer, rabbitmq, tailscale-ping. The server validates the type.";
+
+const CONDITION_OPERATORS = [">", ">=", "<", "<=", "==", "!=", "contains"];
 
 /**
  * Zod raw shape shared by create/update, minus the identity/type fields which
@@ -54,6 +56,20 @@ const commonMonitorShape = {
     notificationIds: z.array(z.number().int()).optional().describe("IDs of notifications to attach to this monitor"),
     parent: z.number().int().nullable().optional().describe("Parent group monitor ID, or null for a top-level monitor"),
     description: z.string().optional().describe("Free-text description"),
+    // prometheus type (also: url = Prometheus base URL, ignoreTls, bearerToken)
+    promql: z
+        .string()
+        .optional()
+        .describe("PromQL instant query returning a single number (prometheus type), e.g. 'node_load1'"),
+    conditionOperator: z
+        .enum(CONDITION_OPERATORS)
+        .optional()
+        .describe("Threshold operator for prometheus/snmp/json-query (>, >=, <, <=, ==, !=, contains)"),
+    expectedValue: z
+        .string()
+        .optional()
+        .describe("Value the query result is compared against, for the conditionOperator"),
+    bearerToken: z.string().optional().describe("Optional Bearer token for auth (http/prometheus types)"),
 };
 
 /**

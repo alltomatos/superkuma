@@ -369,6 +369,31 @@ describe("MCP tool behaviour", () => {
         assert.strictEqual(notification.telegramBotToken, "T");
         assert.strictEqual(call.args[1], null, "notificationID is null for create");
     });
+
+    test("create_monitor maps prometheus fields onto the reused columns", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        client.responses.add = { ok: true, monitorID: 11 };
+        registerAllTools(server, client, fullConfig);
+
+        await server.call("create_monitor", {
+            type: "prometheus",
+            name: "node01 CPU",
+            url: "http://prometheus:9090",
+            promql: "100 - avg(rate(node_cpu_seconds_total[5m]))*100",
+            conditionOperator: ">",
+            expectedValue: "90",
+            bearerToken: "tok",
+        });
+
+        const payload = lastCall(client, "add").args[0];
+        assert.strictEqual(payload.type, "prometheus");
+        assert.strictEqual(payload.url, "http://prometheus:9090");
+        assert.strictEqual(payload.databaseQuery, "100 - avg(rate(node_cpu_seconds_total[5m]))*100");
+        assert.strictEqual(payload.jsonPathOperator, ">");
+        assert.strictEqual(payload.expectedValue, "90");
+        assert.strictEqual(payload.bearer_token, "tok");
+    });
 });
 
 describe("MCP config gates", () => {

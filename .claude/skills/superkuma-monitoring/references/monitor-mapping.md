@@ -18,6 +18,7 @@ How to turn each discovered asset/service into `create_monitor` calls. Defaults:
 | SNMP device (switch/router/UPS)                | `snmp`                                                     | `hostname`, `snmpVersion`, `snmpOid`, community                                                                        |
 | Docker container                               | `docker`                                                   | container name + a configured Docker host in SuperKuma                                                                 |
 | Push-only host (agent behind NAT)              | `push`                                                     | host runs a cron that pings the generated push URL                                                                     |
+| Host metrics (CPU/RAM/disk I/O, SQL Server)    | `prometheus`                                               | `url` (Prometheus), `promql`, `conditionOperator`, `expectedValue` — see below                                         |
 | Certificate expiry                             | `http`                                                     | `expiryNotification: true` (fires ahead of expiry)                                                                     |
 
 ## Per-platform recipe
@@ -74,6 +75,37 @@ always `snmpwalk` the sensor subtree first to find the exact index, then monitor
 // Temperature threshold via ENTITY-SENSOR-MIB — UP while sensor < 60
 { "type": "snmp", "name": "esxi01 — inlet temp", "hostname": "10.0.0.30", "snmpVersion": "2c",
   "snmpOid": "1.3.6.1.2.1.99.1.1.1.4.<idx>", "jsonPath": "$", "jsonPathOperator": "<", "expectedValue": "60" }
+```
+
+## Deep host metrics via Prometheus (CPU/RAM/disk I/O, SQL Server)
+
+SuperKuma is an uptime/status monitor, but the **`prometheus`** monitor type lets it alert on the
+rich metrics a Prometheus already collects — it runs a PromQL instant query and compares the
+returned number against a threshold. Point it at a Prometheus fed by `node_exporter` (Linux),
+`windows_exporter` (Windows) and `mssql_exporter` (SQL Server); SuperKuma queries the Prometheus
+HTTP API, so **no agent is needed on each host**.
+
+Fields: `url` = Prometheus base URL, `promql` = the query, `conditionOperator` + `expectedValue`
+= the threshold (the monitor is DOWN when it crosses). Optional `bearerToken`; `ignoreTls` for
+self-signed TLS. The query must return a single number — add label filters like
+`{instance="10.0.0.10:9100"}` so it resolves to one series per monitor.
+
+| Metric               | PromQL                                                                           | DOWN when |
+| -------------------- | -------------------------------------------------------------------------------- | --------- |
+| CPU % (Linux)        | `100 - avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m]))*100`      | `>` `90`  |
+| CPU % (Windows)      | `100 - avg by(instance)(rate(windows_cpu_time_total{mode="idle"}[5m]))*100`      | `>` `90`  |
+| Free RAM % (Linux)   | `node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100`              | `<` `10`  |
+| Free RAM % (Windows) | `windows_os_physical_memory_free_bytes / windows_cs_physical_memory_bytes * 100` | `<` `10`  |
+| Free disk %          | `node_filesystem_avail_bytes / node_filesystem_size_bytes * 100`                 | `<` `10`  |
+| Disk I/O saturation  | `rate(node_disk_io_time_seconds_total[5m])`                                      | `>` `0.9` |
+| SQL Server up        | `mssql_up`                                                                       | `!=` `1`  |
+| SQL Server deadlocks | `rate(mssql_deadlocks[5m])`                                                      | `>` `0`   |
+
+```jsonc
+// CPU alert via Prometheus — DOWN when CPU > 90%
+{ "type": "prometheus", "name": "node01 — CPU", "url": "http://prometheus:9090",
+  "promql": "100 - avg by(instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))*100",
+  "conditionOperator": ">", "expectedValue": "90", "parent": <hqGroupId> }
 ```
 
 ## Example payloads
