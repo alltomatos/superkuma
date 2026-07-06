@@ -47,6 +47,14 @@ para o `release-docker.yml` via `runs-on: [self-hosted, gnr-docker]`.
   `online`, renovar registro se o container for recriado do zero).
 - (−) Ponto único: se o gnr-kvm cair, o release Docker fica bloqueado até o runner voltar (mesmo
   risco que qualquer self-hosted runner sem redundância).
+- (−) **Perdemos multi-arch (arm64) por ora.** O dind aninhado não propaga o registro
+  QEMU/`binfmt_misc` da mesma forma que um host normal — o worker do buildx dentro do dind só
+  reporta suporte a `linux/amd64`, e um build `--platform linux/amd64,linux/arm64` trava esperando
+  a perna arm64 que nunca resolve. Como o hardware do gnr-kvm já é amd64, o
+  `release-docker.yml` builda **só `linux/amd64`** por enquanto (nativo, sem emulação, rápido e
+  confiável). Retomar arm64 exigiria registrar `binfmt_misc` direto no host (fora de qualquer
+  container) e validar a propagação pro dind, ou usar um runner arm64 de verdade em vez de
+  emulação — deixado como débito técnico documentado, não resolvido nesta decisão.
 
 ## Alternativas consideradas
 

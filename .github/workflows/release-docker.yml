@@ -1,11 +1,19 @@
 name: Release Docker Image
 
-# Builds the self-contained Dockerfile (repo root) and pushes a multi-arch image
-# to Docker Hub. Runs on a version tag push (e.g. v2.4.0) or a manual dispatch.
+# Builds the self-contained Dockerfile (repo root) and pushes it to Docker Hub.
+# Runs on a version tag push (e.g. v2.4.0) or a manual dispatch.
 #
 # Requires two repository secrets:
 #   DOCKERHUB_USERNAME - the Docker Hub account/namespace (e.g. ronaldodavi)
 #   DOCKERHUB_TOKEN    - a Docker Hub access token with write scope
+#
+# amd64-only for now (see ADR-0012): this job runs on a self-hosted runner whose
+# Docker daemon is a nested dind sidecar, and QEMU/binfmt registration for arm64
+# emulation does not propagate into that nested daemon the way it does on a
+# plain host -- so cross-arch (arm64) builds hang waiting for an unsupported
+# platform. gnr-kvm's hardware is amd64, so amd64-only builds natively without
+# needing emulation at all. Re-add arm64 if/when that's solved (or by building
+# it on a real arm64 runner instead of QEMU emulation).
 
 on:
   push:
@@ -50,9 +58,6 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "major=${VERSION%%.*}" >> "$GITHUB_OUTPUT"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
 
@@ -62,13 +67,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push (multi-arch)
+      - name: Build and push (amd64)
         env:
           VERSION: ${{ steps.version.outputs.version }}
           MAJOR: ${{ steps.version.outputs.major }}
         run: |
           docker buildx build \
-            --platform linux/amd64,linux/arm64 \
+            --platform linux/amd64 \
             --file Dockerfile \
             --tag "${IMAGE}:${VERSION}" \
             --tag "${IMAGE}:${MAJOR}" \
