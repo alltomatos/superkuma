@@ -58,8 +58,11 @@ pass what changes. `delete_*` is a dry-run unless `confirm: true`.
 Common fields:
 
 - `type` — `http`, `port`, `ping`, `dns`, `keyword`, `json-query`, `push`, `docker`, `group`,
-  `snmp`, `steam`, `mqtt`, `postgres`, `mysql`, `mongodb`, `redis`, `sqlserver`, `radius`,
-  `real-browser`, `grpc-keyword`, `tailscale-ping`, `rabbitmq`.
+  `snmp`, `prometheus`, `steam`, `mqtt`, `postgres`, `mysql`, `mongodb`, `redis`, `sqlserver`,
+  `radius`, `real-browser`, `grpc-keyword`, `tailscale-ping`, `rabbitmq`.
+- `prometheus` type: `url` (Prometheus base URL), `promql` (query returning one number),
+  `conditionOperator` (`>`,`>=`,`<`,`<=`,`==`,`!=`,`contains`) + `expectedValue` (the threshold),
+  optional `bearerToken` / `ignoreTls`. See [monitor-mapping.md](monitor-mapping.md#deep-host-metrics-via-prometheus-cpuramdisk-io-sql-server).
 - `url` (http/keyword/json-query), `hostname` + `port` (port/dns/snmp/db types).
 - `interval` (s, ≥20), `retryInterval`, `maxretries`, `upsideDown`.
 - `keyword` + `invertKeyword` (keyword type); `acceptedStatusCodes` e.g. `["200-299"]` (http).

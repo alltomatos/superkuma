@@ -100,6 +100,7 @@ const DIRECT_FIELDS = [
     "dns_resolve_type",
     "dns_resolve_server",
     "active",
+    "expectedValue",
 ];
 
 /**
@@ -142,6 +143,20 @@ function buildMonitorPayload(base, input) {
             map[id] = true;
         }
         monitor.notificationIDList = map;
+    }
+
+    // Prometheus monitor type: the PromQL goes in databaseQuery, the threshold
+    // in jsonPathOperator/expectedValue (reused columns), optional bearer auth.
+    if (input.promql !== undefined) {
+        monitor.databaseQuery = input.promql;
+    }
+
+    if (input.conditionOperator !== undefined) {
+        monitor.jsonPathOperator = input.conditionOperator;
+    }
+
+    if (input.bearerToken !== undefined) {
+        monitor.bearer_token = input.bearerToken;
     }
 
     return monitor;

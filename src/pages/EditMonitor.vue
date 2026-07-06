@@ -85,6 +85,7 @@
                                         <option v-if="!$root.info.isContainer" value="sip-options">
                                             SIP Options Ping
                                         </option>
+                                        <option value="prometheus">Prometheus (PromQL)</option>
                                         <option value="smtp">SMTP</option>
                                         <option value="snmp">SNMP</option>
                                         <option v-if="!$root.info.isContainer" value="tailscale-ping">
@@ -716,6 +717,53 @@
                                 />
                             </div>
 
+                            <!-- Prometheus Monitor Type -->
+                            <template v-if="monitor.type === 'prometheus'">
+                                <div class="my-3">
+                                    <label for="prometheus_url" class="form-label">Prometheus URL</label>
+                                    <input
+                                        id="prometheus_url"
+                                        v-model="monitor.url"
+                                        type="url"
+                                        class="form-control"
+                                        placeholder="http://prometheus:9090"
+                                        required
+                                    />
+                                    <div class="form-text">
+                                        Base URL of the Prometheus server (the /api/v1/query endpoint is appended
+                                        automatically).
+                                    </div>
+                                </div>
+
+                                <div class="my-3">
+                                    <label for="prometheus_query" class="form-label">PromQL Query</label>
+                                    <textarea
+                                        id="prometheus_query"
+                                        v-model="monitor.databaseQuery"
+                                        class="form-control"
+                                        rows="3"
+                                        placeholder="node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100"
+                                        required
+                                    ></textarea>
+                                    <div class="form-text">
+                                        An instant query that returns a single number (scalar or single-series vector).
+                                        The value is compared against the condition below.
+                                    </div>
+                                </div>
+
+                                <div class="my-3 form-check">
+                                    <input
+                                        id="prometheus_ignore_tls"
+                                        v-model="monitor.ignoreTls"
+                                        class="form-check-input"
+                                        type="checkbox"
+                                    />
+                                    <label class="form-check-label" for="prometheus_ignore_tls">
+                                        Ignore TLS/SSL error for HTTPS
+                                    </label>
+                                </div>
+                            </template>
+
                             <div v-if="monitor.type === 'smtp'" class="my-3">
                                 <label for="smtp_security" class="form-label">{{ $t("SMTP Security") }}</label>
                                 <select id="smtp_security" v-model="monitor.smtpSecurity" class="form-select">
@@ -780,8 +828,15 @@
 
                             <!-- Json Query -->
                             <!-- For Json Query / SNMP -->
-                            <div v-if="monitor.type === 'json-query' || monitor.type === 'snmp'" class="my-3">
-                                <div class="my-2">
+                            <div
+                                v-if="
+                                    monitor.type === 'json-query' ||
+                                        monitor.type === 'snmp' ||
+                                        monitor.type === 'prometheus'
+                                "
+                                class="my-3"
+                            >
+                                <div v-if="monitor.type !== 'prometheus'" class="my-2">
                                     <label for="jsonPath" class="form-label mb-0">
                                         {{ $t("Json Query Expression") }}
                                     </label>
