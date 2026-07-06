@@ -1,0 +1,48 @@
+name: Auto Release on Main
+
+# Runs on every push to main (i.e. every promotion-PR merge). If package.json's
+# version isn't tagged yet, creates the tag + a GitHub Release with
+# auto-generated notes (compiled from merged PRs since the last release).
+# Pushing the tag itself triggers release-docker.yml (tag-triggered), which
+# builds and publishes the Docker Hub image -- so bumping the version in a PR
+# is the only manual step; tag, changelog and image publish all follow
+# automatically once that PR reaches main.
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  auto-tag:
+    if: github.repository == 'alltomatos/superkuma'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Tag and release if package.json version is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+
+          if git rev-parse "${TAG}" >/dev/null 2>&1; then
+            echo "${TAG} already exists -- nothing to release."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "${TAG}"
+          git push origin "${TAG}"
+
+          gh release create "${TAG}" --title "${TAG}" --generate-notes
