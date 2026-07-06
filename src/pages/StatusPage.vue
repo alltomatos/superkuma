@@ -68,7 +68,7 @@
                 <div class="my-3">
                     <div class="mb-1">{{ $t("Theme Gallery") }}</div>
                     <div class="form-text mb-2">{{ $t("themeGalleryDescription") }}</div>
-                    <ThemeGallery v-model="config.customCSS" />
+                    <StatusPageThemeCustomizer v-model="config.customCSS" />
                 </div>
 
                 <div class="my-3 form-check form-switch">
@@ -640,7 +640,7 @@ import {
     MAINTENANCE,
 } from "../util.ts";
 import Tag from "../components/Tag.vue";
-import ThemeGallery from "../components/ThemeGallery.vue";
+import StatusPageThemeCustomizer from "../components/StatusPageThemeCustomizer.vue";
 import VueMultiselect from "vue-multiselect";
 
 const toast = useToast();
@@ -663,7 +663,7 @@ export default {
         PrismEditor,
         MaintenanceTime,
         Tag,
-        ThemeGallery,
+        StatusPageThemeCustomizer,
         VueMultiselect,
         IncidentHistory,
         IncidentManageModal,
@@ -1504,7 +1504,7 @@ export default {
 
 <!--
     Semantic theming contract for status-page themes (see src/statuspage-themes/
-    and ThemeGallery.vue). Themes only ever set these custom properties -- never
+    and StatusPageThemeCustomizer.vue). Themes only ever set these custom properties -- never
     SuperKuma's internal class names -- so they keep working across upgrades.
     Defaults below match the page's pre-existing look, so nothing changes
     visually until a theme is applied.
@@ -1530,6 +1530,7 @@ export default {
     --sk-bg: transparent;
     --sk-text-color: inherit;
     --sk-font-size-base: 1rem;
+    --sk-columns: 1;
     --sk-color-up: #{$primary};
     --sk-color-down: #{$danger};
     --sk-color-pending: #{$warning};
