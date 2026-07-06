@@ -74,6 +74,58 @@ function registerStatusPageTools(server, client, config) {
     });
 
     registerTool(server, config, {
+        name: "save_status_page",
+        title: "Save status page layout",
+        description:
+            "Configure a status page's title/description and its groups of monitors. 'groups' fully REPLACES the current layout (like editing groups in the dashboard and hitting Save) -- always pass every group you want to keep, in the order you want them shown. Existing groups not included are removed (their monitors are just unlisted from the page, not deleted). Requires the page to already exist (create_status_page first).",
+        mutation: true,
+        inputSchema: {
+            slug: z.string().min(1).describe("Status page slug"),
+            title: z.string().min(1).optional().describe("Status page title"),
+            description: z.string().optional().describe("Status page description"),
+            groups: z
+                .array(
+                    z.object({
+                        name: z.string().min(1).describe("Section heading, e.g. 'Domain Controllers'"),
+                        monitorIds: z
+                            .array(z.number().int())
+                            .describe("Monitor ids to list in this section, in display order"),
+                    })
+                )
+                .describe("The complete list of sections and their monitors, top to bottom"),
+        },
+        handler: async (args) => {
+            const current = await client.request("getStatusPage", args.slug);
+            if (!current || !current.config) {
+                throw new Error(`Status page "${args.slug}" not found. Create it first with create_status_page.`);
+            }
+            const cfg = current.config;
+
+            const mergedConfig = {
+                ...cfg,
+                title: args.title !== undefined ? args.title : cfg.title,
+                description: args.description !== undefined ? args.description : cfg.description,
+            };
+
+            const publicGroupList = args.groups.map((g) => ({
+                name: g.name,
+                monitorList: g.monitorIds.map((id) => ({ id })),
+            }));
+
+            // Preserve the existing logo: saveStatusPage treats a non-"data:" imgDataUrl as a
+            // pass-through URL, so re-submitting the current icon leaves it unchanged.
+            const imgDataUrl = cfg.icon || "";
+
+            await client.request("saveStatusPage", args.slug, mergedConfig, imgDataUrl, publicGroupList);
+
+            return {
+                ok: true,
+                message: `Saved status page "${args.slug}" with ${publicGroupList.length} group(s).`,
+            };
+        },
+    });
+
+    registerTool(server, config, {
         name: "post_incident",
         title: "Post status-page incident",
         description: "Post (or pin) an incident on a status page.",

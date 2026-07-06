@@ -2,7 +2,7 @@
 
 An [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server that lets an
 AI agent inspect and configure a running SuperKuma instance — **monitors, notifications,
-tags, status pages and maintenance windows** — through a safe, gated set of **33 tools**.
+tags, status pages and maintenance windows** — through a safe, gated set of **34 tools**.
 
 It runs in two ways: as a local **stdio** process, or as a **remote HTTP endpoint** hosted
 by the instance itself. Design rationale: [ADR-0011](../../docs/adr/0011-mcp-server-for-agent-configuration.md).
@@ -181,14 +181,15 @@ the API key in the `Authorization` header.
 
 **Status pages**
 
-| Tool                 | Kind        | Purpose                                               |
-| -------------------- | ----------- | ----------------------------------------------------- |
-| `list_status_pages`  | read        | Summaries (id, slug, title, published).               |
-| `get_status_page`    | read        | Full config of one status page by slug.               |
-| `create_status_page` | write       | Create a status page (title + slug).                  |
-| `post_incident`      | write       | Post/pin an incident on a status page.                |
-| `resolve_incident`   | write       | Unpin/resolve the pinned incident.                    |
-| `delete_status_page` | destructive | Delete a status page (needs delete gate + `confirm`). |
+| Tool                 | Kind        | Purpose                                                             |
+| -------------------- | ----------- | ------------------------------------------------------------------- |
+| `list_status_pages`  | read        | Summaries (id, slug, title, published).                             |
+| `get_status_page`    | read        | Full config of one status page by slug.                             |
+| `create_status_page` | write       | Create a status page (title + slug).                                |
+| `save_status_page`   | write       | Set title/description and organize monitors into groups (sections). |
+| `post_incident`      | write       | Post/pin an incident on a status page.                              |
+| `resolve_incident`   | write       | Unpin/resolve the pinned incident.                                  |
+| `delete_status_page` | destructive | Delete a status page (needs delete gate + `confirm`).               |
 
 **Maintenance**
 
