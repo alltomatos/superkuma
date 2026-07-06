@@ -1,0 +1,51 @@
+# Example Prometheus stack for feeding the SuperKuma `prometheus` monitor type.
+# Deploy alongside SuperKuma's own compose.yaml (repo root) in a Docker environment.
+#
+# Usage:
+#   1. cd into this directory (or copy prometheus.yml alongside this file).
+#   2. Edit prometheus.yml's targets to your actual exporter addresses.
+#   3. docker compose up -d
+#   4. In SuperKuma, create a `prometheus` monitor with url: http://<this-host>:9090
+#
+# node_exporter runs containerized here for convenience, but for accurate HOST metrics
+# (not container metrics) prefer running it directly on the host as a systemd service —
+# see references/prometheus-exporters.md. windows_exporter and the SQL Server exporter
+# are NOT containers you run alongside this stack — they run on/near the Windows/SQL
+# hosts you're monitoring (see references/prometheus-exporters.md for each).
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+
+  # Optional: monitor the Docker host itself. Mounts /proc, /sys and / read-only so
+  # CPU/memory/filesystem metrics reflect the HOST, not the container. Stays on the
+  # compose network (not network_mode: host) so Prometheus can reach it by service
+  # name — the one trade-off is that network-interface metrics (node_network_*)
+  # reflect the container's own network namespace, not the host's. If you need
+  # accurate host network stats too, run node_exporter as a native systemd service
+  # instead (see references/prometheus-exporters.md) and point prometheus.yml at
+  # the host's real IP:9100.
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+
+volumes:
+  prometheus-data:

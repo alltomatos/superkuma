@@ -46,6 +46,11 @@ Run this loop per site:
    glance.
 6. **Verify** — `list_monitors`, then `get_monitor_beats` on a few monitors to confirm they are
    actually checking.
+7. **Deep metrics (optional)** — for CPU/RAM/disk I/O and SQL Server internals beyond
+   up/down, set up Prometheus + exporters
+   ([references/prometheus-exporters.md](references/prometheus-exporters.md), example stack in
+   [assets/prometheus-stack/](assets/prometheus-stack/)) and add `prometheus`-type monitors
+   ([references/monitor-mapping.md](references/monitor-mapping.md#deep-host-metrics-via-prometheus-cpuramdisk-io-sql-server)).
 
 ## Safety
 
