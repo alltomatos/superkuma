@@ -25,6 +25,7 @@ SuperKuma is an easy-to-use self-hosted monitoring tool, with built-in Master-Ag
 - 2FA support
 - Master-Agent federation for multi-instance monitoring
 - Long-term monthly metrics history
+- Query **Prometheus** with PromQL to alert on host metrics — CPU / RAM / disk I/O, SQL Server, and anything an exporter exposes
 - Multi-tenant **Teams** with granular **role-based access control (RBAC)**
 - Built-in **MCP server** — let an AI agent add/edit monitors, notifications, tags, status pages and maintenance ([docs](server/mcp/README.md))
 
