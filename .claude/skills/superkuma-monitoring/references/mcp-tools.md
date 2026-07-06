@@ -39,14 +39,14 @@ Create the key in the dashboard: _Settings → API Keys → Add API Key_ → cop
 - `SUPERKUMA_ALLOW_DELETE=true` — enables `delete_*`; each still needs `confirm: true` per call.
 - Without the gates, only read tools are registered. Read-only is the default.
 
-## Tool catalog (33)
+## Tool catalog (34)
 
 | Area          | Read                                                            | Write                                                                                 | Destructive           |
 | ------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------- |
 | Monitors      | `list_monitors`, `get_monitor`, `get_monitor_beats`, `get_info` | `create_monitor`, `update_monitor`, `pause_monitor`, `resume_monitor`                 | `delete_monitor`      |
 | Notifications | `list_notifications`                                            | `create_notification`, `update_notification`, `test_notification`                     | `delete_notification` |
 | Tags          | `list_tags`                                                     | `create_tag`, `update_tag`, `add_monitor_tag`, `remove_monitor_tag`                   | `delete_tag`          |
-| Status pages  | `list_status_pages`, `get_status_page`                          | `create_status_page`, `post_incident`, `resolve_incident`                             | `delete_status_page`  |
+| Status pages  | `list_status_pages`, `get_status_page`                          | `create_status_page`, `save_status_page`, `post_incident`, `resolve_incident`         | `delete_status_page`  |
 | Maintenance   | `list_maintenances`, `get_maintenance`                          | `create_maintenance`, `update_maintenance`, `pause_maintenance`, `resume_maintenance` | `delete_maintenance`  |
 
 `update_*` tools fetch the current object and overlay your fields (fetch-merge-save); you only
@@ -76,8 +76,11 @@ Common fields:
 
 **create_tag** — `name`, `color` (hex). Attach with `add_monitor_tag(tagId, monitorId, value?)`.
 
-**create_status_page** — `title`, `slug` (a–z, 0–9, dashes). Then compose it in the dashboard or
-with `post_incident(slug, title, content, style)`.
+**create_status_page** — `title`, `slug` (a–z, 0–9, dashes). Then `save_status_page(slug, {title?,
+description?, groups})` to organize its monitors into sections — `groups` is
+`[{name, monitorIds: [...]}]` and **fully replaces** the current layout each call (pass every
+group you want kept, in display order). Use `post_incident(slug, title, content, style)` for
+incidents.
 
 **create_maintenance** — `title`; `strategy` defaults to `manual` (toggle on/off). For a one-off
 window use `strategy:"single"` + `startDateTime`/`endDateTime`.

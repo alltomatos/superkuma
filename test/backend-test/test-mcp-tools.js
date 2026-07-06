@@ -394,6 +394,46 @@ describe("MCP tool behaviour", () => {
         assert.strictEqual(payload.expectedValue, "90");
         assert.strictEqual(payload.bearer_token, "tok");
     });
+
+    test("save_status_page replaces groups and preserves unset config fields", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        client.responses.getStatusPage = {
+            ok: true,
+            config: { slug: "gnr", title: "GNR", description: "old desc", icon: "/icon.png", theme: "auto" },
+        };
+        registerAllTools(server, client, fullConfig);
+
+        const res = await server.call("save_status_page", {
+            slug: "gnr",
+            title: "GNR Status",
+            groups: [
+                { name: "Domain Controllers", monitorIds: [6, 11] },
+                { name: "Database", monitorIds: [19, 20] },
+            ],
+        });
+
+        assert.strictEqual(res.isError, false);
+        const call = lastCall(client, "saveStatusPage");
+        assert.strictEqual(call.args[0], "gnr");
+        assert.strictEqual(call.args[1].title, "GNR Status");
+        assert.strictEqual(call.args[1].description, "old desc", "unset fields are preserved");
+        assert.strictEqual(call.args[2], "/icon.png", "existing icon is passed through unchanged");
+        assert.deepStrictEqual(call.args[3], [
+            { name: "Domain Controllers", monitorList: [{ id: 6 }, { id: 11 }] },
+            { name: "Database", monitorList: [{ id: 19 }, { id: 20 }] },
+        ]);
+    });
+
+    test("save_status_page throws if the status page does not exist", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        client.responses.getStatusPage = { ok: false, msg: "No slug?" };
+        registerAllTools(server, client, fullConfig);
+
+        const res = await server.call("save_status_page", { slug: "missing", groups: [] });
+        assert.strictEqual(res.isError, true);
+    });
 });
 
 describe("MCP config gates", () => {
