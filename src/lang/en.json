@@ -243,6 +243,7 @@
     "Search monitored sites": "Search monitored sites",
     "Avg. Ping": "Avg. Ping",
     "Avg. Response": "Avg. Response",
+    "Avg. Value": "Avg. Value",
     "Entry Page": "Entry Page",
     "statusPageNothing": "Nothing here, please add a group or a monitor.",
     "statusPageRefreshIn": "Refresh in: {0}",

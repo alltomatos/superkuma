@@ -215,7 +215,10 @@
                         <p class="col-4 col-sm-12 mb-0 mb-sm-2">({{ $t("Current") }})</p>
                         <span class="col-4 col-sm-12 num">
                             <a href="#" @click.prevent="showPingChartBox = !showPingChartBox">
-                                <CountUp :value="ping" />
+                                <CountUp
+                                    :value="monitor.type === 'prometheus' ? metricCurrentValue : ping"
+                                    :unit="monitor.type === 'prometheus' ? '' : 'ms'"
+                                />
                             </a>
                         </span>
                     </div>
@@ -224,9 +227,14 @@
                         class="col-12 col-sm col row d-flex align-items-center d-sm-block"
                     >
                         <h4 class="col-4 col-sm-12">{{ pingTitle(true) }}</h4>
-                        <p class="col-4 col-sm-12 mb-0 mb-sm-2">({{ $t("hours", 24) }})</p>
+                        <p class="col-4 col-sm-12 mb-0 mb-sm-2">
+                            ({{ monitor.type === "prometheus" ? $t("recent") : $t("hours", 24) }})
+                        </p>
                         <span class="col-4 col-sm-12 num">
-                            <CountUp :value="avgPing" />
+                            <CountUp
+                                :value="monitor.type === 'prometheus' ? metricAvgValue : avgPing"
+                                :unit="monitor.type === 'prometheus' ? '' : 'ms'"
+                            />
                         </span>
                     </div>
 
@@ -455,6 +463,7 @@ const MetricValueChart = defineAsyncComponent(() => import("../components/Metric
 import Tag from "../components/Tag.vue";
 import CertificateInfo from "../components/CertificateInfo.vue";
 import { getMonitorRelativeURL } from "../util.ts";
+import { extractMetricValue } from "../metric-value.js";
 import { URL } from "whatwg-url";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
@@ -559,6 +568,34 @@ export default {
             }
 
             return this.$t("notAvailableShort");
+        },
+
+        /**
+         * Current PromQL value for a prometheus monitor (extracted from its latest
+         * heartbeat message -- see extractMetricValue). Used in place of `ping` in
+         * the stats row, since ping there is just the query round-trip time.
+         * @returns {number|string} The current value, or a "not available" string
+         */
+        metricCurrentValue() {
+            const value = extractMetricValue(this.lastHeartBeat.msg);
+            return value === null ? this.$t("notAvailableShort") : Math.round(value * 100) / 100;
+        },
+
+        /**
+         * Average PromQL value across the recent (raw) heartbeats held in
+         * $root.heartbeatList -- same "recent checks only" scope as
+         * MetricValueChart.vue, not a true 24h aggregate (stat_* tables only
+         * retain ping stats, not arbitrary metric values).
+         * @returns {number|string} The average value, or a "not available" string
+         */
+        metricAvgValue() {
+            const heartbeats = this.$root.heartbeatList[this.monitor.id] ?? [];
+            const values = heartbeats.map((beat) => extractMetricValue(beat.msg)).filter((v) => v !== null);
+            if (!values.length) {
+                return this.$t("notAvailableShort");
+            }
+            const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+            return Math.round(avg * 100) / 100;
         },
 
         status() {
@@ -767,6 +804,10 @@ export default {
 
             if (this.monitor.type === "http" || this.monitor.type === "keyword" || this.monitor.type === "json-query") {
                 return this.$t(translationPrefix + "Response");
+            }
+
+            if (this.monitor.type === "prometheus") {
+                return this.$t(translationPrefix + "Value");
             }
 
             return this.$t(translationPrefix + "Ping");

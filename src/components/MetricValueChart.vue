@@ -13,14 +13,9 @@
 import { Chart, Filler, LinearScale, LineController, LineElement, PointElement, TimeScale, Tooltip } from "chart.js";
 import "chartjs-adapter-dayjs-4";
 import { Line } from "vue-chartjs";
+import { extractMetricValue } from "../metric-value.js";
 
 Chart.register(LineController, LineElement, PointElement, TimeScale, LinearScale, Tooltip, Filler);
-
-// Mirrors Heartbeat.extractPublicMetricValue (server/model/heartbeat.js) -- the
-// dashboard is authenticated so `msg` isn't stripped like it is for public
-// status pages, so this reads the same self-authored message format directly
-// instead of adding a redundant server round-trip.
-const METRIC_VALUE_RE = /^PromQL condition (?:passes|does not pass) \(([-\d.eE+]+)\s/;
 
 export default {
     components: { Line },
@@ -43,12 +38,8 @@ export default {
         points() {
             return this.heartbeatList
                 .map((beat) => {
-                    const match = METRIC_VALUE_RE.exec(beat.msg || "");
-                    if (!match) {
-                        return null;
-                    }
-                    const value = Number(match[1]);
-                    if (Number.isNaN(value)) {
+                    const value = extractMetricValue(beat.msg);
+                    if (value === null) {
                         return null;
                     }
                     return { x: beat.time, y: value, status: beat.status };
