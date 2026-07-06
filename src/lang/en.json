@@ -348,6 +348,8 @@
     "Switch to Dark Theme": "Switch to Dark Theme",
     "Show Tags": "Show Tags",
     "Hide Tags": "Hide Tags",
+    "Theme Gallery": "Theme Gallery",
+    "themeGalleryDescription": "Pick a bundled look, or keep hand-editing Custom CSS below -- applying a theme just writes to it.",
     "Description": "Description",
     "descriptionHelpText": "Shown on the internal dashboard. Markdown is allowed and sanitized (preserves spaces and indentation) before display.",
     "No monitors available.": "No monitors available.",
