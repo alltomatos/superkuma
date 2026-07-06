@@ -119,6 +119,10 @@
                                             <HeartbeatBar size="mid" :monitor-id="monitor.element.id" />
                                         </div>
                                     </div>
+                                    <MetricGaugeWidget
+                                        v-if="metricGaugeProps(monitor.element)"
+                                        v-bind="metricGaugeProps(monitor.element)"
+                                    />
                                 </div>
                             </template>
                         </Draggable>
@@ -137,6 +141,7 @@ import HeartbeatBar from "./HeartbeatBar.vue";
 import Uptime from "./Uptime.vue";
 import Tag from "./Tag.vue";
 import Status from "./Status.vue";
+import MetricGaugeWidget from "./MetricGaugeWidget.vue";
 
 export default {
     components: {
@@ -146,6 +151,7 @@ export default {
         Uptime,
         Tag,
         Status,
+        MetricGaugeWidget,
     },
     props: {
         /** Are we in edit mode? */
@@ -293,6 +299,30 @@ export default {
             let heartbeats = this.$root.heartbeatList[monitorId] ?? [];
             let lastHeartbeat = heartbeats[heartbeats.length - 1];
             return lastHeartbeat?.status;
+        },
+
+        /**
+         * Props for a MetricGaugeWidget rendered under a prometheus-type monitor, or
+         * null when this monitor doesn't have one (wrong type, or no metric value
+         * recorded yet on its last heartbeat -- see Heartbeat.toPublicJSON).
+         * @param {object} monitorElement A monitor from $root.publicGroupList
+         * @returns {object|null} Props to bind onto MetricGaugeWidget, or null
+         */
+        metricGaugeProps(monitorElement) {
+            if (monitorElement.type !== "prometheus") {
+                return null;
+            }
+            const heartbeats = this.$root.heartbeatList[monitorElement.id] ?? [];
+            const last = heartbeats[heartbeats.length - 1];
+            if (!last || typeof last.metricValue !== "number") {
+                return null;
+            }
+            return {
+                value: last.metricValue,
+                status: last.status,
+                thresholdOperator: monitorElement.jsonPathOperator,
+                thresholdValue: monitorElement.expectedValue,
+            };
         },
 
         /**

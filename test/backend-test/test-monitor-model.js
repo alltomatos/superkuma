@@ -449,6 +449,27 @@ describe("Monitor model - characterization", () => {
                 "validCert",
             ]);
         });
+
+        test("type=prometheus additionally exposes jsonPathOperator/expectedValue (needed by the status page gauge widget)", async () => {
+            const monitor = await createMonitor({
+                type: "prometheus",
+                name: "public prometheus monitor",
+                url: "http://prometheus:9090",
+                databaseQuery: "up{job=\"node\"}",
+                jsonPathOperator: ">",
+                expectedValue: "90",
+            });
+            monitor.sendUrl = false;
+
+            const json = await monitor.toPublicJSON();
+            const keys = Object.keys(json).sort();
+
+            assert.deepStrictEqual(keys, ["expectedValue", "id", "jsonPathOperator", "name", "sendUrl", "type"]);
+            assert.strictEqual(json.jsonPathOperator, ">");
+            assert.strictEqual(json.expectedValue, "90");
+            // The PromQL query itself is NOT exposed -- only the threshold.
+            assert.strictEqual("databaseQuery" in json, false);
+        });
     });
 
     describe("small pure/near-pure helpers", () => {

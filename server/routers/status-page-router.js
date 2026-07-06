@@ -132,6 +132,17 @@ router.get("/api/status-page/heartbeat/:slug", cache("1 minutes"), async (reques
             [statusPageID]
         );
 
+        // Batched once up-front (not per-monitor) so toPublicJSON knows whether to
+        // extract a prometheus gauge value -- see Heartbeat.toPublicJSON.
+        const monitorTypeById = {};
+        if (monitorIDList.length > 0) {
+            const placeholders = monitorIDList.map(() => "?").join(",");
+            const typeRows = await R.getAll(`SELECT id, type FROM monitor WHERE id IN (${placeholders})`, monitorIDList);
+            for (const row of typeRows) {
+                monitorTypeById[row.id] = row.type;
+            }
+        }
+
         for (let monitorID of monitorIDList) {
             let list = await R.getAll(
                 `
@@ -144,7 +155,7 @@ router.get("/api/status-page/heartbeat/:slug", cache("1 minutes"), async (reques
             );
 
             list = R.convertToBeans("heartbeat", list);
-            heartbeatList[monitorID] = list.reverse().map((row) => row.toPublicJSON());
+            heartbeatList[monitorID] = list.reverse().map((row) => row.toPublicJSON(monitorTypeById[monitorID]));
 
             const uptimeCalculator = await UptimeCalculator.getUptimeCalculator(monitorID);
             uptimeList[`${monitorID}_24`] = uptimeCalculator.get24Hour().uptime;

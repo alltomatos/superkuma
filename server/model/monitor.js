@@ -99,6 +99,14 @@ class Monitor extends BeanModel {
             obj.validCert = validCert;
         }
 
+        if (this.type === "prometheus") {
+            // Not secret (a threshold like ">90"), and needed by the status page's
+            // metric gauge widget to render its colored zones -- see
+            // MetricGaugeWidget.vue. The PromQL query itself stays internal.
+            obj.jsonPathOperator = this.jsonPathOperator;
+            obj.expectedValue = this.expectedValue;
+        }
+
         return obj;
     }
 

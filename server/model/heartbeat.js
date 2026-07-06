@@ -14,15 +14,49 @@ class Heartbeat extends BeanModel {
     /**
      * Return an object that ready to parse to JSON for public
      * Only show necessary data to public
+     * @param {string} monitorType The owning monitor's type. When
+     * "prometheus", a `metricValue` number is additionally extracted from the
+     * (otherwise hidden) internal message -- see extractPublicMetricValue.
      * @returns {object} Object ready to parse
      */
-    toPublicJSON() {
-        return {
+    toPublicJSON(monitorType) {
+        const obj = {
             status: this.status,
             time: this.time,
             msg: "", // Hide for public
             ping: this.ping,
         };
+
+        if (monitorType === "prometheus") {
+            const metricValue = Heartbeat.extractPublicMetricValue(this.msg);
+            if (metricValue !== null) {
+                obj.metricValue = metricValue;
+            }
+        }
+
+        return obj;
+    }
+
+    /**
+     * Extract the numeric PromQL result from a prometheus monitor's internal
+     * heartbeat message, for public display (status-page gauges). Only ever
+     * recognizes SuperKuma's own message format (see
+     * server/monitor-types/prometheus.js) -- never forwards arbitrary message
+     * text, so this cannot leak whatever an unrelated monitor type put in its
+     * own `msg` (hostnames, error details, etc).
+     * @param {string} msg The heartbeat's internal message
+     * @returns {number|null} The numeric value, or null if not recognized
+     */
+    static extractPublicMetricValue(msg) {
+        if (!msg) {
+            return null;
+        }
+        const match = /^PromQL condition (?:passes|does not pass) \(([-\d.eE+]+)\s/.exec(msg);
+        if (!match) {
+            return null;
+        }
+        const num = Number(match[1]);
+        return Number.isNaN(num) ? null : num;
     }
 
     /**
