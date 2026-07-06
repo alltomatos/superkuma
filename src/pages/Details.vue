@@ -301,11 +301,14 @@
                 </div>
             </transition>
 
-            <!-- Ping Chart -->
+            <!-- Ping Chart (or the metric-value chart for prometheus monitors, which have no
+                 meaningful ping/latency -- their heartbeat.ping is just the PromQL query
+                 round-trip time, not a value worth charting) -->
             <div v-if="showPingChartBox" class="shadow-box big-padding text-center ping-chart-wrapper">
                 <div class="row">
                     <div class="col">
-                        <PingChart :monitor-id="monitor.id" />
+                        <MetricValueChart v-if="monitor.type === 'prometheus'" :monitor-id="monitor.id" />
+                        <PingChart v-else :monitor-id="monitor.id" />
                     </div>
                 </div>
             </div>
@@ -448,6 +451,7 @@ import CountUp from "../components/CountUp.vue";
 import Uptime from "../components/Uptime.vue";
 import Pagination from "v-pagination-3";
 const PingChart = defineAsyncComponent(() => import("../components/PingChart.vue"));
+const MetricValueChart = defineAsyncComponent(() => import("../components/MetricValueChart.vue"));
 import Tag from "../components/Tag.vue";
 import CertificateInfo from "../components/CertificateInfo.vue";
 import { getMonitorRelativeURL } from "../util.ts";
@@ -473,6 +477,7 @@ export default {
         Status,
         Pagination,
         PingChart,
+        MetricValueChart,
         Tag,
         CertificateInfo,
         PrismEditor,
