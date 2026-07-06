@@ -25,7 +25,12 @@ env:
 jobs:
   release-docker:
     if: github.repository == 'alltomatos/superkuma'
-    runs-on: ubuntu-latest
+    # Self-hosted runner (isolated Docker container + dind sidecar on gnr-kvm,
+    # see docs/self-hosted-runner.md). Only THIS maintainer/tag-triggered
+    # workflow is routed here -- PR-triggered workflows (Auto Test, etc.) stay
+    # on GitHub-hosted runners so untrusted contributor code never executes on
+    # our infrastructure.
+    runs-on: [self-hosted, gnr-docker]
     timeout-minutes: 120
     permissions:
       contents: read
