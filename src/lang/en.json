@@ -314,6 +314,8 @@
     "successKeyword": "Success Keyword",
     "successKeywordExplanation": "MQTT Keyword that will be considered as success",
     "recent": "Recent",
+    "Value": "Value",
+    "recentHeartbeatsOnly": "Shows recent checks only -- long-range history isn't retained per-metric yet.",
     "Resolve": "Resolve",
     "Resolved": "Resolved",
     "Reset Token": "Reset Token",
