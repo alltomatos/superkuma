@@ -39,7 +39,7 @@
                         <!-- animation is not working, no idea why -->
                         <Draggable
                             v-model="group.element.monitorList"
-                            class="monitor-list"
+                            class="monitor-list monitor-grid"
                             group="same-group"
                             :disabled="!editMode"
                             :animation="100"
@@ -343,6 +343,12 @@ export default {
 
 .monitor-list {
     min-height: 46px;
+}
+
+.monitor-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--sk-columns, 1), 1fr);
+    gap: 0.5rem;
 }
 
 .item-name {
