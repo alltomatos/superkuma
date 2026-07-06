@@ -1,5 +1,5 @@
 <template>
-    <div v-if="loadedTheme" class="container mt-3">
+    <div v-if="loadedTheme" class="container mt-3 status-page-root">
         <!-- Sidebar for edit mode -->
         <div v-if="enableEditMode" class="sidebar" data-testid="edit-sidebar">
             <div class="sidebar-body">
@@ -62,6 +62,13 @@
                         <option value="light">{{ $t("Light") }}</option>
                         <option value="dark">{{ $t("Dark") }}</option>
                     </select>
+                </div>
+
+                <!-- Theme Gallery -->
+                <div class="my-3">
+                    <div class="mb-1">{{ $t("Theme Gallery") }}</div>
+                    <div class="form-text mb-2">{{ $t("themeGalleryDescription") }}</div>
+                    <ThemeGallery v-model="config.customCSS" />
                 </div>
 
                 <div class="my-3 form-check form-switch">
@@ -633,6 +640,7 @@ import {
     MAINTENANCE,
 } from "../util.ts";
 import Tag from "../components/Tag.vue";
+import ThemeGallery from "../components/ThemeGallery.vue";
 import VueMultiselect from "vue-multiselect";
 
 const toast = useToast();
@@ -655,6 +663,7 @@ export default {
         PrismEditor,
         MaintenanceTime,
         Tag,
+        ThemeGallery,
         VueMultiselect,
         IncidentHistory,
         IncidentManageModal,
@@ -1493,8 +1502,79 @@ export default {
 };
 </script>
 
+<!--
+    Semantic theming contract for status-page themes (see src/statuspage-themes/
+    and ThemeGallery.vue). Themes only ever set these custom properties -- never
+    SuperKuma's internal class names -- so they keep working across upgrades.
+    Defaults below match the page's pre-existing look, so nothing changes
+    visually until a theme is applied.
+
+    Deliberately UNSCOPED: Vue's scoped-style compiler appends a [data-v-xxx]
+    attribute to every scoped selector, which outranks the plain
+    ".status-page-root { ... }" a bundled theme/customCSS writes -- the
+    higher-specificity scoped default would always win regardless of source
+    order. Keeping just the variable *defaults* here (unscoped, so they tie in
+    specificity with a theme override and lose the tie to whichever comes
+    later in the DOM -- customCSS's <style> tag renders after this one) is
+    what lets a theme's override actually take effect.
+-->
+<!-- eslint-disable-next-line vue-scoped-css/enforce-style-type -->
+<style lang="scss">
+@import "../assets/vars.scss";
+
+.status-page-root {
+    --sk-gap: 1.5rem;
+    --sk-card-padding: 10px;
+    --sk-card-radius: 10px;
+    --sk-card-shadow: 0 15px 70px rgba(0, 0, 0, 0.1);
+    --sk-bg: transparent;
+    --sk-text-color: inherit;
+    --sk-font-size-base: 1rem;
+    --sk-color-up: #{$primary};
+    --sk-color-down: #{$danger};
+    --sk-color-pending: #{$warning};
+    --sk-color-maintenance: #{$maintenance};
+}
+</style>
+
 <style lang="scss" scoped>
 @import "../assets/vars.scss";
+
+.status-page-root {
+    background-color: var(--sk-bg);
+    color: var(--sk-text-color);
+
+    :deep(.shadow-box) {
+        padding: var(--sk-card-padding);
+        border-radius: var(--sk-card-radius);
+        box-shadow: var(--sk-card-shadow);
+    }
+
+    :deep(.mb-5) {
+        margin-bottom: var(--sk-gap) !important;
+    }
+
+    :deep(.item-name),
+    :deep(.group-title) {
+        font-size: var(--sk-font-size-base);
+    }
+
+    :deep(.bg-primary) {
+        background-color: var(--sk-color-up) !important;
+    }
+
+    :deep(.bg-danger) {
+        background-color: var(--sk-color-down) !important;
+    }
+
+    :deep(.bg-warning) {
+        background-color: var(--sk-color-pending) !important;
+    }
+
+    :deep(.bg-maintenance) {
+        background-color: var(--sk-color-maintenance) !important;
+    }
+}
 
 .overall-status {
     font-weight: bold;
