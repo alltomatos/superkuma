@@ -37,6 +37,37 @@
 >    `omniroute` (fora deste repositório) antes que `auto-test`, `check-linters` e `validate`
 >    consigam de fato passar quando roteados para lá.
 
+> **Atualização 2026-07-07 (CI focada no artefato de container):** com o CI já rodando no
+> `omniroute`, a matriz de testes foi realinhada ao que a imagem realmente ship — um único artefato
+> `node:20-bookworm-slim`, `linux/amd64` (Dockerfile raiz + `release-docker.yml`). Mudanças:
+>
+> - **`auto-test` colapsou de 5 pernas para 1** (só `ubuntu-22.04`/node 20). As pernas node 24/25
+>   (runtime não shippado) e `ubuntu-22.04-arm` (arch não shippada, amd64-only) foram removidas.
+> - **`armv7-simple-test` foi DELETADO** — arch não shippada, e já quebrado no `omniroute` (ver
+>   item 1 acima). Não vale um mecanismo de transferência alternativo para testar uma arch que a
+>   imagem nunca contém.
+> - **`CodeQL`: removida a perna `go`** — não há Go no artefato (só scripts em `extra/`).
+> - **Adicionado `docker-build-smoke`**: builda o Dockerfile real (`--platform linux/amd64`) em todo
+>   PR, sobe o container e faz poll do HTTP até responder — a primeira vez que o CI valida o
+>   artefato de fato (dumb-init + `server/server.js` + deps de runtime baked-in) em vez de rodar
+>   fonte no runner. Depende do `docker.sock` do host (que o `omniroute` já monta).
+> - **Testes que dependem de infra externa passaram a pular de forma limpa** via
+>   `test/backend-test/util-container.js`: os testes testcontainers (DB/fila/SNMP) pulam sem Docker
+>   (`skipTestcontainers()`, override `SKIP_TESTCONTAINERS=1`); os de internet ao vivo (RDAP, TLS
+>   externo) são opt-in em CI (`RUN_NETWORK_TESTS=1`). O `check-translations` deixou de buscar o
+>   `en.json` do `louislam/uptime-kuma` (acoplava o fork ao upstream, §2).
+> - **`e2e-test`** fixado em Node 20 e instala as libs de navegador via `sudo playwright
+install-deps` (sudo sem senha no runner), sem depender de provisionamento manual do container.
+> - **Removidos 5 workflows de build/release legados** (`build-docker-pr-test`, `build-docker-base`,
+>   `release-beta`, `release-final`, `release-nightly`) que buildavam a imagem `base2` retirada ou
+>   usavam o caminho QEMU+GHCR divergente. O caminho de release real é `auto-release.yml` (tag) →
+>   `release-docker.yml` (imagem amd64 → Docker Hub).
+> - **Instalado no `omniroute`** (7 runners registrados para o repo, para paralelizar a fila):
+>   `libatomic1` (item 2 acima) + `iputils-ping` + libs de navegador do Playwright. **Caveat de
+>   durabilidade:** esses `apt install` são no container em execução e se perdem se os runners forem
+>   recriados; o fix durável é assá-los na imagem `gha-runner-official` (infra fora deste repo). As
+>   libs do Playwright já são reaplicadas pelo próprio job de e2e (`install-deps`).
+
 ## Contexto
 
 O workflow `release-docker.yml` (build+push da imagem `ronaldodavi/superkuma`) ficou preso na fila
