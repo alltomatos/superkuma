@@ -30,7 +30,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-22.04, windows-latest, ubuntu-22.04-arm]
+        # SuperKuma ships as a Linux Docker image (see root Dockerfile /
+        # release-docker.yml) -- macOS/Windows aren't a supported runtime, so
+        # only the Linux legs are tested here.
+        os: [ubuntu-22.04, ubuntu-22.04-arm]
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
         node: [20, 24]
         # Also test non-LTS, but only on Ubuntu.
@@ -39,7 +42,6 @@ jobs:
             node: 25
 
     steps:
-      - run: git config --global core.autocrlf false # Mainly for Windows
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with: { persist-credentials: false }
 
