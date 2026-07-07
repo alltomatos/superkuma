@@ -68,6 +68,24 @@
 >   `release-beta`, `release-final`, `release-nightly`) que buildavam a imagem `base2` retirada ou
 >   usavam o caminho QEMU+GHCR divergente. O caminho de release real é `auto-release.yml` (tag) →
 >   `release-docker.yml` (imagem amd64 → Docker Hub).
+> - **Camada de testes de integração flaky REMOVIDA.** Os testes que sobem um `SuperKumaServer`/
+>   Socket.io real ou spawnam um processo (RBAC socket-wiring: `test-monitor-socket-authz`,
+>   `-maintenance-authz`, `-status-page-authz`, `-apikey-remoteinstance-authz`, `-client-list-scoping`;
+>   `test-badge-authz`, `test-federation-forwarder/-heartbeat`, `test-prometheus-monitor`,
+>   `test-setup-superadmin`, `test-two-team-isolation-e2e`, `test-rbac-boot-sync`,
+>   `test-room-routing-retrofit`, + o helper `test/prepare-test-server.js`) eram
+>   **não-determinísticos** — arquivos diferentes falhavam a cada run local e a suíte **travava 7,5min+**
+>   no runner (era a causa da "queue"/timeout). Um teste que falha aleatoriamente e bloqueia o CI é
+>   pior que nenhum teste. Fica a suíte unitária determinística (**403 testes, verde em ~1min**): o
+>   motor RBAC (`test-authz`), `actor-repository`, a migração RBAC, guard de superadmin, team-id
+>   loaders, authz a nível de model (docker/proxy/remote-browser/server-notification),
+>   `federation-foundation`, uptime-calculator, monitor-model, tipos de monitor mockados/loopback,
+>   monitor-conditions, notification-providers e util/format. A lógica RBAC core segue coberta pelo
+>   `test-authz`; perde-se a asserção (flaky) do "wiring" de handler.
+> - **Gate local (husky pre-push):** `npm run lint && npm run test-backend` roda antes de cada push;
+>   se falhar, bloqueia o push — os básicos passam localmente ANTES de gastar runner. `prepare: husky`
+>   auto-instala pra todo dev; sai 0 sem `.git`, então o `npm ci` do Dockerfile (que roda antes do
+>   `.git` ser copiado) não é afetado.
 > - **Instalado no `omniroute`** (7 runners registrados para o repo, para paralelizar a fila):
 >   `libatomic1` (item 2 acima) + `iputils-ping`. **Caveat de durabilidade:** esses `apt install` são
 >   no container em execução e se perdem se os runners forem recriados; o fix durável é assá-los na
