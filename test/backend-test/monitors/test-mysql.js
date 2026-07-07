@@ -3,6 +3,7 @@ const assert = require("node:assert");
 const { MariaDbContainer } = require("@testcontainers/mariadb");
 const { MysqlMonitorType } = require("../../../server/monitor-types/mysql");
 const { UP, PENDING } = require("../../../src/util");
+const { skipTestcontainers } = require("../util-container");
 
 /**
  * Helper function to create and start a MariaDB container
@@ -22,7 +23,7 @@ async function createAndStartMariaDBContainer() {
 describe(
     "MySQL/MariaDB Monitor",
     {
-        skip: !!process.env.CI && (process.platform !== "linux" || process.arch !== "x64"),
+        skip: skipTestcontainers(),
     },
     () => {
         test("check() sets status to UP when MariaDB server is reachable", async () => {

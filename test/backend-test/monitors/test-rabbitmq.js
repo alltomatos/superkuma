@@ -3,11 +3,12 @@ const assert = require("node:assert");
 const { RabbitMQContainer } = require("@testcontainers/rabbitmq");
 const { RabbitMqMonitorType } = require("../../../server/monitor-types/rabbitmq");
 const { UP, PENDING } = require("../../../src/util");
+const { skipTestcontainers } = require("../util-container");
 
 describe(
     "RabbitMQ Single Node",
     {
-        skip: !!process.env.CI && (process.platform !== "linux" || process.arch !== "x64"),
+        skip: skipTestcontainers(),
     },
     () => {
         test("check() sets status to UP when RabbitMQ server is reachable", async () => {

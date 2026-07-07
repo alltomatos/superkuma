@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { GenericContainer, Wait } = require("testcontainers");
 const { MySqlContainer } = require("@testcontainers/mysql");
+const { skipTestcontainers } = require("./util-container");
 
 describe("Database Migration", () => {
     test("SQLite migrations run successfully from fresh database", async () => {
@@ -59,7 +60,7 @@ describe("Database Migration", () => {
     test(
         "MariaDB migrations run successfully from fresh database",
         {
-            skip: !!process.env.CI && (process.platform !== "linux" || process.arch !== "x64"),
+            skip: skipTestcontainers(),
         },
         async () => {
             // Start MariaDB container (using MariaDB 12 to match current production)
@@ -131,7 +132,7 @@ describe("Database Migration", () => {
     test(
         "MySQL migrations run successfully from fresh database",
         {
-            skip: !!process.env.CI && (process.platform !== "linux" || process.arch !== "x64"),
+            skip: skipTestcontainers(),
         },
         async () => {
             // Start MySQL 8.0 container (the version mentioned in the issue)

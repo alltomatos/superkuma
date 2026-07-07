@@ -3,6 +3,7 @@ const assert = require("node:assert");
 const { MSSQLServerContainer } = require("@testcontainers/mssqlserver");
 const { MssqlMonitorType } = require("../../../server/monitor-types/mssql");
 const { UP, PENDING } = require("../../../src/util");
+const { skipTestcontainers } = require("../util-container");
 
 /**
  * Helper function to create and start a MSSQL container
@@ -24,7 +25,7 @@ async function createAndStartMSSQLContainer() {
 describe(
     "MSSQL Monitor",
     {
-        skip: !!process.env.CI && (process.platform !== "linux" || process.arch !== "x64"),
+        skip: skipTestcontainers(),
     },
     () => {
         test("check() sets status to UP when MSSQL server is reachable", async () => {

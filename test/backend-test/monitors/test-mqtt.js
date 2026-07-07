@@ -4,6 +4,7 @@ const { HiveMQContainer } = require("@testcontainers/hivemq");
 const mqtt = require("mqtt");
 const { MqttMonitorType } = require("../../../server/monitor-types/mqtt");
 const { UP, PENDING } = require("../../../src/util");
+const { skipTestcontainers } = require("../util-container");
 
 /**
  * Runs an MQTT test with the
@@ -67,7 +68,7 @@ describe(
     "MqttMonitorType",
     {
         concurrency: 4,
-        skip: !!process.env.CI && (process.platform !== "linux" || process.arch !== "x64"),
+        skip: skipTestcontainers(),
     },
     () => {
         test("check() sets status to UP when keyword is found in message (type=default)", async () => {

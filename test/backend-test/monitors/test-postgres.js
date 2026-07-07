@@ -3,11 +3,12 @@ const assert = require("node:assert");
 const { PostgreSqlContainer } = require("@testcontainers/postgresql");
 const { PostgresMonitorType } = require("../../../server/monitor-types/postgres");
 const { UP, PENDING } = require("../../../src/util");
+const { skipTestcontainers } = require("../util-container");
 
 describe(
     "Postgres Single Node",
     {
-        skip: !!process.env.CI && (process.platform !== "linux" || process.arch !== "x64"),
+        skip: skipTestcontainers(),
     },
     () => {
         test("check() sets status to UP when Postgres server is reachable", async () => {

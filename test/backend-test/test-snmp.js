@@ -4,12 +4,13 @@ const { GenericContainer } = require("testcontainers");
 const { SNMPMonitorType } = require("../../server/monitor-types/snmp");
 const { UP } = require("../../src/util");
 const snmp = require("net-snmp");
+const { skipTestcontainers } = require("./util-container");
 
 describe("SNMPMonitorType", () => {
     test(
         "check() sets heartbeat to UP when SNMP agent responds",
         {
-            skip: !!process.env.CI && (process.platform !== "linux" || process.arch !== "x64"),
+            skip: skipTestcontainers(),
         },
         async () => {
             const container = await new GenericContainer("polinux/snmpd").withExposedPorts("161/udp").start();
@@ -52,7 +53,7 @@ describe("SNMPMonitorType", () => {
     test(
         "check() throws when SNMP agent does not respond",
         {
-            skip: !!process.env.CI && (process.platform !== "linux" || process.arch !== "x64"),
+            skip: skipTestcontainers(),
         },
         async () => {
             const monitor = {

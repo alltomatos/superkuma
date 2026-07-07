@@ -3,6 +3,7 @@ const assert = require("node:assert");
 const { TCPMonitorType } = require("../../../server/monitor-types/tcp");
 const { UP, PENDING } = require("../../../src/util");
 const net = require("net");
+const { skipNetworkTests } = require("../util-container");
 
 describe("TCP Monitor", () => {
     /**
@@ -94,7 +95,7 @@ describe("TCP Monitor", () => {
         await assert.rejects(tcpMonitor.check(monitor, heartbeat, {}), new Error("Connection failed"));
     });
 
-    test("check() rejects when TLS certificate is expired or invalid", async () => {
+    test("check() rejects when TLS certificate is expired or invalid", { skip: skipNetworkTests() }, async () => {
         const tcpMonitor = new TCPMonitorType();
 
         const monitor = {
@@ -118,7 +119,7 @@ describe("TCP Monitor", () => {
         await assert.rejects(tcpMonitor.check(monitor, heartbeat, {}), regex);
     });
 
-    test("check() sets status to UP when TLS certificate is valid (SSL)", async () => {
+    test("check() sets status to UP when TLS certificate is valid (SSL)", { skip: skipNetworkTests() }, async () => {
         const tcpMonitor = new TCPMonitorType();
 
         const monitor = {
@@ -142,7 +143,7 @@ describe("TCP Monitor", () => {
         assert.strictEqual(heartbeat.status, UP);
     });
 
-    test("check() sets status to UP when TLS certificate is valid (STARTTLS)", async () => {
+    test("check() sets status to UP when TLS certificate is valid (STARTTLS)", { skip: skipNetworkTests() }, async () => {
         const tcpMonitor = new TCPMonitorType();
 
         const monitor = {
@@ -166,7 +167,7 @@ describe("TCP Monitor", () => {
         assert.strictEqual(heartbeat.status, UP);
     });
 
-    test("check() rejects when TLS certificate hostname does not match (STARTTLS)", async () => {
+    test("check() rejects when TLS certificate hostname does not match (STARTTLS)", { skip: skipNetworkTests() }, async () => {
         const tcpMonitor = new TCPMonitorType();
 
         const monitor = {
@@ -188,7 +189,7 @@ describe("TCP Monitor", () => {
 
         await assert.rejects(tcpMonitor.check(monitor, heartbeat, {}), regex);
     });
-    test("check() sets status to UP for XMPP server with valid certificate (STARTTLS)", async () => {
+    test("check() sets status to UP for XMPP server with valid certificate (STARTTLS)", { skip: skipNetworkTests() }, async () => {
         const tcpMonitor = new TCPMonitorType();
 
         const monitor = {
@@ -213,7 +214,7 @@ describe("TCP Monitor", () => {
     });
 
     // TLS Alert checking tests
-    test("check() rejects when expecting TLS alert but connection succeeds", async () => {
+    test("check() rejects when expecting TLS alert but connection succeeds", { skip: skipNetworkTests() }, async () => {
         const tcpMonitor = new TCPMonitorType();
 
         const monitor = {

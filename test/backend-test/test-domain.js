@@ -9,12 +9,13 @@ const { R } = require("redbean-node");
 const { Notification } = require("../../server/notification");
 const { Settings } = require("../../server/settings");
 const { setSetting } = require("../../server/util-server");
+const { skipNetworkTests } = require("./util-container");
 const dayjs = require("dayjs");
 dayjs.extend(require("dayjs/plugin/utc"));
 
 const testDb = new TestDB();
 
-describe("Domain Expiry", () => {
+describe("Domain Expiry", { skip: skipNetworkTests() }, () => {
     const monHttpCom = {
         type: "http",
         url: "https://www.google.com",

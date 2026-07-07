@@ -3,6 +3,7 @@ const assert = require("node:assert");
 const { OracleDbContainer } = require("@testcontainers/oraclefree");
 const { OracleDbMonitorType } = require("../../../server/monitor-types/oracledb");
 const { UP, PENDING } = require("../../../src/util");
+const { skipTestcontainers } = require("../util-container");
 
 const ORACLE_IMAGE = "gvenzl/oracle-free:23-slim-faststart";
 const APP_USER = "superkuma";
@@ -52,7 +53,7 @@ async function createAndStartOracleContainer() {
 describe(
     "Oracle Database Monitor",
     {
-        skip: !!process.env.CI && (process.platform !== "linux" || process.arch !== "x64"),
+        skip: skipTestcontainers(),
     },
     () => {
         /** @type {import("@testcontainers/oraclefree").StartedOracleDbContainer | undefined} */
