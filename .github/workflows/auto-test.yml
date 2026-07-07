@@ -12,17 +12,14 @@ permissions: {}
 
 jobs:
   auto-test:
-    # Route the amd64 Linux leg to the omniroute self-hosted runner (ADR-0012),
-    # but ONLY for PRs from a branch of this same repo -- never for a fork PR,
-    # where untrusted code would execute on our infra. Every other OS leg
-    # (macOS/Windows/arm) always stays on GitHub-hosted, since omniroute can't
-    # run those and arm64 on it is unverified (see ADR-0012 consequences).
+    # Runs on the omniroute self-hosted runner (ADR-0012) for PRs from a branch
+    # of this same repo; fork PRs fall back to a GitHub-hosted amd64 runner so
+    # untrusted code never executes on our infra.
     runs-on: >-
       ${{
-        matrix.os == 'ubuntu-22.04' &&
         (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
         fromJSON('["self-hosted","omniroute"]') ||
-        matrix.os
+        'ubuntu-22.04'
       }}
     permissions:
       contents: read
@@ -30,16 +27,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # SuperKuma ships as a Linux Docker image (see root Dockerfile /
-        # release-docker.yml) -- macOS/Windows aren't a supported runtime, so
-        # only the Linux legs are tested here.
-        os: [ubuntu-22.04, ubuntu-22.04-arm]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
-        node: [20, 24]
-        # Also test non-LTS, but only on Ubuntu.
-        include:
-          - os: ubuntu-22.04
-            node: 25
+        # SuperKuma ships as ONE Linux Docker image: node:20-bookworm-slim,
+        # linux/amd64 (root Dockerfile + release-docker.yml). Testing other
+        # Node versions or CPU arches validates a runtime the image never
+        # contains, so the backend suite runs only against the shipped runtime.
+        os: [ubuntu-22.04]
+        node: [20]
 
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -66,56 +59,63 @@ jobs:
 
       - run: npm clean-install --no-fund
 
-      - name: Rebuild native modules for ARM64
-        if: matrix.os == 'ubuntu-22.04-arm'
-        run: npm rebuild @louislam/sqlite3
-
       - run: npm run build
       - run: npm run test-backend
         env:
           HEADLESS_TEST: 1
           JUST_FOR_TEST: ${{ secrets.JUST_FOR_TEST }}
 
-  # As a lot of dev dependencies are not supported on ARMv7, we have to test it separately and just test if `npm ci --production` works
-  armv7-simple-test:
-    # Always GitHub-hosted, NOT gated like the other jobs below -- verified
-    # incompatible with omniroute's runner architecture (2026-07-07): the
-    # runner process itself lives inside a container with the HOST's
-    # docker.sock mounted directly (no dind, see ADR-0012), so `docker run -v
-    # $PWD:/workspace` resolves $PWD against the runner container's
-    # filesystem but the bind-mount is created by the HOST daemon -- the path
-    # doesn't exist there, so the arm32v7 container gets an empty
-    # /workspace (no package-lock.json, npm ci fails with EUSAGE). Fixing
-    # this needs a different transfer mechanism (e.g. a named volume + docker
-    # cp) and is out of scope here.
-    runs-on: ubuntu-latest
+  # Build the ACTUAL shipped artifact on every PR and prove the container boots.
+  # This is the single most faithful test we have: it compiles the exact
+  # release Dockerfile (linux/amd64, node:20-bookworm-slim), then boots the
+  # image and confirms server/server.js comes up under dumb-init and serves
+  # HTTP -- exercising the runtime system deps (iputils-ping, sqlite3, tzdata,
+  # curl) that no source-on-the-runner test touches. We poll the HTTP port
+  # directly rather than the baked-in HEALTHCHECK: that healthcheck only passes
+  # on a 302, which a fresh (unconfigured) container may not return, whereas any
+  # HTTP response proves the server booted and bound the port.
+  docker-build-smoke:
+    # Needs the host Docker daemon (omniroute mounts docker.sock, ADR-0012).
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        fromJSON('["self-hosted","omniroute"]') ||
+        'ubuntu-22.04'
+      }}
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [20, 22]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
-
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with: { persist-credentials: false }
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
-        with:
-          platforms: linux/arm/v7
+      - name: Build release image (linux/amd64, no push)
+        run: docker build --platform linux/amd64 -f Dockerfile -t "superkuma:pr-${{ github.sha }}" .
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
-
-      - name: Test on ARMv7 using Docker with QEMU
+      - name: Boot container and smoke-test the HTTP endpoint
         run: |
-          docker run --rm --platform linux/arm/v7 \
-            -v $PWD:/workspace \
-            -w /workspace \
-            arm32v7/node:${{ matrix.node }} \
-            npm clean-install --no-fund --production
+          set -euo pipefail
+          # Ephemeral host port -- the runner is shared, so a fixed 3001 could
+          # collide with another job's container.
+          cid=$(docker run -d -P "superkuma:pr-${{ github.sha }}")
+          echo "cid=$cid" >> "$GITHUB_ENV"
+          port=$(docker inspect -f '{{(index (index .NetworkSettings.Ports "3001/tcp") 0).HostPort}}' "$cid")
+          echo "Container $cid serving on host port $port"
+          # curl --fail exits non-zero on HTTP >= 400 but succeeds on 200/302,
+          # so this is robust to whether the fresh container is in setup mode.
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null "http://localhost:${port}/"; then
+              echo "Container booted and served HTTP OK"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Container did not serve HTTP within timeout"
+          docker logs "$cid"
+          exit 1
+
+      - name: Teardown
+        if: always()
+        run: docker rm -f "${cid:-}" 2>/dev/null || true
 
   check-linters:
     # Same same-repo-only gate as auto-test above -- see ADR-0012.
