@@ -94,16 +94,16 @@ jobs:
       - name: Boot container and smoke-test the HTTP endpoint
         run: |
           set -euo pipefail
-          # Ephemeral host port -- the runner is shared, so a fixed 3001 could
-          # collide with another job's container.
-          cid=$(docker run -d -P "superkuma:pr-${{ github.sha }}")
+          cid=$(docker run -d "superkuma:pr-${{ github.sha }}")
           echo "cid=$cid" >> "$GITHUB_ENV"
-          port=$(docker inspect -f '{{(index (index .NetworkSettings.Ports "3001/tcp") 0).HostPort}}' "$cid")
-          echo "Container $cid serving on host port $port"
-          # curl --fail exits non-zero on HTTP >= 400 but succeeds on 200/302,
-          # so this is robust to whether the fresh container is in setup mode.
+          # curl from INSIDE the container (the image ships curl), not from the
+          # runner: the runner shares the host docker.sock (no dind, see
+          # ADR-0012), so a published port lands on the host, not the runner's
+          # localhost. Exec'ing in also proves the baked-in curl works.
+          # --fail exits non-zero on HTTP >= 400 but succeeds on 200/302, so
+          # this is robust to whether the fresh container is in setup mode.
           for _ in $(seq 1 30); do
-            if curl -fsS -o /dev/null "http://localhost:${port}/"; then
+            if docker exec "$cid" curl -fsS -o /dev/null http://localhost:3001/; then
               echo "Container booted and served HTTP OK"
               exit 0
             fi
