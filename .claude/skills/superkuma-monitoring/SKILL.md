@@ -1,6 +1,6 @@
 ---
 name: superkuma-monitoring
-description: Operate the SuperKuma MCP server and onboard a site's infrastructure into monitoring. Use when setting up or expanding SuperKuma monitoring, using the SuperKuma MCP tools, or discovering/inventorying infrastructure (Active Directory / domain controllers, Proxmox VE, VMware/ESXi, Linux servers, pfSense, Mikrotik, managed switches, UniFi, TrueNAS, IP cameras/NVR, routers) to turn assets into monitors.
+description: Deploy a new SuperKuma instance (Proxmox VM, Docker Compose + MariaDB) and/or operate the SuperKuma MCP server to onboard a site's infrastructure into monitoring. Use when deploying SuperKuma to a client's infrastructure, setting up or expanding SuperKuma monitoring, using the SuperKuma MCP tools, or discovering/inventorying infrastructure (Active Directory / domain controllers, Proxmox VE, VMware/ESXi, Linux servers, pfSense, Mikrotik, managed switches, UniFi, TrueNAS, IP cameras/NVR, routers) to turn assets into monitors.
 ---
 
 # SuperKuma Monitoring
@@ -17,6 +17,9 @@ it.
   `npx mcp-remote https://<instance>/mcp --header "Authorization:Bearer uk1_..."`.
 - Network reach + **read-only** credentials for each system you will inventory.
 - Connection details and the full tool catalog: [references/mcp-tools.md](references/mcp-tools.md).
+- **No instance yet?** See [references/deployment-playbook.md](references/deployment-playbook.md)
+  for standing one up on a client's own infrastructure (Proxmox VM, Docker Compose + MariaDB, and
+  the concrete pitfalls hit doing this in the field) before continuing below.
 
 ## Quick start
 
