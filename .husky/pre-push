@@ -1,0 +1,5 @@
+# Local gate before code reaches the runners: lint + the fast backend unit
+# suite. If either fails the push is blocked, so a broken/red change never
+# burns CI time. Keep this in sync with the CI check-linters + auto-test jobs.
+# (The heavy/flaky server-boot tests were removed; this suite is deterministic.)
+npm run lint && npm run test-backend

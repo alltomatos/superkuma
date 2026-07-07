@@ -1,7 +1,95 @@
 # ADR-0012: Runner self-hosted para o release Docker
 
-- **Status:** Accepted
+- **Status:** Accepted (escopo ampliado em 2026-07-07, ver nota abaixo)
 - **Data:** 2026-07-06
+
+> **Atualização 2026-07-07:** a rejeição de mover `Auto Test`/`validate` para o `omniroute` (ver
+> "Decisão" e "Alternativas consideradas" abaixo) foi revisitada, não revertida. A fila
+> compartilhada do GitHub Actions continuou lenta o suficiente para incomodar no dia a dia, e a
+> objeção original — código de PR de fork externo rodando na nossa infra — tinha uma solução mais
+> simples do que "não fazer isso": condicionar `runs-on` a
+> `github.event.pull_request.head.repo.full_name == github.repository`. PRs de uma branch deste
+> mesmo repositório (o caso comum aqui — não recebemos PRs de forks externos no dia a dia) rodam no
+> `omniroute`; PRs de fork continuam no GitHub-hosted, preservando a garantia original. Aplicado em
+> `auto-test.yml` (jobs `auto-test` — só a perna `ubuntu-22.04`, já que macOS/Windows/arm64 não
+> rodam no `omniroute`/são não-verificados nele —, `check-linters`, `e2e-test`) e `validate.yml`
+> (`json-yaml-validate`, `validate`). `CodeQL`/`zizmor` (scans de segurança first-party do GitHub) e
+> os workflows `pull_request_target` que não fazem checkout de código de PR (`pr-title.yml`,
+> `pr-description-check.yml`) permanecem no GitHub-hosted — não há ganho em movê-los e/ou já não têm
+> o problema de fila que motivou isso.
+>
+> **Dois problemas reais de ambiente encontrados testando isso no próprio PR desse ajuste:**
+>
+> 1. **`armv7-simple-test` NÃO foi movido** — ficou permanentemente em `ubuntu-latest`. Esse job
+>    roda `docker run -v $PWD:/workspace ...` para testar `npm ci` sob QEMU (arm/v7); no `omniroute`
+>    isso resultou em `/workspace` vazio dentro do container (npm ci falhou com
+>    `EUSAGE: package-lock.json not found`). Causa: o runner roda dentro de um container com o
+>    `docker.sock` do HOST montado direto (não um dind aninhado — ver "Decisão" acima), então
+>    `-v $PWD:/workspace` é resolvido pelo daemon do HOST contra o `$PWD` do runner _dentro do seu
+>    próprio container_ — um caminho que não existe no host, então o Docker cria um bind-mount vazio
+>    silenciosamente em vez de falhar. Corrigir exigiria trocar o mecanismo de transferência (volume
+>    nomeado + `docker cp`, por exemplo) — fora do escopo desta mudança.
+> 2. **Falta `libatomic1` na imagem do runner (`gha-runner-official`)** — qualquer job que rode
+>    `actions/setup-node` + `node ...` no `omniroute` falha com
+>    `node: error while loading shared libraries: libatomic.so.1: cannot open shared object file`.
+>    Não é específico de uma versão do Node; é uma lib de sistema (Debian/Ubuntu `libatomic1`)
+>    ausente na imagem base do runner. Precisa ser instalada na imagem/container do runner no
+>    `omniroute` (fora deste repositório) antes que `auto-test`, `check-linters` e `validate`
+>    consigam de fato passar quando roteados para lá.
+
+> **Atualização 2026-07-07 (CI focada no artefato de container):** com o CI já rodando no
+> `omniroute`, a matriz de testes foi realinhada ao que a imagem realmente ship — um único artefato
+> `node:20-bookworm-slim`, `linux/amd64` (Dockerfile raiz + `release-docker.yml`). Mudanças:
+>
+> - **`auto-test` colapsou de 5 pernas para 1** (só `ubuntu-22.04`/node 20). As pernas node 24/25
+>   (runtime não shippado) e `ubuntu-22.04-arm` (arch não shippada, amd64-only) foram removidas.
+> - **`armv7-simple-test` foi DELETADO** — arch não shippada, e já quebrado no `omniroute` (ver
+>   item 1 acima). Não vale um mecanismo de transferência alternativo para testar uma arch que a
+>   imagem nunca contém.
+> - **`CodeQL`: removida a perna `go`** — não há Go no artefato (só scripts em `extra/`).
+> - **Adicionado `docker-build-smoke`**: builda o Dockerfile real (`--platform linux/amd64`) em todo
+>   PR, sobe o container e faz poll do HTTP até responder — a primeira vez que o CI valida o
+>   artefato de fato (dumb-init + `server/server.js` + deps de runtime baked-in) em vez de rodar
+>   fonte no runner. Depende do `docker.sock` do host (que o `omniroute` já monta).
+> - **Testes de integração pesados REMOVIDOS** (princípio: teste deve pegar bug/qualidade de código,
+>   não re-verificar que infra externa que já funciona — um MariaDB real, um endpoint TLS ao vivo —
+>   funciona; isso é redundante e gasta recurso de CI a cada PR). Removidos: os testes testcontainers
+>   de monitor (`test-mqtt/mssql/mysql/oracledb/postgres` inteiros; o "Single Node" de RabbitMQ,
+>   mantendo os testes mockados Multi-Node; os casos MariaDB/MySQL de `test-migration`, mantendo o de
+>   SQLite; o caso `polinux/snmpd` de `test-snmp`, mantendo o de timeout loopback e o stub SNMPv3); os
+>   de internet ao vivo (`test-domain` RDAP inteiro; os 6 testes de host externo em `test-tcp`,
+>   mantendo os loopback + os puros `parseTlsAlertNumber`/`getTlsAlertName`); e o job `e2e-test`
+>   (Playwright/navegador). Removidas também as devDependencies `@testcontainers/*` + `testcontainers`
+>   agora órfãs (−~1.5k linhas de lockfile, `npm ci` mais rápido). O `check-translations` deixou de
+>   buscar o `en.json` do `louislam/uptime-kuma` (acoplava o fork ao upstream, §2). **Fica** a suíte
+>   unitária rápida e determinística (authz/RBAC, federação, uptime-calculator, monitor-model, tipos
+>   de monitor mockados, migração em SQLite, util/format) + lint + validate + o `docker-build-smoke`.
+> - **Removidos 5 workflows de build/release legados** (`build-docker-pr-test`, `build-docker-base`,
+>   `release-beta`, `release-final`, `release-nightly`) que buildavam a imagem `base2` retirada ou
+>   usavam o caminho QEMU+GHCR divergente. O caminho de release real é `auto-release.yml` (tag) →
+>   `release-docker.yml` (imagem amd64 → Docker Hub).
+> - **Camada de testes de integração flaky REMOVIDA.** Os testes que sobem um `SuperKumaServer`/
+>   Socket.io real ou spawnam um processo (RBAC socket-wiring: `test-monitor-socket-authz`,
+>   `-maintenance-authz`, `-status-page-authz`, `-apikey-remoteinstance-authz`, `-client-list-scoping`;
+>   `test-badge-authz`, `test-federation-forwarder/-heartbeat`, `test-prometheus-monitor`,
+>   `test-setup-superadmin`, `test-two-team-isolation-e2e`, `test-rbac-boot-sync`,
+>   `test-room-routing-retrofit`, + o helper `test/prepare-test-server.js`) eram
+>   **não-determinísticos** — arquivos diferentes falhavam a cada run local e a suíte **travava 7,5min+**
+>   no runner (era a causa da "queue"/timeout). Um teste que falha aleatoriamente e bloqueia o CI é
+>   pior que nenhum teste. Fica a suíte unitária determinística (**403 testes, verde em ~1min**): o
+>   motor RBAC (`test-authz`), `actor-repository`, a migração RBAC, guard de superadmin, team-id
+>   loaders, authz a nível de model (docker/proxy/remote-browser/server-notification),
+>   `federation-foundation`, uptime-calculator, monitor-model, tipos de monitor mockados/loopback,
+>   monitor-conditions, notification-providers e util/format. A lógica RBAC core segue coberta pelo
+>   `test-authz`; perde-se a asserção (flaky) do "wiring" de handler.
+> - **Gate local (husky pre-push):** `npm run lint && npm run test-backend` roda antes de cada push;
+>   se falhar, bloqueia o push — os básicos passam localmente ANTES de gastar runner. `prepare: husky`
+>   auto-instala pra todo dev; sai 0 sem `.git`, então o `npm ci` do Dockerfile (que roda antes do
+>   `.git` ser copiado) não é afetado.
+> - **Instalado no `omniroute`** (7 runners registrados para o repo, para paralelizar a fila):
+>   `libatomic1` (item 2 acima) + `iputils-ping`. **Caveat de durabilidade:** esses `apt install` são
+>   no container em execução e se perdem se os runners forem recriados; o fix durável é assá-los na
+>   imagem `gha-runner-official` (infra fora deste repo).
 
 ## Contexto
 

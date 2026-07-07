@@ -12,23 +12,29 @@ permissions: {}
 
 jobs:
   auto-test:
-    runs-on: ${{ matrix.os }}
+    # Runs on the omniroute self-hosted runner (ADR-0012) for PRs from a branch
+    # of this same repo; fork PRs fall back to a GitHub-hosted amd64 runner so
+    # untrusted code never executes on our infra.
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        fromJSON('["self-hosted","omniroute"]') ||
+        'ubuntu-22.04'
+      }}
     permissions:
       contents: read
 
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-22.04, windows-latest, ubuntu-22.04-arm]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
-        node: [20, 24]
-        # Also test non-LTS, but only on Ubuntu.
-        include:
-          - os: ubuntu-22.04
-            node: 25
+        # SuperKuma ships as ONE Linux Docker image: node:20-bookworm-slim,
+        # linux/amd64 (root Dockerfile + release-docker.yml). Testing other
+        # Node versions or CPU arches validates a runtime the image never
+        # contains, so the backend suite runs only against the shipped runtime.
+        os: [ubuntu-22.04]
+        node: [20]
 
     steps:
-      - run: git config --global core.autocrlf false # Mainly for Windows
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with: { persist-credentials: false }
 
@@ -53,49 +59,72 @@ jobs:
 
       - run: npm clean-install --no-fund
 
-      - name: Rebuild native modules for ARM64
-        if: matrix.os == 'ubuntu-22.04-arm'
-        run: npm rebuild @louislam/sqlite3
-
       - run: npm run build
       - run: npm run test-backend
         env:
           HEADLESS_TEST: 1
           JUST_FOR_TEST: ${{ secrets.JUST_FOR_TEST }}
 
-  # As a lot of dev dependencies are not supported on ARMv7, we have to test it separately and just test if `npm ci --production` works
-  armv7-simple-test:
-    runs-on: ubuntu-latest
+  # Build the ACTUAL shipped artifact on every PR and prove the container boots.
+  # This is the single most faithful test we have: it compiles the exact
+  # release Dockerfile (linux/amd64, node:20-bookworm-slim), then boots the
+  # image and confirms server/server.js comes up under dumb-init and serves
+  # HTTP -- exercising the runtime system deps (iputils-ping, sqlite3, tzdata,
+  # curl) that no source-on-the-runner test touches. We poll the HTTP port
+  # directly rather than the baked-in HEALTHCHECK: that healthcheck only passes
+  # on a 302, which a fresh (unconfigured) container may not return, whereas any
+  # HTTP response proves the server booted and bound the port.
+  docker-build-smoke:
+    # Needs the host Docker daemon (omniroute mounts docker.sock, ADR-0012).
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        fromJSON('["self-hosted","omniroute"]') ||
+        'ubuntu-22.04'
+      }}
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [20, 22]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
-
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with: { persist-credentials: false }
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
-        with:
-          platforms: linux/arm/v7
+      - name: Build release image (linux/amd64, no push)
+        run: docker build --platform linux/amd64 -f Dockerfile -t "superkuma:pr-${{ github.sha }}" .
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
-
-      - name: Test on ARMv7 using Docker with QEMU
+      - name: Boot container and smoke-test the HTTP endpoint
         run: |
-          docker run --rm --platform linux/arm/v7 \
-            -v $PWD:/workspace \
-            -w /workspace \
-            arm32v7/node:${{ matrix.node }} \
-            npm clean-install --no-fund --production
+          set -euo pipefail
+          cid=$(docker run -d "superkuma:pr-${{ github.sha }}")
+          echo "cid=$cid" >> "$GITHUB_ENV"
+          # curl from INSIDE the container (the image ships curl), not from the
+          # runner: the runner shares the host docker.sock (no dind, see
+          # ADR-0012), so a published port lands on the host, not the runner's
+          # localhost. Exec'ing in also proves the baked-in curl works.
+          # --fail exits non-zero on HTTP >= 400 but succeeds on 200/302, so
+          # this is robust to whether the fresh container is in setup mode.
+          for _ in $(seq 1 30); do
+            if docker exec "$cid" curl -fsS -o /dev/null http://localhost:3001/; then
+              echo "Container booted and served HTTP OK"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Container did not serve HTTP within timeout"
+          docker logs "$cid"
+          exit 1
+
+      - name: Teardown
+        if: always()
+        run: docker rm -f "${cid:-}" 2>/dev/null || true
 
   check-linters:
-    runs-on: ubuntu-latest
+    # Same same-repo-only gate as auto-test above -- see ADR-0012.
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        fromJSON('["self-hosted","omniroute"]') ||
+        'ubuntu-latest'
+      }}
     permissions:
       contents: read
 
@@ -118,37 +147,3 @@ jobs:
           node-version: 20
       - run: npm clean-install --no-fund
       - run: npm run lint:prod
-
-  e2e-test:
-    runs-on: ubuntu-22.04-arm
-    permissions:
-      contents: read
-    env:
-      PLAYWRIGHT_VERSION: ~1.39.0
-    steps:
-      - run: git config --global core.autocrlf false # Mainly for Windows
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with: { persist-credentials: false }
-
-      #    Tempoary disable until we understand TanStack npm supply-chain compromise
-      #      - name: Cache/Restore node_modules
-      #        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
-      #        id: node-modules-cache
-      #        with:
-      #          path: node_modules
-      #          key: node-modules-${{ runner.os }}-node${{ matrix.node }}-${{ hashFiles('**/package-lock.json') }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
-        with:
-          node-version: 22
-      - run: npm clean-install --no-fund
-
-      - name: Rebuild native modules for ARM64
-        run: npm rebuild @louislam/sqlite3
-
-      - name: Install Playwright ${{ env.PLAYWRIGHT_VERSION }}
-        run: npx playwright@${{ env.PLAYWRIGHT_VERSION }} install
-
-      - run: npm run build
-      - run: npm run test-e2e

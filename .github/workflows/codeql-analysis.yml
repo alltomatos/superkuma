@@ -24,7 +24,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ["go", "javascript-typescript"]
+        # Only the JS/TS server + frontend ships. Go exists solely in extra/
+        # helper scripts (healthcheck.go, push examples) that are never in the
+        # image, so a Go autobuild+scan adds a heavy leg for zero artifact value.
+        language: ["javascript-typescript"]
 
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
