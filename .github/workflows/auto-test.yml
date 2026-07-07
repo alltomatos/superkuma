@@ -76,13 +76,17 @@ jobs:
 
   # As a lot of dev dependencies are not supported on ARMv7, we have to test it separately and just test if `npm ci --production` works
   armv7-simple-test:
-    # Same same-repo-only gate as auto-test above -- see ADR-0012.
-    runs-on: >-
-      ${{
-        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
-        fromJSON('["self-hosted","omniroute"]') ||
-        'ubuntu-latest'
-      }}
+    # Always GitHub-hosted, NOT gated like the other jobs below -- verified
+    # incompatible with omniroute's runner architecture (2026-07-07): the
+    # runner process itself lives inside a container with the HOST's
+    # docker.sock mounted directly (no dind, see ADR-0012), so `docker run -v
+    # $PWD:/workspace` resolves $PWD against the runner container's
+    # filesystem but the bind-mount is created by the HOST daemon -- the path
+    # doesn't exist there, so the arm32v7 container gets an empty
+    # /workspace (no package-lock.json, npm ci fails with EUSAGE). Fixing
+    # this needs a different transfer mechanism (e.g. a named volume + docker
+    # cp) and is out of scope here.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     strategy:

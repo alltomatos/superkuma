@@ -12,11 +12,30 @@
 > mesmo repositório (o caso comum aqui — não recebemos PRs de forks externos no dia a dia) rodam no
 > `omniroute`; PRs de fork continuam no GitHub-hosted, preservando a garantia original. Aplicado em
 > `auto-test.yml` (jobs `auto-test` — só a perna `ubuntu-22.04`, já que macOS/Windows/arm64 não
-> rodam no `omniroute`/são não-verificados nele — `armv7-simple-test`, `check-linters`, `e2e-test`)
-> e `validate.yml` (`json-yaml-validate`, `validate`). `CodeQL`/`zizmor` (scans de segurança
-> first-party do GitHub) e os workflows `pull_request_target` que não fazem checkout de código de
-> PR (`pr-title.yml`, `pr-description-check.yml`) permanecem no GitHub-hosted — não há ganho em
-> movê-los e/ou já não têm o problema de fila que motivou isso.
+> rodam no `omniroute`/são não-verificados nele —, `check-linters`, `e2e-test`) e `validate.yml`
+> (`json-yaml-validate`, `validate`). `CodeQL`/`zizmor` (scans de segurança first-party do GitHub) e
+> os workflows `pull_request_target` que não fazem checkout de código de PR (`pr-title.yml`,
+> `pr-description-check.yml`) permanecem no GitHub-hosted — não há ganho em movê-los e/ou já não têm
+> o problema de fila que motivou isso.
+>
+> **Dois problemas reais de ambiente encontrados testando isso no próprio PR desse ajuste:**
+>
+> 1. **`armv7-simple-test` NÃO foi movido** — ficou permanentemente em `ubuntu-latest`. Esse job
+>    roda `docker run -v $PWD:/workspace ...` para testar `npm ci` sob QEMU (arm/v7); no `omniroute`
+>    isso resultou em `/workspace` vazio dentro do container (npm ci falhou com
+>    `EUSAGE: package-lock.json not found`). Causa: o runner roda dentro de um container com o
+>    `docker.sock` do HOST montado direto (não um dind aninhado — ver "Decisão" acima), então
+>    `-v $PWD:/workspace` é resolvido pelo daemon do HOST contra o `$PWD` do runner _dentro do seu
+>    próprio container_ — um caminho que não existe no host, então o Docker cria um bind-mount vazio
+>    silenciosamente em vez de falhar. Corrigir exigiria trocar o mecanismo de transferência (volume
+>    nomeado + `docker cp`, por exemplo) — fora do escopo desta mudança.
+> 2. **Falta `libatomic1` na imagem do runner (`gha-runner-official`)** — qualquer job que rode
+>    `actions/setup-node` + `node ...` no `omniroute` falha com
+>    `node: error while loading shared libraries: libatomic.so.1: cannot open shared object file`.
+>    Não é específico de uma versão do Node; é uma lib de sistema (Debian/Ubuntu `libatomic1`)
+>    ausente na imagem base do runner. Precisa ser instalada na imagem/container do runner no
+>    `omniroute` (fora deste repositório) antes que `auto-test`, `check-linters` e `validate`
+>    consigam de fato passar quando roteados para lá.
 
 ## Contexto
 
