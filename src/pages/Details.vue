@@ -319,6 +319,11 @@
                         <PingChart v-else :monitor-id="monitor.id" />
                     </div>
                 </div>
+                <div v-if="metricGaugeProps" class="row justify-content-center mt-3">
+                    <div class="col-auto">
+                        <MetricGaugeWidget v-bind="metricGaugeProps" />
+                    </div>
+                </div>
             </div>
 
             <!-- Screenshot -->
@@ -460,6 +465,7 @@ import Uptime from "../components/Uptime.vue";
 import Pagination from "v-pagination-3";
 const PingChart = defineAsyncComponent(() => import("../components/PingChart.vue"));
 const MetricValueChart = defineAsyncComponent(() => import("../components/MetricValueChart.vue"));
+const MetricGaugeWidget = defineAsyncComponent(() => import("../components/MetricGaugeWidget.vue"));
 import Tag from "../components/Tag.vue";
 import CertificateInfo from "../components/CertificateInfo.vue";
 import { getMonitorRelativeURL } from "../util.ts";
@@ -487,6 +493,7 @@ export default {
         Pagination,
         PingChart,
         MetricValueChart,
+        MetricGaugeWidget,
         Tag,
         CertificateInfo,
         PrismEditor,
@@ -596,6 +603,29 @@ export default {
             }
             const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
             return Math.round(avg * 100) / 100;
+        },
+
+        /**
+         * Props for a MetricGaugeWidget for this monitor, or null when it isn't a
+         * prometheus monitor or has no metric value recorded yet. Same shape as
+         * PublicGroupList.vue's metricGaugeProps, but sourced from lastHeartBeat
+         * directly since this page already tracks a single monitor's heartbeats.
+         * @returns {object|null} Props to bind onto MetricGaugeWidget, or null
+         */
+        metricGaugeProps() {
+            if (this.monitor.type !== "prometheus") {
+                return null;
+            }
+            const value = extractMetricValue(this.lastHeartBeat.msg);
+            if (value === null) {
+                return null;
+            }
+            return {
+                value,
+                status: this.lastHeartBeat.status,
+                thresholdOperator: this.monitor.jsonPathOperator,
+                thresholdValue: this.monitor.expectedValue,
+            };
         },
 
         status() {

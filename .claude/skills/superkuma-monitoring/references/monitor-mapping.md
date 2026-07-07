@@ -86,27 +86,34 @@ returned number against a threshold. Point it at a Prometheus fed by `node_expor
 `windows_exporter` (Windows) and `mssql_exporter` (SQL Server); SuperKuma queries the Prometheus
 HTTP API, so **no agent is needed on each host**.
 
-Fields: `url` = Prometheus base URL, `promql` = the query, `conditionOperator` + `expectedValue`
-= the threshold (the monitor is DOWN when it crosses). Optional `bearerToken`; `ignoreTls` for
+Fields: `url` = Prometheus base URL, `promql` = the query, `conditionOperator` + `expectedValue` =
+the threshold. **The monitor logic is `value <conditionOperator> expectedValue` → UP when TRUE,
+DOWN when FALSE** (same `evaluateJsonQuery` mechanism the `snmp`/`json-query` types use — see
+`server/monitor-types/prometheus.js`). This trips people up because it's the inverse of how you'd
+naturally phrase an alert threshold: to express "DOWN when CPU > 90%" you must give the operator
+for the **healthy** side, `<=` `90`, not `>` `90` — verified the hard way in the field (Tecbrita,
+2026-07-07: created 4 monitors with the intuitive-but-inverted operator, all reported DOWN despite
+healthy hosts, e.g. `19% free RAM < 10` evaluating false → DOWN, when 19% free is fine). Always
+phrase the table below as "UP while", not "DOWN when". Optional `bearerToken`; `ignoreTls` for
 self-signed TLS. The query must return a single number — add label filters like
 `{instance="10.0.0.10:9100"}` so it resolves to one series per monitor.
 
-| Metric               | PromQL                                                                           | DOWN when |
-| -------------------- | -------------------------------------------------------------------------------- | --------- |
-| CPU % (Linux)        | `100 - avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m]))*100`      | `>` `90`  |
-| CPU % (Windows)      | `100 - avg by(instance)(rate(windows_cpu_time_total{mode="idle"}[5m]))*100`      | `>` `90`  |
-| Free RAM % (Linux)   | `node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100`              | `<` `10`  |
-| Free RAM % (Windows) | `windows_os_physical_memory_free_bytes / windows_cs_physical_memory_bytes * 100` | `<` `10`  |
-| Free disk %          | `node_filesystem_avail_bytes / node_filesystem_size_bytes * 100`                 | `<` `10`  |
-| Disk I/O saturation  | `rate(node_disk_io_time_seconds_total[5m])`                                      | `>` `0.9` |
-| SQL Server up        | `mssql_up`                                                                       | `!=` `1`  |
-| SQL Server deadlocks | `rate(mssql_deadlocks[5m])`                                                      | `>` `0`   |
+| Metric               | PromQL                                                                           | UP while   |
+| -------------------- | -------------------------------------------------------------------------------- | ---------- |
+| CPU % (Linux)        | `100 - avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m]))*100`      | `<=` `90`  |
+| CPU % (Windows)      | `100 - avg by(instance)(rate(windows_cpu_time_total{mode="idle"}[5m]))*100`      | `<=` `90`  |
+| Free RAM % (Linux)   | `node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100`              | `>=` `10`  |
+| Free RAM % (Windows) | `windows_memory_physical_free_bytes / windows_memory_physical_total_bytes * 100` | `>=` `10`  |
+| Free disk %          | `node_filesystem_avail_bytes / node_filesystem_size_bytes * 100`                 | `>=` `10`  |
+| Disk I/O saturation  | `rate(node_disk_io_time_seconds_total[5m])`                                      | `<=` `0.9` |
+| SQL Server up        | `mssql_up`                                                                       | `==` `1`   |
+| SQL Server deadlocks | `rate(mssql_deadlocks[5m])`                                                      | `<=` `0`   |
 
 ```jsonc
-// CPU alert via Prometheus — DOWN when CPU > 90%
+// CPU alert via Prometheus — UP while CPU <= 90% (i.e. DOWN once it exceeds 90%)
 { "type": "prometheus", "name": "node01 — CPU", "url": "http://prometheus:9090",
   "promql": "100 - avg by(instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))*100",
-  "conditionOperator": ">", "expectedValue": "90", "parent": <hqGroupId> }
+  "conditionOperator": "<=", "expectedValue": "90", "parent": <hqGroupId> }
 ```
 
 ## Example payloads
