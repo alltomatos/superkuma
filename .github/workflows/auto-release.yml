@@ -7,6 +7,14 @@ name: Auto Release on Main
 # builds and publishes the Docker Hub image -- so bumping the version in a PR
 # is the only manual step; tag, changelog and image publish all follow
 # automatically once that PR reaches main.
+#
+# Runs on the omniroute self-hosted runner (see ADR-0012) rather than a
+# GitHub-hosted one, since this only ever fires on pushes to main (never
+# PR-triggered, so no untrusted-code exposure) and avoids depending on the
+# shared GitHub Actions runner queue for something this lightweight. That
+# runner's image doesn't have node or the gh CLI installed, only git/curl/jq
+# -- so this uses jq for version parsing and the GitHub REST API directly via
+# curl instead of `gh release create`.
 
 on:
   push:
@@ -17,13 +25,15 @@ permissions: {}
 jobs:
   auto-tag:
     if: github.repository == 'alltomatos/superkuma'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, omniroute]
     timeout-minutes: 10
     permissions:
       contents: write
 
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      # Pinned to v4 (node20) rather than v6 (node24): the omniroute runner's
+      # agent predates node24 action support (see release-docker.yml).
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
           persist-credentials: true
@@ -31,8 +41,9 @@ jobs:
       - name: Tag and release if package.json version is new
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
-          VERSION=$(node -p "require('./package.json').version")
+          VERSION=$(jq -r .version package.json)
           TAG="v${VERSION}"
 
           if git rev-parse "${TAG}" >/dev/null 2>&1; then
@@ -45,4 +56,9 @@ jobs:
           git tag -a "${TAG}" -m "${TAG}"
           git push origin "${TAG}"
 
-          gh release create "${TAG}" --title "${TAG}" --generate-notes
+          jq -n --arg tag "$TAG" '{tag_name: $tag, name: $tag, generate_release_notes: true}' \
+            | curl -sf -X POST \
+                -H "Authorization: Bearer ${GH_TOKEN}" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/repos/${REPO}/releases" \
+                -d @-
