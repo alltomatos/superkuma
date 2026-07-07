@@ -82,12 +82,16 @@ to recreate the VM from scratch if you got the network/access config wrong the f
 Then just: `curl -fsSL https://get.docker.com | sh` — works cleanly on a real VM kernel, no
 sysctl/namespace fights.
 
-## 2. Deploy: Docker Compose, MariaDB from the start
+## 2. Deploy: Docker Compose, MariaDB + Prometheus from the start
 
 Reuse the same shape as every other instance this skill has deployed: SuperKuma + MariaDB (per
 [ADR-0009](../../../../docs/adr/0009-master-long-term-metrics-history.md) — MariaDB is the
-recommended engine beyond a small standalone), on their own bridge network, MariaDB **never**
-published on a host port:
+recommended engine beyond a small standalone) + **Prometheus + node-exporter** (for host CPU/RAM
+metrics — see [prometheus-exporters.md](prometheus-exporters.md) and
+[monitor-mapping.md](monitor-mapping.md#deep-host-metrics-via-prometheus-cpuramdisk-io-sql-server)),
+all on their own bridge network. MariaDB and Prometheus are **never** published on a host port —
+SuperKuma reaches Prometheus internally at `http://prometheus:9090` via the compose network, so no
+extra firewall rule is needed:
 
 ```yaml
 services:
@@ -116,9 +120,78 @@ services:
     volumes: ["./mariadb-data:/var/lib/mysql"]
     networks: [superkuma-net]
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: superkuma-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks: [superkuma-net]
+
+  node-exporter: # this VM's own CPU/RAM (the SuperKuma host) -- other hosts add themselves
+    image: prom/node-exporter:latest # as scrape targets in prometheus.yml, see below
+    container_name: superkuma-node-exporter
+    restart: unless-stopped
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    networks: [superkuma-net]
+
 networks:
   superkuma-net: { driver: bridge }
+
+volumes:
+  prometheus-data:
 ```
+
+`./prometheus/prometheus.yml` (create before `docker compose up`):
+
+```yaml
+global:
+  scrape_interval: 30s
+
+scrape_configs:
+  - job_name: "superkuma-host" # this VM's own metrics, via the bundled node-exporter above
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  # Add one static_config block per additional Linux/Windows host you want CPU/RAM
+  # monitors for, once its exporter is installed (see prometheus-exporters.md):
+  # - job_name: "linux-servers"
+  #   static_configs:
+  #     - targets: ["<host-ip>:9100"]
+  #       labels: { host: "<name>" }
+  # - job_name: "windows-servers"
+  #   static_configs:
+  #     - targets: ["<host-ip>:9182"]
+  #       labels: { host: "<name>" }
+```
+
+Verified working in the field (Tecbrita deployment, 2026-07-07): the bundled node-exporter reported
+this VM's real `node_memory_MemTotal_bytes`/CPU immediately with no extra config, and a remote
+Proxmox-host node_exporter (installed per prometheus-exporters.md) was reachable and scraped
+successfully over the LAN with `job: health: up`.
+
+### Windows targets need the exporter installed on-host — WinRM from an off-domain box won't work
+
+`windows_exporter` isn't containerized (see prometheus-exporters.md) — it installs directly on each
+Windows host. Don't assume you can push that install remotely via WinRM/PowerShell-remoting from an
+un-domain-joined machine: WinRM's default NTLM negotiation rejects even correct domain-admin
+credentials (`401`/`InvalidCredentialsError`) unless the calling machine is domain-joined or
+explicitly added to that host's `TrustedHosts`. Retrying with different username formats
+(`DOMAIN\user` vs `user@domain`) does **not** fix this — don't burn AD lockout attempts on it.
+Fastest path: hand the client (or an operator with console/RDP access on that box) the
+`msiexec`/`ENABLED_COLLECTORS` one-liner from prometheus-exporters.md to run locally, or fix WinRM
+trust first (`winrm quickconfig` + `Set-Item WSMan:\localhost\Client\TrustedHosts` on the target, or
+join the calling box to the domain / go through a jump host that's already domain-joined).
 
 Complete the DB setup via the REST endpoint (no UI needed, works before any user exists):
 

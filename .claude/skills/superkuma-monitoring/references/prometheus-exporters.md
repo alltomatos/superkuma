@@ -47,7 +47,13 @@ Installs and starts as a Windows service automatically. Metrics at
 `http://<host>:9182/metrics`. Verified names:
 
 - CPU: `windows_cpu_time_total` (filter `mode="idle"`)
-- Memory: `windows_os_physical_memory_free_bytes`, `windows_cs_physical_memory_bytes` (total)
+- Memory: `windows_memory_physical_free_bytes`, `windows_memory_physical_total_bytes` (total) —
+  confirmed against a real `windows_exporter` v0.30.4 install (Tecbrita, 2026-07-07). Older docs
+  and some tutorials reference `windows_os_physical_memory_free_bytes`/
+  `windows_cs_physical_memory_bytes` — those names come from an older exporter version and were
+  **not present** on v0.30.4; always confirm against your own `/metrics` output
+  (`curl host:9182/metrics | grep windows_memory` or Prometheus's
+  `/api/v1/label/__name__/values`) before wiring a monitor, metric names do drift across releases.
 - Logical disk: `windows_logical_disk_free_bytes`, `windows_logical_disk_size_bytes`,
   `windows_logical_disk_requests_queued`, `windows_logical_disk_read_bytes_total`,
   `windows_logical_disk_write_bytes_total`
@@ -114,16 +120,21 @@ mssql_database_filesize{database="MyApp", type="LOG"} > 5000000
 
 ### SuperKuma monitor examples
 
+The `prometheus` monitor type is UP when `value <conditionOperator> expectedValue` is TRUE — give
+the operator for the **healthy** side, not the alert side (see
+[monitor-mapping.md](monitor-mapping.md#deep-host-metrics-via-prometheus-cpuramdisk-io-sql-server)
+for the full explanation and a field-verified example of getting this backwards).
+
 ```jsonc
-// Page life expectancy — DOWN below 300s (memory pressure)
+// Page life expectancy — UP while >= 300s (DOWN below 300s = memory pressure)
 { "type": "prometheus", "name": "sql01 — PLE", "url": "http://prometheus:9090",
   "promql": "mssql_page_life_expectancy{instance=\"sql01:4000\"}",
-  "conditionOperator": "<", "expectedValue": "300" }
+  "conditionOperator": ">=", "expectedValue": "300" }
 
-// Deadlocks in the last 5 minutes — DOWN if any occurred
+// Deadlocks in the last 5 minutes — UP while none occurred (DOWN if any did)
 { "type": "prometheus", "name": "sql01 — deadlocks", "url": "http://prometheus:9090",
   "promql": "rate(mssql_deadlocks{instance=\"sql01:4000\"}[5m])",
-  "conditionOperator": ">", "expectedValue": "0" }
+  "conditionOperator": "<=", "expectedValue": "0" }
 ```
 
 Always scope the query to one instance (`{instance="host:port"}`) so it resolves to a single

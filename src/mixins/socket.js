@@ -46,6 +46,7 @@ export default {
             maintenanceList: {},
             apiKeyList: {},
             remoteInstanceList: [],
+            userList: [],
             heartbeatList: {},
             avgPingList: {},
             uptimeList: {},
@@ -572,6 +573,38 @@ export default {
             socket.emit("getRemoteInstanceList", (res) => {
                 if (res.ok) {
                     this.remoteInstanceList = res.remoteInstanceList;
+                }
+                callback(res);
+            });
+        },
+
+        /**
+         * Fetch and store the list of registered users.
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        getUserList(callback) {
+            if (!callback) {
+                callback = () => {};
+            }
+            socket.emit("getUserList", (res) => {
+                if (res.ok) {
+                    this.userList = res.userList;
+                }
+                callback(res);
+            });
+        },
+
+        /**
+         * Create a new user; the server emails them their credentials.
+         * @param {object} user User to add ({ username, email, password })
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        addUser(user, callback) {
+            socket.emit("addUser", user, (res) => {
+                if (res.ok) {
+                    this.getUserList();
                 }
                 callback(res);
             });

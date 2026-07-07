@@ -32,6 +32,8 @@ import Proxies from "./components/settings/Proxies.vue";
 import About from "./components/settings/About.vue";
 import RemoteBrowsers from "./components/settings/RemoteBrowsers.vue";
 import Federation from "./components/settings/Federation.vue";
+import Users from "./components/settings/Users.vue";
+import Mail from "./components/settings/Mail.vue";
 
 const routes = [
     {
@@ -123,6 +125,14 @@ const routes = [
                             {
                                 path: "security",
                                 component: Security,
+                            },
+                            {
+                                path: "users",
+                                component: Users,
+                            },
+                            {
+                                path: "mail",
+                                component: Mail,
                             },
                             {
                                 path: "api-keys",
