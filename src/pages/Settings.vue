@@ -112,6 +112,12 @@ export default {
                 security: {
                     title: this.$t("Security"),
                 },
+                users: {
+                    title: this.$t("Users"),
+                },
+                mail: {
+                    title: this.$t("Mail"),
+                },
                 "api-keys": {
                     title: this.$t("API Keys"),
                 },
