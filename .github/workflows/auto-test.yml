@@ -12,7 +12,18 @@ permissions: {}
 
 jobs:
   auto-test:
-    runs-on: ${{ matrix.os }}
+    # Route the amd64 Linux leg to the omniroute self-hosted runner (ADR-0012),
+    # but ONLY for PRs from a branch of this same repo -- never for a fork PR,
+    # where untrusted code would execute on our infra. Every other OS leg
+    # (macOS/Windows/arm) always stays on GitHub-hosted, since omniroute can't
+    # run those and arm64 on it is unverified (see ADR-0012 consequences).
+    runs-on: >-
+      ${{
+        matrix.os == 'ubuntu-22.04' &&
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        fromJSON('["self-hosted","omniroute"]') ||
+        matrix.os
+      }}
     permissions:
       contents: read
 
@@ -65,7 +76,13 @@ jobs:
 
   # As a lot of dev dependencies are not supported on ARMv7, we have to test it separately and just test if `npm ci --production` works
   armv7-simple-test:
-    runs-on: ubuntu-latest
+    # Same same-repo-only gate as auto-test above -- see ADR-0012.
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        fromJSON('["self-hosted","omniroute"]') ||
+        'ubuntu-latest'
+      }}
     permissions:
       contents: read
     strategy:
@@ -95,7 +112,13 @@ jobs:
             npm clean-install --no-fund --production
 
   check-linters:
-    runs-on: ubuntu-latest
+    # Same same-repo-only gate as auto-test above -- see ADR-0012.
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        fromJSON('["self-hosted","omniroute"]') ||
+        'ubuntu-latest'
+      }}
     permissions:
       contents: read
 
@@ -120,7 +143,14 @@ jobs:
       - run: npm run lint:prod
 
   e2e-test:
-    runs-on: ubuntu-22.04-arm
+    # Same same-repo-only gate as auto-test above -- see ADR-0012. Falls back
+    # to the arm GitHub-hosted runner (unchanged prior behavior) for fork PRs.
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        fromJSON('["self-hosted","omniroute"]') ||
+        'ubuntu-22.04-arm'
+      }}
     permissions:
       contents: read
     env:

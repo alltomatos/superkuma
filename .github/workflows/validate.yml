@@ -16,7 +16,15 @@ permissions: {}
 
 jobs:
   json-yaml-validate:
-    runs-on: ubuntu-latest
+    # Route to the omniroute self-hosted runner (ADR-0012) only for PRs from a
+    # branch of this same repo -- fork PRs stay on GitHub-hosted, since this
+    # job checks out and processes PR-controlled content.
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        fromJSON('["self-hosted","omniroute"]') ||
+        'ubuntu-latest'
+      }}
     permissions:
       contents: read
       pull-requests: write # enable write permissions for pull request comments
@@ -33,7 +41,13 @@ jobs:
 
   # General validations
   validate:
-    runs-on: ubuntu-latest
+    # Same same-repo-only gate as json-yaml-validate above -- see ADR-0012.
+    runs-on: >-
+      ${{
+        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+        fromJSON('["self-hosted","omniroute"]') ||
+        'ubuntu-latest'
+      }}
     permissions:
       contents: read
     steps:

@@ -1,7 +1,22 @@
 # ADR-0012: Runner self-hosted para o release Docker
 
-- **Status:** Accepted
+- **Status:** Accepted (escopo ampliado em 2026-07-07, ver nota abaixo)
 - **Data:** 2026-07-06
+
+> **Atualização 2026-07-07:** a rejeição de mover `Auto Test`/`validate` para o `omniroute` (ver
+> "Decisão" e "Alternativas consideradas" abaixo) foi revisitada, não revertida. A fila
+> compartilhada do GitHub Actions continuou lenta o suficiente para incomodar no dia a dia, e a
+> objeção original — código de PR de fork externo rodando na nossa infra — tinha uma solução mais
+> simples do que "não fazer isso": condicionar `runs-on` a
+> `github.event.pull_request.head.repo.full_name == github.repository`. PRs de uma branch deste
+> mesmo repositório (o caso comum aqui — não recebemos PRs de forks externos no dia a dia) rodam no
+> `omniroute`; PRs de fork continuam no GitHub-hosted, preservando a garantia original. Aplicado em
+> `auto-test.yml` (jobs `auto-test` — só a perna `ubuntu-22.04`, já que macOS/Windows/arm64 não
+> rodam no `omniroute`/são não-verificados nele — `armv7-simple-test`, `check-linters`, `e2e-test`)
+> e `validate.yml` (`json-yaml-validate`, `validate`). `CodeQL`/`zizmor` (scans de segurança
+> first-party do GitHub) e os workflows `pull_request_target` que não fazem checkout de código de
+> PR (`pr-title.yml`, `pr-description-check.yml`) permanecem no GitHub-hosted — não há ganho em
+> movê-los e/ou já não têm o problema de fila que motivou isso.
 
 ## Contexto
 
