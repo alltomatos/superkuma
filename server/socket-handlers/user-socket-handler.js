@@ -9,6 +9,7 @@ const { requirePermission, ForbiddenError } = require("../security/authz");
 const { z } = require("zod");
 const { validate } = require("../validation");
 const TranslatableError = require("../translatable-error");
+const User = require("../model/user");
 
 // bcrypt (via bcryptjs) only uses the first ~72 UTF-8 bytes of its input --
 // anything past that is silently ignored, so two passwords that differ only
@@ -26,7 +27,10 @@ const passwordField = z
 const addUserSchema = z.object({
     username: z.string().trim().min(1).max(255),
     email: z.string().trim().email().max(255),
-    password: passwordField.optional(),
+    // An empty string (the form's "leave blank to auto-generate" state) must
+    // stay valid here -- only .optional() would reject it, since it only
+    // allows `undefined`, not "".
+    password: z.union([passwordField, z.literal("")]).optional(),
 });
 
 const resendWelcomeSchema = z.object({
@@ -37,6 +41,11 @@ const setUserPasswordSchema = z.object({
     id: z.number().int().positive(),
     password: passwordField,
     sendEmail: z.boolean().optional().default(false),
+});
+
+const setUserSuperadminSchema = z.object({
+    id: z.number().int().positive(),
+    isSuperadmin: z.boolean(),
 });
 
 /**
@@ -81,9 +90,13 @@ function assertCanModifyCredentials(actor, targetUser) {
 /**
  * Handlers for admin-driven user management (creating additional users).
  * @param {Socket} socket Socket.io instance
+ * @param {SuperKumaServer} server SuperKuma server instance, used to force-disconnect a demoted
+ * user's other live sockets so a superadmin revocation takes effect immediately rather than only
+ * on that user's next reconnect (their socket.actor -- cached once at login -- would otherwise
+ * keep granting stale superadmin-only reads/writes for as long as the connection stays open).
  * @returns {void}
  */
-module.exports.userSocketHandler = (socket) => {
+module.exports.userSocketHandler = (socket, server) => {
     // Create a new user and email them their credentials
     socket.on("addUser", async (userInput, callback) => {
         try {
@@ -285,6 +298,88 @@ module.exports.userSocketHandler = (socket) => {
             callback({
                 ok: true,
                 msg: msgByEmailStatus[emailStatus],
+                msgi18n: true,
+            });
+        } catch (e) {
+            callback({
+                ok: false,
+                msg: e.message,
+                msgi18n: !!e.msgi18n,
+            });
+        }
+    });
+
+    // Grant or revoke superadmin status. Gated on the CALLER already being a
+    // superadmin -- the coarse "user:manage" permission alone isn't enough,
+    // since under RBAC's dark-launch default (ADR-0010) it's a no-op that
+    // passes for every authenticated actor, which would otherwise let anyone
+    // promote themselves. Refuses to demote the last remaining active
+    // superadmin, which would leave the instance with nobody able to manage it.
+    socket.on("setUserSuperadmin", async (input, callback) => {
+        try {
+            checkLogin(socket);
+            requirePermission(socket.actor, "user:manage", {});
+
+            // Re-fetch the caller's live status from the DB rather than trusting
+            // socket.actor.isSuperadmin: that flag is cached once at login and
+            // never refreshed on this connection, so a just-demoted admin whose
+            // socket is still open would otherwise be able to re-grant
+            // themselves superadmin using nothing but the stale cached value.
+            const caller = await R.findOne("user", "id = ?", [socket.userID]);
+            if (!(caller && caller.is_superadmin)) {
+                throw new ForbiddenError("Only a superadmin can grant or revoke superadmin status.");
+            }
+
+            const { id, isSuperadmin } = validate(setUserSuperadminSchema, input);
+
+            const user = await R.findOne("user", "id = ?", [id]);
+            if (!user) {
+                throw new Error("User not found.");
+            }
+
+            if (isSuperadmin) {
+                user.is_superadmin = true;
+                await R.store(user);
+            } else if (user.is_superadmin && user.active) {
+                // Atomic conditional demotion: the guard (is another active
+                // superadmin left?) and the write happen in a single UPDATE
+                // statement instead of a separate count-then-store, closing the
+                // gap where two concurrent demotions could each read a
+                // pre-decrement count and both succeed, leaving zero
+                // superadmins with no in-app way to promote anyone back.
+                await R.exec(
+                    `UPDATE user SET is_superadmin = 0 WHERE id = ? AND is_superadmin = 1
+                     AND (SELECT COUNT(*) FROM user WHERE is_superadmin = 1 AND active = 1 AND id != ?) > 0`,
+                    [id, id]
+                );
+                const stillSuperadmin = await R.getCell("SELECT is_superadmin FROM user WHERE id = ?", [id]);
+                if (stillSuperadmin) {
+                    throw new TranslatableError("cannotRemoveLastSuperadmin");
+                }
+                // socket.actor is cached once at login and never refreshed on an
+                // already-open connection, so without this the demoted user's
+                // existing socket(s) would keep granting superadmin-only reads
+                // (e.g. every other user's monitor credentials) and writes (e.g.
+                // overwriting another superadmin's password) until they happened
+                // to reconnect on their own -- potentially indefinitely. Force
+                // that now, the same way changePassword/enableAuth do.
+                server.disconnectAllSocketClients(id);
+                // Belt-and-suspenders for the reconnect itself: reject any JWT
+                // issued before this demotion, in case a stale token is replayed
+                // instead of a fresh login.
+                await User.bumpTokenVersion(id);
+            } else if (user.is_superadmin) {
+                // Already-inactive superadmin: no "last superadmin" risk from
+                // clearing a disabled account's stale flag, so skip the guard.
+                user.is_superadmin = false;
+                await R.store(user);
+            }
+
+            log.debug("user", `Superadmin ${isSuperadmin ? "granted" : "revoked"} by admin: ${id}`);
+
+            callback({
+                ok: true,
+                msg: isSuperadmin ? "userPromotedToSuperadmin" : "userDemotedFromSuperadmin",
                 msgi18n: true,
             });
         } catch (e) {

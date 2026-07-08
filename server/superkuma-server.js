@@ -267,7 +267,25 @@ class SuperKumaServer {
     /**
      * Get a list of monitors visible to the given actor.
      * @param {object} actor - The RBAC actor to scope the list to (ADR-0010). While
-     * enforcement is OFF, behaves exactly as the legacy per-user filter did.
+     * enforcement is OFF, behaves exactly as the legacy per-user filter did --
+     * except for a superadmin, who always sees every monitor. This carve-out is
+     * deliberately local to this function rather than in `scopeFilter()` itself:
+     * several other `scopeFilter()` call sites (notifications, proxies, remote
+     * browsers) hand back plaintext secrets with no per-row filtering, so a
+     * blanket superadmin bypass in the shared function would leak those across
+     * users while enforcement is off. Monitors are the one resource an admin
+     * genuinely needs full (including credential) visibility into to manage them.
+     *
+     * Note this intentionally does NOT gate on `isEnforcementEnabled()` the way
+     * `scopeFilter()`'s own superadmin carve-out does -- it applies as soon as
+     * `is_superadmin` is set, dark-launch or not. That is a deliberate deviation
+     * from ADR-0010's "flag-OFF byte-identical" contract, accepted because on a
+     * single- or few-admin instance there is no one else's monitor to leak. If an
+     * instance ever has multiple users who each own private monitors and only
+     * SOME of them should be promoted to superadmin without inheriting visibility
+     * into everyone else's monitor credentials, gate this on `isEnforcementEnabled()`
+     * too (matching every other `scopeFilter()` call site) instead of granting
+     * that account superadmin.
      * @param {number} monitorID - The ID of monitor for.
      * @returns {Promise<object>} A promise that resolves to an object with monitor IDs as keys and monitor objects as values.
      *
@@ -275,7 +293,7 @@ class SuperKumaServer {
      */
     async getMonitorJSONList(actor, monitorID = null) {
         const { scopeFilter } = require("./security/authz");
-        const filter = scopeFilter(actor);
+        const filter = actor && actor.isSuperadmin ? { clause: "1 = 1", params: [] } : scopeFilter(actor);
         let query = filter.clause + " ";
         let queryParams = [...filter.params];
 

@@ -70,8 +70,10 @@ class User extends BeanModel {
     }
 
     /**
-     * Increment a user's token version, invalidating all their existing JWTs
-     * (used for admin-forced logout and role changes; wired in a later phase).
+     * Increment a user's token version, invalidating all their existing JWTs.
+     * Called from setUserSuperadmin's demotion path (alongside an immediate
+     * live-socket disconnect) so a stale/replayed JWT can't be used to regain
+     * a revoked superadmin's privileges.
      * @param {number} userID The user whose tokens to revoke
      * @returns {Promise<void>}
      */

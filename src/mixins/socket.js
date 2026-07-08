@@ -634,6 +634,17 @@ export default {
         },
 
         /**
+         * Grant or revoke superadmin status for an existing user.
+         * @param {number} id ID of the user to update
+         * @param {boolean} isSuperadmin Whether the user should be a superadmin
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        setUserSuperadmin(id, isSuperadmin, callback) {
+            socket.emit("setUserSuperadmin", { id, isSuperadmin }, callback);
+        },
+
+        /**
          * Send a test email to a chosen recipient using the (possibly
          * unsaved) SMTP settings form.
          * @param {object} mailSettings Mail settings from the settings form
