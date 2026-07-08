@@ -23,15 +23,21 @@
                     <td>{{ item.username }}</td>
                     <td>{{ item.email }}</td>
                     <td class="text-end">
-                        <button
-                            v-if="item.email"
-                            class="btn btn-normal btn-sm"
-                            type="button"
-                            @click="resendDialog(item.id)"
-                        >
-                            <font-awesome-icon icon="paper-plane" />
-                            {{ $t("Resend Welcome Email") }}
-                        </button>
+                        <div class="d-flex gap-2 justify-content-end">
+                            <button
+                                v-if="item.email"
+                                class="btn btn-normal btn-sm"
+                                type="button"
+                                @click="resendDialog(item.id)"
+                            >
+                                <font-awesome-icon icon="paper-plane" />
+                                {{ $t("Resend Welcome Email") }}
+                            </button>
+                            <button class="btn btn-normal btn-sm" type="button" @click="setPasswordDialog(item.id)">
+                                <font-awesome-icon icon="key" />
+                                {{ $t("Set Password") }}
+                            </button>
+                        </div>
                     </td>
                 </tr>
             </tbody>
@@ -42,31 +48,91 @@
         <Confirm ref="confirmResend" :yes-text="$t('Yes')" :no-text="$t('No')" @yes="resendWelcome">
             {{ $t("resendWelcomeMsg") }}
         </Confirm>
+
+        <!-- Manual password entry for an existing user -->
+        <div ref="setPasswordModal" class="modal fade" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form @submit.prevent="submitSetPassword">
+                        <div class="modal-header">
+                            <h5 class="modal-title">{{ $t("Set Password") }}</h5>
+                            <button
+                                type="button"
+                                class="btn-close"
+                                data-bs-dismiss="modal"
+                                :aria-label="$t('Close')"
+                            />
+                        </div>
+                        <div class="modal-body">
+                            <label class="form-label" for="newUserPassword">{{ $t("Password") }}</label>
+                            <HiddenInput id="newUserPassword" v-model="newPassword" required />
+
+                            <div class="form-check form-switch">
+                                <input
+                                    id="setPasswordSendEmail"
+                                    v-model="setPasswordSendEmail"
+                                    class="form-check-input"
+                                    type="checkbox"
+                                    :disabled="!selectedUserEmail"
+                                />
+                                <label class="form-check-label" for="setPasswordSendEmail">
+                                    {{ $t("notifyUserByEmail") }}
+                                </label>
+                            </div>
+                            <div v-if="!selectedUserEmail" class="form-text">{{ $t("userHasNoEmail") }}</div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary" :disabled="settingPassword">
+                                <div v-if="settingPassword" class="spinner-border spinner-border-sm me-1"></div>
+                                {{ $t("Set Password") }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script>
+import { Modal } from "bootstrap";
 import UserDialog from "../../components/UserDialog.vue";
 import Confirm from "../Confirm.vue";
+import HiddenInput from "../../components/HiddenInput.vue";
 
 export default {
     components: {
         UserDialog,
         Confirm,
+        HiddenInput,
     },
     data() {
         return {
             selectedUserID: null,
+            newPassword: "",
+            setPasswordSendEmail: false,
+            settingPassword: false,
+            setPasswordModal: null,
         };
     },
     computed: {
         userList() {
             return this.$root.userList;
         },
+        /**
+         * Email of the user currently targeted by the set-password modal, or
+         * null (used to gate the "notify by email" checkbox).
+         * @returns {string|null} The selected user's email, or null
+         */
+        selectedUserEmail() {
+            const user = (this.userList || []).find((item) => item.id === this.selectedUserID);
+            return (user && user.email) || null;
+        },
     },
 
     mounted() {
         this.$root.getUserList();
+        this.setPasswordModal = new Modal(this.$refs.setPasswordModal);
     },
 
     methods: {
@@ -87,6 +153,33 @@ export default {
         resendWelcome() {
             this.$root.resendWelcome(this.selectedUserID, (res) => {
                 this.$root.toastRes(res);
+            });
+        },
+
+        /**
+         * Open the manual password-entry modal for a user.
+         * @param {number} id ID of the user to set a password for
+         * @returns {void}
+         */
+        setPasswordDialog(id) {
+            this.selectedUserID = id;
+            this.newPassword = "";
+            this.setPasswordSendEmail = false;
+            this.setPasswordModal.show();
+        },
+
+        /**
+         * Set the selected user's password to the typed value.
+         * @returns {void}
+         */
+        submitSetPassword() {
+            this.settingPassword = true;
+            this.$root.setUserPassword(this.selectedUserID, this.newPassword, this.setPasswordSendEmail, (res) => {
+                this.settingPassword = false;
+                this.$root.toastRes(res);
+                if (res.ok) {
+                    this.setPasswordModal.hide();
+                }
             });
         },
     },

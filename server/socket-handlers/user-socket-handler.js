@@ -5,19 +5,38 @@ const { nanoid } = require("nanoid");
 const { passwordStrength } = require("check-password-strength");
 const passwordHash = require("../password-hash");
 const mailer = require("../mailer");
-const { requirePermission } = require("../security/authz");
+const { requirePermission, ForbiddenError } = require("../security/authz");
 const { z } = require("zod");
 const { validate } = require("../validation");
 const TranslatableError = require("../translatable-error");
 
+// bcrypt (via bcryptjs) only uses the first ~72 UTF-8 bytes of its input --
+// anything past that is silently ignored, so two passwords that differ only
+// after that point hash identically. Reject upfront rather than letting an
+// admin believe they set a long/multi-byte password that was quietly
+// truncated with no error anywhere in the flow.
+const passwordField = z
+    .string()
+    .min(1)
+    .max(255)
+    .refine((pw) => Buffer.byteLength(pw, "utf8") <= 72, {
+        message: "Password is too long for bcrypt (max 72 bytes once UTF-8 encoded).",
+    });
+
 const addUserSchema = z.object({
     username: z.string().trim().min(1).max(255),
     email: z.string().trim().email().max(255),
-    password: z.string().max(255).optional(),
+    password: passwordField.optional(),
 });
 
 const resendWelcomeSchema = z.object({
     id: z.number().int().positive(),
+});
+
+const setUserPasswordSchema = z.object({
+    id: z.number().int().positive(),
+    password: passwordField,
+    sendEmail: z.boolean().optional().default(false),
 });
 
 /**
@@ -40,6 +59,23 @@ async function sendCredentialsEmail(username, email, password, subject, intro) {
         subject,
         text: `Olá ${username},\n\n${intro}\n\nUsuário: ${username}\nSenha: ${password}\n\nRecomendamos alterar sua senha após o primeiro acesso.`,
     });
+}
+
+/**
+ * Refuse to let a non-superadmin actor change a superadmin's credentials.
+ * The "user:manage" permission is coarse (and, under RBAC's dark-launch
+ * default per ADR-0010, a no-op that allows every authenticated actor) --
+ * without this check, any caller reaching resendWelcome/setUserPassword
+ * could silently take over the superadmin account.
+ * @param {object} actor The calling actor (socket.actor)
+ * @param {object} targetUser The user bean about to have its credentials changed
+ * @returns {void}
+ * @throws {ForbiddenError} If a non-superadmin actor targets a superadmin user
+ */
+function assertCanModifyCredentials(actor, targetUser) {
+    if (targetUser.is_superadmin && !(actor && actor.isSuperadmin)) {
+        throw new ForbiddenError("Only a superadmin can change another superadmin's credentials.");
+    }
 }
 
 /**
@@ -147,6 +183,7 @@ module.exports.userSocketHandler = (socket) => {
             if (!user) {
                 throw new Error("User not found.");
             }
+            assertCanModifyCredentials(socket.actor, user);
             if (!user.email) {
                 throw new TranslatableError("userHasNoEmail");
             }
@@ -174,6 +211,80 @@ module.exports.userSocketHandler = (socket) => {
             callback({
                 ok: true,
                 msg: "welcomeEmailResent",
+                msgi18n: true,
+            });
+        } catch (e) {
+            callback({
+                ok: false,
+                msg: e.message,
+                msgi18n: !!e.msgi18n,
+            });
+        }
+    });
+
+    // Set an existing user's password to an admin-chosen value (as opposed
+    // to resendWelcome's random-and-emailed reissue). Unlike resendWelcome,
+    // the password is persisted immediately: the admin already knows the
+    // value they typed, so there's no "nobody received it" risk to guard
+    // against by delaying the write. Notifying the user by email is
+    // optional and best-effort -- a manually-set password is often meant to
+    // be communicated out of band (in person, chat, phone).
+    socket.on("setUserPassword", async (input, callback) => {
+        try {
+            checkLogin(socket);
+            requirePermission(socket.actor, "user:manage", {});
+
+            const { id, password, sendEmail } = validate(setUserPasswordSchema, input);
+
+            const user = await R.findOne("user", "id = ?", [id]);
+            if (!user) {
+                throw new Error("User not found.");
+            }
+            assertCanModifyCredentials(socket.actor, user);
+
+            if (passwordStrength(password).value === "Too weak") {
+                throw new TranslatableError("passwordTooWeak");
+            }
+
+            user.password = await passwordHash.generate(password);
+            await R.store(user);
+
+            log.debug("user", `Password set by admin: ${user.id}`);
+
+            // Three distinct outcomes for the (optional) notification, so the
+            // admin-facing message always matches the real cause instead of
+            // conflating "no email on file" with "SMTP send failed".
+            let emailStatus = "skipped";
+            if (sendEmail) {
+                if (!user.email) {
+                    emailStatus = "noEmail";
+                } else {
+                    try {
+                        await sendCredentialsEmail(
+                            user.username,
+                            user.email,
+                            password,
+                            "Sua senha no SuperKuma foi alterada",
+                            "Um administrador definiu uma nova senha para sua conta no SuperKuma."
+                        );
+                        emailStatus = "sent";
+                    } catch (e) {
+                        log.error("user", `Failed to email the new password to user ${user.id}: ${e.message}`);
+                        emailStatus = "failed";
+                    }
+                }
+            }
+
+            const msgByEmailStatus = {
+                skipped: "userPasswordSet",
+                sent: "userPasswordSet",
+                noEmail: "userPasswordSetNoEmailOnFile",
+                failed: "userPasswordSetEmailFailed",
+            };
+
+            callback({
+                ok: true,
+                msg: msgByEmailStatus[emailStatus],
                 msgi18n: true,
             });
         } catch (e) {
