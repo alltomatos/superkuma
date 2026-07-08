@@ -450,7 +450,7 @@ describe("Monitor model - characterization", () => {
             ]);
         });
 
-        test("type=prometheus additionally exposes jsonPathOperator/expectedValue (needed by the status page gauge widget)", async () => {
+        test("type=prometheus additionally exposes jsonPathOperator/expectedValue/metricUnit (needed by the status page gauge widget)", async () => {
             const monitor = await createMonitor({
                 type: "prometheus",
                 name: "public prometheus monitor",
@@ -458,17 +458,54 @@ describe("Monitor model - characterization", () => {
                 databaseQuery: "up{job=\"node\"}",
                 jsonPathOperator: ">",
                 expectedValue: "90",
+                metricUnit: "%",
             });
             monitor.sendUrl = false;
 
             const json = await monitor.toPublicJSON();
             const keys = Object.keys(json).sort();
 
-            assert.deepStrictEqual(keys, ["expectedValue", "id", "jsonPathOperator", "name", "sendUrl", "type"]);
+            assert.deepStrictEqual(keys, [
+                "expectedValue",
+                "id",
+                "jsonPathOperator",
+                "metricUnit",
+                "name",
+                "sendUrl",
+                "type",
+            ]);
             assert.strictEqual(json.jsonPathOperator, ">");
             assert.strictEqual(json.expectedValue, "90");
+            assert.strictEqual(json.metricUnit, "%");
             // The PromQL query itself is NOT exposed -- only the threshold.
             assert.strictEqual("databaseQuery" in json, false);
+        });
+
+        test("type=snmp and type=json-query also expose the threshold + unit (metric gauge on status pages)", async () => {
+            for (const type of ["snmp", "json-query"]) {
+                const monitor = await createMonitor({
+                    type,
+                    name: `public ${type} monitor`,
+                    url: "http://example:8080",
+                    jsonPath: "$",
+                    jsonPathOperator: "<",
+                    expectedValue: "400",
+                    metricUnit: "GB",
+                });
+                monitor.sendUrl = false;
+
+                const json = await monitor.toPublicJSON();
+                const keys = Object.keys(json).sort();
+
+                assert.deepStrictEqual(
+                    keys,
+                    ["expectedValue", "id", "jsonPathOperator", "metricUnit", "name", "sendUrl", "type"],
+                    `unexpected public key set for ${type}`
+                );
+                assert.strictEqual(json.metricUnit, "GB");
+                // The jsonata query expression itself is NOT exposed.
+                assert.strictEqual("jsonPath" in json, false);
+            }
         });
     });
 

@@ -3,8 +3,7 @@
         <div class="gauge-canvas-wrapper">
             <Doughnut :data="chartData" :options="chartOptions" />
             <div class="gauge-value" :style="{ color: statusColor }">
-                {{ displayValue }}
-                <span v-if="unit" class="gauge-unit">{{ unit }}</span>
+                {{ displayValue }}<span v-if="unit" class="gauge-unit">{{ unitSuffix }}</span>
             </div>
         </div>
         <div class="gauge-threshold">{{ thresholdLabel }}</div>
@@ -48,7 +47,7 @@ export default {
             type: [String, Number],
             default: null,
         },
-        /** Optional fixed gauge ceiling. Auto-scaled from value/threshold when omitted. */
+        /** Optional fixed gauge ceiling (e.g. 100 for "%"). When omitted, the ceiling is the alert threshold, falling back to 1.25x the value. */
         max: {
             type: Number,
             default: null,
@@ -64,10 +63,17 @@ export default {
             if (this.max !== null) {
                 return this.max;
             }
+            // Anchor the ceiling to the alert threshold so the arc reads as
+            // "value relative to your limit": a "<" usage monitor fills toward
+            // the limit (disk 120/400 = 30%), a ">" headroom monitor stays full
+            // while safe and drains as it nears the floor. This avoids the old
+            // auto-scale that pinned every above-threshold value at a flat 80%.
             const threshold = Number(this.thresholdValue);
-            const reference = Math.max(this.value, Number.isNaN(threshold) ? 0 : threshold);
-            // Auto-scale with headroom above the larger of value/threshold; never 0 (div-by-zero guard).
-            return Math.max(reference * 1.25, 1);
+            if (Number.isFinite(threshold) && threshold > 0) {
+                return threshold;
+            }
+            // No usable threshold: fall back to headroom above the value.
+            return Math.max(this.value * 1.25, 1);
         },
         clampedValue() {
             return Math.max(0, Math.min(this.value, this.gaugeMax));
@@ -77,14 +83,26 @@ export default {
         },
         displayValue() {
             // Trim to a sane number of decimals for display without implying false precision.
-            const rounded = Math.round(this.value * 100) / 100;
-            return rounded.toLocaleString();
+            // Plain number (not toLocaleString) so it matches the CountUp stat boxes,
+            // which use a dot decimal separator regardless of locale.
+            return Math.round(this.value * 100) / 100;
+        },
+        /**
+         * The unit spaced for display: no space before "%", a leading space
+         * before alphabetic units. Matches CountUp's metric mode.
+         * @returns {string} The spaced unit suffix, or "".
+         */
+        unitSuffix() {
+            if (this.unit && this.unit !== "%") {
+                return ` ${this.unit}`;
+            }
+            return this.unit;
         },
         thresholdLabel() {
             if (!this.thresholdOperator || this.thresholdValue === null || this.thresholdValue === undefined) {
                 return "";
             }
-            return `${this.thresholdOperator} ${this.thresholdValue}${this.unit}`;
+            return `${this.thresholdOperator} ${this.thresholdValue}${this.unitSuffix}`;
         },
         chartData() {
             return {
@@ -140,7 +158,6 @@ export default {
 .gauge-unit {
     font-size: 0.7em;
     font-weight: normal;
-    margin-left: 1px;
 }
 
 .gauge-threshold {

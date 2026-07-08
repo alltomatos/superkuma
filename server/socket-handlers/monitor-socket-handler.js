@@ -224,6 +224,7 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
             bean.mqttWebsocketPath = monitor.mqttWebsocketPath;
             bean.databaseConnectionString = monitor.databaseConnectionString;
             bean.databaseQuery = monitor.databaseQuery;
+            bean.metricUnit = monitor.metricUnit;
             bean.authMethod = monitor.authMethod;
             bean.authWorkstation = monitor.authWorkstation;
             bean.authDomain = monitor.authDomain;

@@ -54,6 +54,9 @@ Run this loop per site:
    ([references/prometheus-exporters.md](references/prometheus-exporters.md), example stack in
    [assets/prometheus-stack/](assets/prometheus-stack/)) and add `prometheus`-type monitors
    ([references/monitor-mapping.md](references/monitor-mapping.md#deep-host-metrics-via-prometheus-cpuramdisk-io-sql-server)).
+   Set `metricUnit` (`%`, `GB`, …) on these — and on any numeric `snmp` / `json-query` monitor —
+   so the detail page shows a value gauge + trend chart (`%` gives a fixed 0-100 scale); it's the
+   unit that turns a threshold check into a readable metric dial.
 
 ## Safety
 

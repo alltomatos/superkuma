@@ -63,12 +63,23 @@ export default {
             };
         },
         chartOptions() {
+            // Captured in a local so the tick/tooltip callbacks (called with
+            // chart.js's own `this`) can reach the unit. No space before "%",
+            // a space before alphabetic units ("18%" vs "115 GB").
+            const isPercent = this.unit === "%";
+            const suffix = this.unit ? (isPercent ? "%" : ` ${this.unit}`) : "";
             return {
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: false,
                 plugins: {
                     legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            // Round like the stat boxes so the tooltip doesn't leak raw float noise.
+                            label: (ctx) => `${Math.round(ctx.parsed.y * 100) / 100}${suffix}`,
+                        },
+                    },
                 },
                 scales: {
                     x: {
@@ -76,7 +87,15 @@ export default {
                         ticks: { maxRotation: 0 },
                     },
                     y: {
-                        beginAtZero: true,
+                        // Percentages anchor at 0 with a soft 100 ceiling (spikes past
+                        // 100 still show); absolute units auto-fit around the data band
+                        // instead of being flattened against a 0 floor.
+                        beginAtZero: isPercent,
+                        suggestedMax: isPercent ? 100 : undefined,
+                        ticks: {
+                            // Label the axis with the unit so "18" reads as "18%".
+                            callback: (value) => `${value}${suffix}`,
+                        },
                     },
                 },
             };

@@ -101,6 +101,7 @@ const DIRECT_FIELDS = [
     "dns_resolve_server",
     "active",
     "expectedValue",
+    "metricUnit",
 ];
 
 /**

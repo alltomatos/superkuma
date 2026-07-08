@@ -18,7 +18,7 @@ How to turn each discovered asset/service into `create_monitor` calls. Defaults:
 | SNMP device (switch/router/UPS)                | `snmp`                                                     | `hostname`, `snmpVersion`, `snmpOid`, community                                                                                       |
 | Docker container                               | `docker`                                                   | container name + a configured Docker host in SuperKuma                                                                                |
 | Push-only host (agent behind NAT)              | `push`                                                     | host runs a cron that pings the generated push URL                                                                                    |
-| Host metrics (CPU/RAM/disk I/O, SQL Server)    | `prometheus`                                               | `url` (Prometheus), `promql`, `conditionOperator`, `expectedValue` — see below                                                        |
+| Host metrics (CPU/RAM/disk I/O, SQL Server)    | `prometheus`                                               | `url` (Prometheus), `promql`, `conditionOperator`, `expectedValue`, `metricUnit` (`%`/`GB`/…) — see below                             |
 | Certificate expiry                             | `http`                                                     | `expiryNotification: true` (fires ahead of expiry)                                                                                    |
 
 ## Per-platform recipe
@@ -98,23 +98,36 @@ phrase the table below as "UP while", not "DOWN when". Optional `bearerToken`; `
 self-signed TLS. The query must return a single number — add label filters like
 `{instance="10.0.0.10:9100"}` so it resolves to one series per monitor.
 
-| Metric               | PromQL                                                                           | UP while   |
-| -------------------- | -------------------------------------------------------------------------------- | ---------- |
-| CPU % (Linux)        | `100 - avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m]))*100`      | `<=` `90`  |
-| CPU % (Windows)      | `100 - avg by(instance)(rate(windows_cpu_time_total{mode="idle"}[5m]))*100`      | `<=` `90`  |
-| Free RAM % (Linux)   | `node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100`              | `>=` `10`  |
-| Free RAM % (Windows) | `windows_memory_physical_free_bytes / windows_memory_physical_total_bytes * 100` | `>=` `10`  |
-| Free disk %          | `node_filesystem_avail_bytes / node_filesystem_size_bytes * 100`                 | `>=` `10`  |
-| Disk I/O saturation  | `rate(node_disk_io_time_seconds_total[5m])`                                      | `<=` `0.9` |
-| SQL Server up        | `mssql_up`                                                                       | `==` `1`   |
-| SQL Server deadlocks | `rate(mssql_deadlocks[5m])`                                                      | `<=` `0`   |
+Set **`metricUnit`** to the unit the query returns (`%`, `GB`, `MB`, `s`, …). It's display-only —
+it doesn't change the query — but the monitor page uses it to label the value and to render a
+**radial gauge + trend chart**: **`%` locks both to a fixed 0-100 scale**, any other unit
+auto-scales toward the threshold. Always set `%` for the percentage queries below so CPU/RAM read
+on a proper 0-100 gauge; use `GB`/`MB` for byte-derived queries.
+
+| Metric               | PromQL                                                                           | UP while   | Unit |
+| -------------------- | -------------------------------------------------------------------------------- | ---------- | ---- |
+| CPU % (Linux)        | `100 - avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m]))*100`      | `<=` `90`  | `%`  |
+| CPU % (Windows)      | `100 - avg by(instance)(rate(windows_cpu_time_total{mode="idle"}[5m]))*100`      | `<=` `90`  | `%`  |
+| Free RAM % (Linux)   | `node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100`              | `>=` `10`  | `%`  |
+| Free RAM % (Windows) | `windows_memory_physical_free_bytes / windows_memory_physical_total_bytes * 100` | `>=` `10`  | `%`  |
+| Free disk %          | `node_filesystem_avail_bytes / node_filesystem_size_bytes * 100`                 | `>=` `10`  | `%`  |
+| Disk I/O saturation  | `rate(node_disk_io_time_seconds_total[5m])`                                      | `<=` `0.9` | —    |
+| SQL Server up        | `mssql_up`                                                                       | `==` `1`   | —    |
+| SQL Server deadlocks | `rate(mssql_deadlocks[5m])`                                                      | `<=` `0`   | —    |
 
 ```jsonc
 // CPU alert via Prometheus — UP while CPU <= 90% (i.e. DOWN once it exceeds 90%)
 { "type": "prometheus", "name": "node01 — CPU", "url": "http://prometheus:9090",
   "promql": "100 - avg by(instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))*100",
-  "conditionOperator": "<=", "expectedValue": "90", "parent": <hqGroupId> }
+  "conditionOperator": "<=", "expectedValue": "90", "metricUnit": "%", "parent": <hqGroupId> }
 ```
+
+**The metric UI is not Prometheus-only.** Any monitor whose check yields a *number* against a
+threshold — `prometheus`, and numeric `snmp` / `json-query` — renders the same value + gauge +
+trend + min/max on its detail page (and a gauge on public status pages), with the uptime-%
+boxes hidden. So the SNMP temperature/PSU and json-query numeric examples above also benefit from
+a `metricUnit` (e.g. `°C`, `GB`). A `snmp`/`json-query` monitor that compares a *string* keeps the
+normal uptime display. Set `metricUnit` on those too when the compared value is numeric.
 
 ## Example payloads
 

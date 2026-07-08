@@ -901,6 +901,28 @@
                                         />
                                     </div>
                                 </div>
+
+                                <div class="my-2">
+                                    <label for="metric_unit" class="form-label">{{ $t("Unit") }}</label>
+                                    <input
+                                        id="metric_unit"
+                                        v-model="monitor.metricUnit"
+                                        list="metric-unit-suggestions"
+                                        type="text"
+                                        class="form-control"
+                                        maxlength="20"
+                                        placeholder="%"
+                                        :required="monitor.type === 'prometheus'"
+                                    />
+                                    <datalist id="metric-unit-suggestions">
+                                        <option value="%" />
+                                        <option value="GB" />
+                                        <option value="MB" />
+                                        <option value="s" />
+                                        <option value="ms" />
+                                    </datalist>
+                                    <div class="form-text">{{ $t("metricUnitDescription") }}</div>
+                                </div>
                             </div>
 
                             <!-- DNS Resolver Server -->
@@ -3405,6 +3427,12 @@ message HealthCheckResponse {
             // Set default condition for jsonPathOperator
             if (!this.monitor.jsonPathOperator) {
                 this.monitor.jsonPathOperator = "==";
+            }
+
+            // Default the metric unit to "%" for prometheus (CPU/RAM/usage are
+            // typically percentages) so the gauge/chart use the 0-100 scale.
+            if (this.monitor.type === "prometheus" && !this.monitor.metricUnit) {
+                this.monitor.metricUnit = "%";
             }
 
             // Get the game list from server

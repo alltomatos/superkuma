@@ -162,7 +162,7 @@
                             style="font-size: 30px"
                             data-testid="monitor-status"
                         >
-                            {{ status.text }}
+                            {{ isMetricMonitor ? metricStatusText : status.text }}
                         </span>
                     </div>
                 </div>
@@ -206,7 +206,15 @@
 
             <!-- Stats -->
             <div class="shadow-box big-padding text-center stats">
-                <div class="row">
+                <div class="row align-items-center">
+                    <!-- Metric gauge (prometheus/snmp/json-query monitors) -- shown on the
+                         same row as the value stats instead of below the chart. -->
+                    <div
+                        v-if="isMetricMonitor && metricGaugeProps"
+                        class="col-12 col-sm-auto d-flex justify-content-center mb-3 mb-sm-0"
+                    >
+                        <MetricGaugeWidget v-bind="metricGaugeProps" />
+                    </div>
                     <div
                         v-if="monitor.type !== 'group'"
                         class="col-12 col-sm col row d-flex align-items-center d-sm-block"
@@ -216,8 +224,9 @@
                         <span class="col-4 col-sm-12 num">
                             <a href="#" @click.prevent="showPingChartBox = !showPingChartBox">
                                 <CountUp
-                                    :value="monitor.type === 'prometheus' ? metricCurrentValue : ping"
-                                    :unit="monitor.type === 'prometheus' ? '' : 'ms'"
+                                    :value="isMetricMonitor ? metricCurrentValue : ping"
+                                    :unit="isMetricMonitor ? metricUnit : 'ms'"
+                                    :metric="isMetricMonitor"
                                 />
                             </a>
                         </span>
@@ -228,18 +237,46 @@
                     >
                         <h4 class="col-4 col-sm-12">{{ pingTitle(true) }}</h4>
                         <p class="col-4 col-sm-12 mb-0 mb-sm-2">
-                            ({{ monitor.type === "prometheus" ? $t("recent") : $t("hours", 24) }})
+                            ({{ isMetricMonitor ? $t("recent") : $t("hours", 24) }})
                         </p>
                         <span class="col-4 col-sm-12 num">
                             <CountUp
-                                :value="monitor.type === 'prometheus' ? metricAvgValue : avgPing"
-                                :unit="monitor.type === 'prometheus' ? '' : 'ms'"
+                                :value="isMetricMonitor ? metricAvgValue : avgPing"
+                                :unit="isMetricMonitor ? metricUnit : 'ms'"
+                                :metric="isMetricMonitor"
                             />
                         </span>
                     </div>
 
+                    <!-- Minimum / Maximum (metric monitors) -- these replace the uptime
+                         stats below, which measure % of time healthy rather than the
+                         metric's own consumption (confusing for CPU/RAM/disk). -->
+                    <div
+                        v-if="isMetricMonitor"
+                        class="col-12 col-sm col row d-flex align-items-center d-sm-block"
+                    >
+                        <h4 class="col-4 col-sm-12">{{ $t("Minimum") }}</h4>
+                        <p class="col-4 col-sm-12 mb-0 mb-sm-2">({{ $t("recent") }})</p>
+                        <span class="col-4 col-sm-12 num">
+                            <CountUp :value="metricMinValue" :unit="metricUnit" metric />
+                        </span>
+                    </div>
+                    <div
+                        v-if="isMetricMonitor"
+                        class="col-12 col-sm col row d-flex align-items-center d-sm-block"
+                    >
+                        <h4 class="col-4 col-sm-12">{{ $t("Maximum") }}</h4>
+                        <p class="col-4 col-sm-12 mb-0 mb-sm-2">({{ $t("recent") }})</p>
+                        <span class="col-4 col-sm-12 num">
+                            <CountUp :value="metricMaxValue" :unit="metricUnit" metric />
+                        </span>
+                    </div>
+
                     <!-- Uptime (24-hour) -->
-                    <div class="col-12 col-sm col row d-flex align-items-center d-sm-block">
+                    <div
+                        v-if="!isMetricMonitor"
+                        class="col-12 col-sm col row d-flex align-items-center d-sm-block"
+                    >
                         <h4 class="col-4 col-sm-12">{{ $t("Uptime") }}</h4>
                         <p class="col-4 col-sm-12 mb-0 mb-sm-2">({{ $t("hours", 24) }})</p>
                         <span class="col-4 col-sm-12 num">
@@ -248,7 +285,10 @@
                     </div>
 
                     <!-- Uptime (30-day) -->
-                    <div class="col-12 col-sm col row d-flex align-items-center d-sm-block">
+                    <div
+                        v-if="!isMetricMonitor"
+                        class="col-12 col-sm col row d-flex align-items-center d-sm-block"
+                    >
                         <h4 class="col-4 col-sm-12">{{ $t("Uptime") }}</h4>
                         <p class="col-4 col-sm-12 mb-0 mb-sm-2">({{ $t("days", 30) }})</p>
                         <span class="col-4 col-sm-12 num">
@@ -257,7 +297,10 @@
                     </div>
 
                     <!-- Uptime (1-year) -->
-                    <div class="col-12 col-sm col row d-flex align-items-center d-sm-block">
+                    <div
+                        v-if="!isMetricMonitor"
+                        class="col-12 col-sm col row d-flex align-items-center d-sm-block"
+                    >
                         <h4 class="col-4 col-sm-12">{{ $t("Uptime") }}</h4>
                         <p class="col-4 col-sm-12 mb-0 mb-sm-2">({{ $t("years", 1) }})</p>
                         <span class="col-4 col-sm-12 num">
@@ -309,19 +352,18 @@
                 </div>
             </transition>
 
-            <!-- Ping Chart (or the metric-value chart for prometheus monitors, which have no
-                 meaningful ping/latency -- their heartbeat.ping is just the PromQL query
+            <!-- Ping Chart (or the metric-value chart for metric monitors, which have no
+                 meaningful ping/latency -- their heartbeat.ping is just the query
                  round-trip time, not a value worth charting) -->
             <div v-if="showPingChartBox" class="shadow-box big-padding text-center ping-chart-wrapper">
                 <div class="row">
                     <div class="col">
-                        <MetricValueChart v-if="monitor.type === 'prometheus'" :monitor-id="monitor.id" />
+                        <MetricValueChart
+                            v-if="isMetricMonitor"
+                            :monitor-id="monitor.id"
+                            :unit="metricUnit"
+                        />
                         <PingChart v-else :monitor-id="monitor.id" />
-                    </div>
-                </div>
-                <div v-if="metricGaugeProps" class="row justify-content-center mt-3">
-                    <div class="col-auto">
-                        <MetricGaugeWidget v-bind="metricGaugeProps" />
                     </div>
                 </div>
             </div>
@@ -469,7 +511,7 @@ const MetricGaugeWidget = defineAsyncComponent(() => import("../components/Metri
 import Tag from "../components/Tag.vue";
 import CertificateInfo from "../components/CertificateInfo.vue";
 import { getMonitorRelativeURL } from "../util.ts";
-import { extractMetricValue } from "../metric-value.js";
+import { extractMetricValue, isMetricMonitorType } from "../metric-value.js";
 import { URL } from "whatwg-url";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
@@ -578,9 +620,20 @@ export default {
         },
 
         /**
-         * Current PromQL value for a prometheus monitor (extracted from its latest
-         * heartbeat message -- see extractMetricValue). Used in place of `ping` in
-         * the stats row, since ping there is just the query round-trip time.
+         * Whether to render this monitor with the metric UI (gauge, chart, unit,
+         * min/max) instead of the ping/uptime UI. True for a metric-capable type
+         * (prometheus/snmp/json-query) that actually has a recent numeric value --
+         * so a string-comparison json-query keeps its normal display.
+         * @returns {boolean} True when the metric UI applies.
+         */
+        isMetricMonitor() {
+            return isMetricMonitorType(this.monitor.type) && this.recentMetricValues.length > 0;
+        },
+
+        /**
+         * Current metric value (extracted from its latest heartbeat message --
+         * see extractMetricValue). Used in place of `ping` in the stats row,
+         * since ping there is just the query round-trip time.
          * @returns {number|string} The current value, or a "not available" string
          */
         metricCurrentValue() {
@@ -589,7 +642,7 @@ export default {
         },
 
         /**
-         * Average PromQL value across the recent (raw) heartbeats held in
+         * Average metric value across the recent (raw) heartbeats held in
          * $root.heartbeatList -- same "recent checks only" scope as
          * MetricValueChart.vue, not a true 24h aggregate (stat_* tables only
          * retain ping stats, not arbitrary metric values).
@@ -606,14 +659,73 @@ export default {
         },
 
         /**
+         * The unit configured on a metric monitor (e.g. "%", "GB", "MB").
+         * Besides labelling the value, "%" switches the gauge and chart to a
+         * fixed 0-100 scale; any other unit (or empty) auto-scales instead.
+         * @returns {string} The unit suffix, or "".
+         */
+        metricUnit() {
+            return isMetricMonitorType(this.monitor.type) ? this.monitor.metricUnit || "" : "";
+        },
+
+        /**
+         * Minimum metric value across the recent (raw) heartbeats -- same "recent
+         * checks only" scope as metricAvgValue.
+         * @returns {number|string} The minimum, or a "not available" string.
+         */
+        metricMinValue() {
+            const values = this.recentMetricValues;
+            return values.length ? Math.round(Math.min(...values) * 100) / 100 : this.$t("notAvailableShort");
+        },
+
+        /**
+         * Maximum metric value across the recent (raw) heartbeats.
+         * @returns {number|string} The maximum, or a "not available" string.
+         */
+        metricMaxValue() {
+            const values = this.recentMetricValues;
+            return values.length ? Math.round(Math.max(...values) * 100) / 100 : this.$t("notAvailableShort");
+        },
+
+        /**
+         * The numeric metric values from the recent heartbeats, filtered of
+         * un-parseable entries. Shared by the avg/min/max stat computeds.
+         * @returns {number[]} The recent numeric values.
+         */
+        recentMetricValues() {
+            const heartbeats = this.$root.heartbeatList[this.monitor.id] ?? [];
+            return heartbeats.map((beat) => extractMetricValue(beat.msg)).filter((v) => v !== null);
+        },
+
+        /**
+         * Human status label for a metric monitor -- "Healthy"/"Critical" reads
+         * better than "Up"/"Down" for a threshold on CPU/RAM/disk.
+         * @returns {string} The localized status text.
+         */
+        metricStatusText() {
+            switch (this.lastHeartBeat.status) {
+                case 1:
+                    return this.$t("Healthy");
+                case 0:
+                    return this.$t("Critical");
+                case 2:
+                    return this.$t("Pending");
+                case 3:
+                    return this.$t("statusMaintenance");
+                default:
+                    return this.$t("Unknown");
+            }
+        },
+
+        /**
          * Props for a MetricGaugeWidget for this monitor, or null when it isn't a
-         * prometheus monitor or has no metric value recorded yet. Same shape as
+         * metric monitor or has no metric value recorded yet. Same shape as
          * PublicGroupList.vue's metricGaugeProps, but sourced from lastHeartBeat
          * directly since this page already tracks a single monitor's heartbeats.
          * @returns {object|null} Props to bind onto MetricGaugeWidget, or null
          */
         metricGaugeProps() {
-            if (this.monitor.type !== "prometheus") {
+            if (!this.isMetricMonitor) {
                 return null;
             }
             const value = extractMetricValue(this.lastHeartBeat.msg);
@@ -625,6 +737,9 @@ export default {
                 status: this.lastHeartBeat.status,
                 thresholdOperator: this.monitor.jsonPathOperator,
                 thresholdValue: this.monitor.expectedValue,
+                unit: this.metricUnit,
+                // A percentage metric has a natural 0-100 gauge; others auto-scale.
+                max: this.metricUnit === "%" ? 100 : null,
             };
         },
 
@@ -832,12 +947,12 @@ export default {
                 translationPrefix = "Avg. ";
             }
 
-            if (this.monitor.type === "http" || this.monitor.type === "keyword" || this.monitor.type === "json-query") {
-                return this.$t(translationPrefix + "Response");
+            if (this.isMetricMonitor) {
+                return this.$t(translationPrefix + "Value");
             }
 
-            if (this.monitor.type === "prometheus") {
-                return this.$t(translationPrefix + "Value");
+            if (this.monitor.type === "http" || this.monitor.type === "keyword" || this.monitor.type === "json-query") {
+                return this.$t(translationPrefix + "Response");
             }
 
             return this.$t(translationPrefix + "Ping");

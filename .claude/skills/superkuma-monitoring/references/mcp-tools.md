@@ -63,6 +63,12 @@ Common fields:
 - `prometheus` type: `url` (Prometheus base URL), `promql` (query returning one number),
   `conditionOperator` (`>`,`>=`,`<`,`<=`,`==`,`!=`,`contains`) + `expectedValue` (the threshold),
   optional `bearerToken` / `ignoreTls`. See [monitor-mapping.md](monitor-mapping.md#deep-host-metrics-via-prometheus-cpuramdisk-io-sql-server).
+- `metricUnit` — display unit for a **metric monitor** (`prometheus`, and numeric `snmp` /
+  `json-query`), e.g. `%`, `GB`, `MB`, `s`. Labels the value and drives the monitor page's
+  gauge + trend chart. **`%` locks the gauge and chart to a fixed 0-100 scale**; any other unit
+  auto-scales toward the threshold. It's display-only — set it to match what the query returns
+  (e.g. a PromQL `…* 100` → `%`, a bytes-÷-1e9 query → `GB`). Prefer setting it (especially `%`)
+  so CPU/RAM read on a proper 0-100 gauge instead of auto-scaling.
 - `url` (http/keyword/json-query), `hostname` + `port` (port/dns/snmp/db types).
 - `interval` (s, ≥20), `retryInterval`, `maxretries`, `upsideDown`.
 - `keyword` + `invertKeyword` (keyword type); `acceptedStatusCodes` e.g. `["200-299"]` (http).

@@ -69,6 +69,14 @@ const commonMonitorShape = {
         .string()
         .optional()
         .describe("Value the query result is compared against, for the conditionOperator"),
+    metricUnit: z
+        .string()
+        .optional()
+        .describe(
+            "Display unit for a metric monitor (prometheus/snmp/json-query), e.g. '%', 'GB', 'MB', 's'. Shown " +
+                "next to the value, gauge and chart on the monitor page. '%' puts the gauge and chart on a fixed " +
+                "0-100 scale; any other unit auto-scales. Does not change the query -- match it to what the query returns."
+        ),
     bearerToken: z.string().optional().describe("Optional Bearer token for auth (http/prometheus types)"),
 };
 

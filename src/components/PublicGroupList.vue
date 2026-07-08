@@ -142,6 +142,7 @@ import Uptime from "./Uptime.vue";
 import Tag from "./Tag.vue";
 import Status from "./Status.vue";
 import MetricGaugeWidget from "./MetricGaugeWidget.vue";
+import { isMetricMonitorType } from "../metric-value.js";
 
 export default {
     components: {
@@ -302,14 +303,15 @@ export default {
         },
 
         /**
-         * Props for a MetricGaugeWidget rendered under a prometheus-type monitor, or
-         * null when this monitor doesn't have one (wrong type, or no metric value
-         * recorded yet on its last heartbeat -- see Heartbeat.toPublicJSON).
+         * Props for a MetricGaugeWidget rendered under a metric-type monitor
+         * (prometheus/snmp/json-query), or null when this monitor doesn't have one
+         * (wrong type, or no metric value recorded yet on its last heartbeat -- see
+         * Heartbeat.toPublicJSON).
          * @param {object} monitorElement A monitor from $root.publicGroupList
          * @returns {object|null} Props to bind onto MetricGaugeWidget, or null
          */
         metricGaugeProps(monitorElement) {
-            if (monitorElement.type !== "prometheus") {
+            if (!isMetricMonitorType(monitorElement.type)) {
                 return null;
             }
             const heartbeats = this.$root.heartbeatList[monitorElement.id] ?? [];
@@ -317,11 +319,15 @@ export default {
             if (!last || typeof last.metricValue !== "number") {
                 return null;
             }
+            const unit = monitorElement.metricUnit || "";
             return {
                 value: last.metricValue,
                 status: last.status,
                 thresholdOperator: monitorElement.jsonPathOperator,
                 thresholdValue: monitorElement.expectedValue,
+                unit,
+                // A percentage metric has a natural 0-100 gauge; others auto-scale.
+                max: unit === "%" ? 100 : null,
             };
         },
 
