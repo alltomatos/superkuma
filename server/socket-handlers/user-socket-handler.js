@@ -16,6 +16,32 @@ const addUserSchema = z.object({
     password: z.string().max(255).optional(),
 });
 
+const resendWelcomeSchema = z.object({
+    id: z.number().int().positive(),
+});
+
+/**
+ * Email a user's login credentials to them. Used both when an account is
+ * created and when an admin resends/reissues credentials for an existing
+ * account -- the credentials block and password-change reminder stay
+ * identical so the two flows can't drift in wording; only the subject and
+ * opening line differ.
+ * @param {string} username Username shown in the email
+ * @param {string} email Recipient address
+ * @param {string} password Plaintext password to include
+ * @param {string} subject Email subject line
+ * @param {string} intro Opening sentence, before the credentials block
+ * @returns {Promise<void>} Resolves once the email has been sent
+ * @throws {Error} If sending fails (see mailer.sendMail)
+ */
+async function sendCredentialsEmail(username, email, password, subject, intro) {
+    await mailer.sendMail({
+        to: email,
+        subject,
+        text: `Olá ${username},\n\n${intro}\n\nUsuário: ${username}\nSenha: ${password}\n\nRecomendamos alterar sua senha após o primeiro acesso.`,
+    });
+}
+
 /**
  * Handlers for admin-driven user management (creating additional users).
  * @param {Socket} socket Socket.io instance
@@ -57,11 +83,13 @@ module.exports.userSocketHandler = (socket) => {
 
             let emailSent = true;
             try {
-                await mailer.sendMail({
-                    to: data.email,
-                    subject: "Sua conta no SuperKuma foi criada",
-                    text: `Olá ${data.username},\n\nSua conta no SuperKuma foi criada.\n\nUsuário: ${data.username}\nSenha: ${password}\n\nRecomendamos alterar sua senha após o primeiro acesso.`,
-                });
+                await sendCredentialsEmail(
+                    data.username,
+                    data.email,
+                    password,
+                    "Sua conta no SuperKuma foi criada",
+                    "Sua conta no SuperKuma foi criada."
+                );
             } catch (e) {
                 emailSent = false;
                 log.error("user", `Failed to send welcome email to user ${user.id}: ${e.message}`);
@@ -98,6 +126,61 @@ module.exports.userSocketHandler = (socket) => {
             callback({
                 ok: false,
                 msg: e.message,
+            });
+        }
+    });
+
+    // Issue a fresh password for an existing user and email it to them. The
+    // original password can never be recovered (it's stored as a bcrypt
+    // hash) -- "resend" necessarily means "reissue". The email is sent
+    // BEFORE the new password is persisted, so if SMTP is broken the user's
+    // working password is left untouched instead of being silently replaced
+    // with one nobody received.
+    socket.on("resendWelcome", async (input, callback) => {
+        try {
+            checkLogin(socket);
+            requirePermission(socket.actor, "user:manage", {});
+
+            const { id } = validate(resendWelcomeSchema, input);
+
+            const user = await R.findOne("user", "id = ?", [id]);
+            if (!user) {
+                throw new Error("User not found.");
+            }
+            if (!user.email) {
+                throw new TranslatableError("userHasNoEmail");
+            }
+
+            const newPassword = nanoid(16);
+
+            try {
+                await sendCredentialsEmail(
+                    user.username,
+                    user.email,
+                    newPassword,
+                    "Suas credenciais de acesso ao SuperKuma foram reenviadas",
+                    "Uma nova senha foi gerada para sua conta no SuperKuma."
+                );
+            } catch (e) {
+                log.error("user", `Failed to resend welcome email to user ${user.id}: ${e.message}`);
+                throw new TranslatableError("resendWelcomeEmailFailed");
+            }
+
+            user.password = await passwordHash.generate(newPassword);
+            await R.store(user);
+
+            log.debug("user", `Resent welcome email: ${user.id}`);
+
+            callback({
+                ok: true,
+                msg: "welcomeEmailResent",
+                msgi18n: true,
+            });
+        } catch (e) {
+            callback({
+                ok: false,
+                msg: e.message,
+                msgi18n: !!e.msgi18n,
             });
         }
     });

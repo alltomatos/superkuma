@@ -611,6 +611,27 @@ export default {
         },
 
         /**
+         * Issue a fresh password for an existing user and email it to them
+         * (the original password can't be recovered, so this is a reissue).
+         * @param {number} id ID of the user to resend credentials to
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        resendWelcome(id, callback) {
+            socket.emit("resendWelcome", { id }, callback);
+        },
+
+        /**
+         * Send a test email using the (possibly unsaved) SMTP settings form.
+         * @param {object} mailSettings Mail settings from the settings form
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        testMailSettings(mailSettings, callback) {
+            socket.emit("testMailSettings", mailSettings, callback);
+        },
+
+        /**
          * Add a monitor
          * @param {object} monitor Object representing monitor to add
          * @param {socketCB} callback Callback for socket response

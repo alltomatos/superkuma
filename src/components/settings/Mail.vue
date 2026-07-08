@@ -62,10 +62,14 @@
                 <input id="mailFrom" v-model="settings.mailFrom" class="form-control" autocomplete="new-password" />
             </div>
 
-            <!-- Save Button -->
+            <!-- Save / Test Buttons -->
             <div>
-                <button class="btn btn-primary" type="submit">
+                <button class="btn btn-primary me-2" type="submit">
                     {{ $t("Save") }}
+                </button>
+                <button class="btn btn-normal" type="button" :disabled="testing" @click="testSmtp">
+                    <div v-if="testing" class="spinner-border spinner-border-sm me-1"></div>
+                    {{ $t("Test SMTP") }}
                 </button>
             </div>
         </form>
@@ -78,6 +82,11 @@ import HiddenInput from "../../components/HiddenInput.vue";
 export default {
     components: {
         HiddenInput,
+    },
+    data() {
+        return {
+            testing: false,
+        };
     },
     computed: {
         // Shared settings object/save-flow with General.vue and the other
@@ -97,6 +106,19 @@ export default {
          */
         saveMail() {
             this.saveSettings();
+        },
+
+        /**
+         * Send a test email using the current (possibly unsaved) form values,
+         * so the SMTP configuration can be confirmed before saving.
+         * @returns {void}
+         */
+        testSmtp() {
+            this.testing = true;
+            this.$root.testMailSettings(this.settings, (res) => {
+                this.testing = false;
+                this.$root.toastRes(res);
+            });
         },
     },
 };
