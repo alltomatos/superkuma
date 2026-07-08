@@ -86,7 +86,27 @@ async function sendTestMail(mailSettings, to) {
     }
 }
 
+/**
+ * Verify SMTP connectivity/authentication using settings straight from the
+ * settings form (not yet saved), without sending any email -- a quick way to
+ * check host/port/auth/TLS before sending an actual test message.
+ * @param {object} mailSettings Mail settings from the (possibly unsaved) settings form
+ * @returns {Promise<void>} Resolves if the connection and authentication succeed
+ * @throws {Error} If SMTP is not configured or the connection/auth check fails
+ */
+async function verifyConnection(mailSettings) {
+    const transporter = buildTransporter(mailSettings);
+
+    try {
+        await transporter.verify();
+    } catch (e) {
+        log.error("mailer", `SMTP connection check failed: ${e.message}`);
+        throw e;
+    }
+}
+
 module.exports = {
     sendMail,
     sendTestMail,
+    verifyConnection,
 };

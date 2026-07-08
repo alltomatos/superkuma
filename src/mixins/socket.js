@@ -622,13 +622,26 @@ export default {
         },
 
         /**
-         * Send a test email using the (possibly unsaved) SMTP settings form.
+         * Send a test email to a chosen recipient using the (possibly
+         * unsaved) SMTP settings form.
+         * @param {object} mailSettings Mail settings from the settings form
+         * @param {string} to Recipient address for the test email
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        testMailSettings(mailSettings, to, callback) {
+            socket.emit("testMailSettings", { mailSettings, to }, callback);
+        },
+
+        /**
+         * Check SMTP connectivity/authentication only (no email sent) using
+         * the (possibly unsaved) SMTP settings form.
          * @param {object} mailSettings Mail settings from the settings form
          * @param {socketCB} callback Callback for socket response
          * @returns {void}
          */
-        testMailSettings(mailSettings, callback) {
-            socket.emit("testMailSettings", mailSettings, callback);
+        verifyMailConnection(mailSettings, callback) {
+            socket.emit("verifyMailConnection", mailSettings, callback);
         },
 
         /**
