@@ -383,6 +383,7 @@ describe("MCP tool behaviour", () => {
             promql: "100 - avg(rate(node_cpu_seconds_total[5m]))*100",
             conditionOperator: ">",
             expectedValue: "90",
+            metricUnit: "%",
             bearerToken: "tok",
         });
 
@@ -392,6 +393,7 @@ describe("MCP tool behaviour", () => {
         assert.strictEqual(payload.databaseQuery, "100 - avg(rate(node_cpu_seconds_total[5m]))*100");
         assert.strictEqual(payload.jsonPathOperator, ">");
         assert.strictEqual(payload.expectedValue, "90");
+        assert.strictEqual(payload.metricUnit, "%");
         assert.strictEqual(payload.bearer_token, "tok");
     });
 

@@ -11,12 +11,16 @@ const brotliDecompress = promisify(zlib.brotliDecompress);
  *      3 = MAINTENANCE
  */
 class Heartbeat extends BeanModel {
+    /** Monitor types whose heartbeat can carry an extractable numeric metric value. */
+    static METRIC_MONITOR_TYPES = ["prometheus", "snmp", "json-query"];
+
     /**
      * Return an object that ready to parse to JSON for public
      * Only show necessary data to public
-     * @param {string} monitorType The owning monitor's type. When
-     * "prometheus", a `metricValue` number is additionally extracted from the
-     * (otherwise hidden) internal message -- see extractPublicMetricValue.
+     * @param {string} monitorType The owning monitor's type. For metric
+     * monitors (prometheus/snmp/json-query), a `metricValue` number is
+     * additionally extracted from the (otherwise hidden) internal message --
+     * see extractPublicMetricValue.
      * @returns {object} Object ready to parse
      */
     toPublicJSON(monitorType) {
@@ -27,7 +31,7 @@ class Heartbeat extends BeanModel {
             ping: this.ping,
         };
 
-        if (monitorType === "prometheus") {
+        if (Heartbeat.METRIC_MONITOR_TYPES.includes(monitorType)) {
             const metricValue = Heartbeat.extractPublicMetricValue(this.msg);
             if (metricValue !== null) {
                 obj.metricValue = metricValue;
@@ -38,12 +42,13 @@ class Heartbeat extends BeanModel {
     }
 
     /**
-     * Extract the numeric PromQL result from a prometheus monitor's internal
+     * Extract the numeric measurement from a metric monitor's internal
      * heartbeat message, for public display (status-page gauges). Only ever
-     * recognizes SuperKuma's own message format (see
-     * server/monitor-types/prometheus.js) -- never forwards arbitrary message
-     * text, so this cannot leak whatever an unrelated monitor type put in its
-     * own `msg` (hostnames, error details, etc).
+     * recognizes SuperKuma's own message formats (prometheus's "PromQL
+     * condition ..." and snmp/json-query's "JSON query ... (comparing ...)")
+     * -- never forwards arbitrary message text, so this cannot leak whatever
+     * an unrelated monitor type put in its own `msg` (hostnames, error
+     * details, etc).
      * @param {string} msg The heartbeat's internal message
      * @returns {number|null} The numeric value, or null if not recognized
      */
@@ -51,7 +56,10 @@ class Heartbeat extends BeanModel {
         if (!msg) {
             return null;
         }
-        const match = /^PromQL condition (?:passes|does not pass) \(([-\d.eE+]+)\s/.exec(msg);
+        const match =
+            /^(?:PromQL condition (?:passes|does not pass) \(|JSON query (?:passes|does not pass) \(comparing )([-\d.eE+]+)\s/.exec(
+                msg
+            );
         if (!match) {
             return null;
         }
