@@ -1172,7 +1172,7 @@ let needSetup = false;
         apiKeySocketHandler(socket);
         remoteInstanceSocketHandler(socket);
         remoteBrowserSocketHandler(socket);
-        userSocketHandler(socket);
+        userSocketHandler(socket, server);
         mailSocketHandler(socket);
         generalSocketHandler(socket, server);
         chartSocketHandler(socket);

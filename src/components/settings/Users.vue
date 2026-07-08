@@ -20,7 +20,10 @@
             </thead>
             <tbody>
                 <tr v-for="item in userList" :key="item.id">
-                    <td>{{ item.username }}</td>
+                    <td>
+                        {{ item.username }}
+                        <span v-if="item.is_superadmin" class="badge bg-primary ms-1">{{ $t("Admin") }}</span>
+                    </td>
                     <td>{{ item.email }}</td>
                     <td class="text-end">
                         <div class="d-flex gap-2 justify-content-end">
@@ -37,6 +40,14 @@
                                 <font-awesome-icon icon="key" />
                                 {{ $t("Set Password") }}
                             </button>
+                            <button
+                                class="btn btn-normal btn-sm"
+                                type="button"
+                                @click="toggleSuperadminDialog(item.id, !item.is_superadmin)"
+                            >
+                                <font-awesome-icon icon="user-shield" />
+                                {{ item.is_superadmin ? $t("Remove Admin") : $t("Make Admin") }}
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -47,6 +58,10 @@
 
         <Confirm ref="confirmResend" :yes-text="$t('Yes')" :no-text="$t('No')" @yes="resendWelcome">
             {{ $t("resendWelcomeMsg") }}
+        </Confirm>
+
+        <Confirm ref="confirmSuperadmin" :yes-text="$t('Yes')" :no-text="$t('No')" @yes="toggleSuperadmin">
+            {{ confirmSuperadminMsg }}
         </Confirm>
 
         <!-- Manual password entry for an existing user -->
@@ -113,6 +128,7 @@ export default {
             setPasswordSendEmail: false,
             settingPassword: false,
             setPasswordModal: null,
+            pendingSuperadminValue: null,
         };
     },
     computed: {
@@ -127,6 +143,13 @@ export default {
         selectedUserEmail() {
             const user = (this.userList || []).find((item) => item.id === this.selectedUserID);
             return (user && user.email) || null;
+        },
+        /**
+         * Confirmation text for the pending admin-status change (grant vs revoke).
+         * @returns {string} The translated confirmation message
+         */
+        confirmSuperadminMsg() {
+            return this.pendingSuperadminValue ? this.$t("makeAdminMsg") : this.$t("removeAdminMsg");
         },
     },
 
@@ -179,6 +202,31 @@ export default {
                 this.$root.toastRes(res);
                 if (res.ok) {
                     this.setPasswordModal.hide();
+                }
+            });
+        },
+
+        /**
+         * Show dialog to confirm granting or revoking a user's admin status.
+         * @param {number} id ID of the user to update
+         * @param {boolean} makeSuperadmin Whether this would grant (true) or revoke (false) admin status
+         * @returns {void}
+         */
+        toggleSuperadminDialog(id, makeSuperadmin) {
+            this.selectedUserID = id;
+            this.pendingSuperadminValue = makeSuperadmin;
+            this.$refs.confirmSuperadmin.show();
+        },
+
+        /**
+         * Apply the pending admin-status change for the selected user.
+         * @returns {void}
+         */
+        toggleSuperadmin() {
+            this.$root.setUserSuperadmin(this.selectedUserID, this.pendingSuperadminValue, (res) => {
+                this.$root.toastRes(res);
+                if (res.ok) {
+                    this.$root.getUserList();
                 }
             });
         },

@@ -341,6 +341,11 @@ describe("flag-OFF dark-launch contract", () => {
         assert.deepStrictEqual(scopeFilter(actor), { clause: "user_id = ?", params: [42] });
     });
 
+    test("scopeFilter has no superadmin carve-out while OFF -- a superadmin is scoped to their own rows too, since several call sites hand back plaintext secrets with no per-row filtering", () => {
+        const superadmin = buildActor({ userId: 1, isSuperadmin: true }, []);
+        assert.deepStrictEqual(scopeFilter(superadmin), { clause: "user_id = ?", params: [1] });
+    });
+
     test("scopeFilter never throws on a null/undefined actor, even while OFF", () => {
         assert.deepStrictEqual(scopeFilter(null), { clause: "1 = 0", params: [] });
         assert.deepStrictEqual(scopeFilter(undefined), { clause: "1 = 0", params: [] });

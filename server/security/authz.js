@@ -10,7 +10,17 @@
  * Dark-launch: while enforcement is disabled (the default, driven by the
  * `rbacEnforced` setting), every check passes and list scoping falls back to
  * the legacy per-user filter, keeping behaviour byte-identical to the pre-RBAC
- * single-user model.
+ * single-user model -- for every actor, including superadmins. A superadmin
+ * carve-out here would apply to every `scopeFilter()` call site at once
+ * (notifications, proxies, remote browsers, API keys, docker hosts, remote
+ * instances, monitors), several of which hand back plaintext secrets
+ * (SMTP passwords, webhook URLs, bot tokens, proxy passwords, embedded API
+ * tokens) with no per-row filtering -- so while enforcement is off, a
+ * superadmin seeing everything would mean a superadmin seeing every other
+ * user's stored credentials. Callers that need a superadmin to see more than
+ * their own rows before the P4 enforcement flip must add a narrow,
+ * call-site-local bypass instead (see `getMonitorJSONList` for an example),
+ * not touch this shared function.
  *
  * See docs/adr/0010-teams-rbac-multitenancy.md §4.
  */
@@ -233,8 +243,13 @@ async function requireResource(actor, action, resourceType, resourceId, teamIdLo
 /**
  * Build a SQL WHERE fragment restricting a list query to rows an actor may see.
  * Enforced mode filters by the actor's team memberships (optionally only those
- * granting a given read permission); flag-OFF falls back to the legacy per-user
- * filter so existing single-user queries are unchanged.
+ * granting a given read permission); flag-OFF falls back to the legacy
+ * per-user filter for every actor, including superadmins, so existing
+ * single-user queries -- and what they expose -- are byte-identical to
+ * pre-RBAC behaviour until enforcement is actually flipped on. Superadmins
+ * only get to see everything once `enforcementEnabled` is true, at which
+ * point that's a deliberate, catalog-driven grant rather than a blanket
+ * bypass of every list query's row-level filtering.
  * @param {Actor} actor The actor running the query.
  * @param {object} options Options bag.
  * @param {string} options.column The trusted team-id column name (default "team_id").
@@ -254,10 +269,10 @@ function scopeFilter(actor, options) {
     if (!enforcementEnabled) {
         return { clause: "user_id = ?", params: [actor.userId] };
     }
-    if (actor && actor.isSuperadmin) {
+    if (actor.isSuperadmin) {
         return { clause: "1 = 1", params: [] };
     }
-    if (!actor || !actor.memberships || actor.memberships.size === 0) {
+    if (!actor.memberships || actor.memberships.size === 0) {
         return { clause: "1 = 0", params: [] };
     }
 
