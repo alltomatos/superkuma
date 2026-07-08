@@ -1,6 +1,6 @@
 ---
 name: superkuma-monitoring
-description: Deploy a new SuperKuma instance (Proxmox VM, Docker Compose + MariaDB) and/or operate the SuperKuma MCP server to onboard a site's infrastructure into monitoring. Use when deploying SuperKuma to a client's infrastructure, setting up or expanding SuperKuma monitoring, using the SuperKuma MCP tools, or discovering/inventorying infrastructure (Active Directory / domain controllers, Proxmox VE, VMware/ESXi, Linux servers, pfSense, Mikrotik, managed switches, UniFi, TrueNAS, IP cameras/NVR, routers) to turn assets into monitors.
+description: Deploy a new SuperKuma instance (Proxmox VM, Docker Compose + MariaDB), update/upgrade an already-deployed instance to a new version, and/or operate the SuperKuma MCP server to onboard a site's infrastructure into monitoring. Use when deploying SuperKuma to a client's infrastructure, rolling out a new SuperKuma release to an existing client instance, setting up or expanding SuperKuma monitoring, using the SuperKuma MCP tools, or discovering/inventorying infrastructure (Active Directory / domain controllers, Proxmox VE, VMware/ESXi, Linux servers, pfSense, Mikrotik, managed switches, UniFi, TrueNAS, IP cameras/NVR, routers) to turn assets into monitors.
 ---
 
 # SuperKuma Monitoring
@@ -20,6 +20,9 @@ it.
 - **No instance yet?** See [references/deployment-playbook.md](references/deployment-playbook.md)
   for standing one up on a client's own infrastructure (Proxmox VM, Docker Compose + MariaDB, and
   the concrete pitfalls hit doing this in the field) before continuing below.
+- **Already have an instance and need to roll out a new version?** See
+  [references/deployment-playbook.md](references/deployment-playbook.md#5-keeping-an-instance-up-to-date)
+  (cutting a release, safely updating a running instance, testing unreleased code live).
 
 ## Quick start
 

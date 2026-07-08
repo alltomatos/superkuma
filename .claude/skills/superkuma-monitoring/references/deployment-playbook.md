@@ -251,3 +251,79 @@ curl -s http://<ip>:3001/api/entry-page            # {"type":"entryPage","entryP
 Then hand off the URL for the human to create the admin account (don't do this yourself — account
 creation/passwords are the user's call), and once they have an API key, proceed with the
 [onboarding workflow](../SKILL.md#onboarding-workflow).
+
+If the client will have more than one admin, configure **Settings → Mail** with a real SMTP relay
+first — **Verify Connection** checks host/port/auth without sending anything, and **Test SMTP**
+sends a one-off test message to an address you choose. Once Mail is set, adding a user
+(**Settings → Users → Add User**) or reissuing credentials (**Resend Welcome Email**) emails the
+account's username/password automatically.
+
+## 5. Keeping an instance up to date
+
+Rolling out a new SuperKuma version to instances already deployed by this skill (not a fresh
+install — see sections 1-2 above for that).
+
+### 5.1 Cut a release
+
+1. Bump the version in `package.json` (the `version` field **and** the `scripts.setup`
+   `git checkout <version>` line) and `package-lock.json` (top-level `version` **and**
+   `packages[""].version` near the top of the file — don't touch other packages' `version` fields
+   that happen to match the same number by coincidence). Commit and push to `main` directly (it
+   isn't branch-protected in this repo) or merge via PR.
+   - **Version bump size**: patch (`x.y.Z`) for a small change or follow-up fix; minor (`x.Y.0`)
+     for a larger feature. Never ship a real change with no version bump — two unrelated rounds of
+     work should never share one version number.
+2. The push triggers `auto-release.yml` on the org's self-hosted CI runner: if the new version
+   isn't tagged yet, it creates the `vX.Y.Z` tag and a GitHub Release with auto-generated notes.
+3. **The tag push does not automatically trigger the Docker build** — GitHub's anti-recursion rule
+   means a tag pushed with the workflow's own token doesn't cascade into `release-docker.yml`
+   (which is tag-triggered). Dispatch it manually:
+   ```bash
+   gh workflow run release-docker.yml --ref main -f version=X.Y.Z
+   gh run watch <run-id> --exit-status   # amd64 build+push, several minutes
+   ```
+   This publishes `ronaldodavi/superkuma:X.Y.Z`, `:X` (major) and `:latest` to Docker Hub.
+
+### 5.2 Deploy the new image to a running instance
+
+**Always back up before touching a running instance.** Two backup commands depending on the
+backend (see the compose shapes in section 2):
+
+- MariaDB-backed: `docker exec <mariadb-container> sh -c 'mariadb-dump --single-transaction
+  --no-tablespaces -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE"' >
+  backup-$(date +%Y%m%d-%H%M%S).sql` — reads creds from the container's own env, so nothing
+  sensitive is ever typed or echoed.
+- SQLite-backed: `cp -a ./data/. ./backup-$(date +%Y%m%d-%H%M%S)/` (copy the bind-mounted data dir).
+
+Then, depending on how the compose file references the image:
+
+- **Direct version tag in `image:`** (e.g. `image: ronaldodavi/superkuma:2.7.0`): edit the compose
+  file to the new tag (`sed -i 's#superkuma:OLD#superkuma:NEW#' compose.yaml`), then
+  `docker compose pull superkuma && docker compose up -d --no-deps superkuma`.
+- **Local alias tag** (e.g. `image: superkuma:local`): `docker pull
+  ronaldodavi/superkuma:X.Y.Z && docker tag ronaldodavi/superkuma:X.Y.Z superkuma:local &&
+  docker compose up -d superkuma`.
+
+**Always scope the recreate to the `superkuma` service alone** (`--no-deps`, or naming the service
+explicitly). A bare `docker compose up -d` with no service name also recreates sibling services on
+the same stack (MariaDB, Prometheus, node-exporter, or unrelated containers sharing the host, e.g.
+CI runners) that don't need to move.
+
+Verify: `docker ps` shows `superkuma` as `healthy`; the version inside the container matches
+(`docker exec superkuma node -e "console.log(require('/app/package.json').version)"`); a new
+migration's column exists if one shipped (`PRAGMA table_info(monitor)` for SQLite / `SHOW COLUMNS
+FROM monitor` for MariaDB); `docker logs --since 5m superkuma` has no new errors;
+`curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/` returns `302`.
+
+Verified in the field (two live client instances patched the same day): one MariaDB-backed, one
+SQLite-backed, both updated without touching sibling containers or losing data.
+
+### 5.3 Testing unreleased code on a real instance before cutting a release
+
+To validate a fix against a client's real environment (their real SMTP relay, their real data)
+before committing to a numbered release: `docker build` the image locally from the branch under
+test, `docker save <image> | gzip > image.tar.gz`, `scp` it to the target host, `docker load -i
+image.tar.gz` there, then deploy it the same safe way as 5.2 (backup first, point compose at the
+freshly-loaded local tag, `--no-deps`). Once validated, cut the real point release (5.1) and swap
+the instance back to the registry tag so it stays on a reproducible, tagged version instead of an
+ad-hoc local build.
