@@ -62,21 +62,61 @@
                 <input id="mailFrom" v-model="settings.mailFrom" class="form-control" autocomplete="new-password" />
             </div>
 
-            <!-- Save / Test Buttons -->
+            <!-- Save / Verify / Test Buttons -->
             <div>
                 <button class="btn btn-primary me-2" type="submit">
                     {{ $t("Save") }}
                 </button>
-                <button class="btn btn-normal" type="button" :disabled="testing" @click="testSmtp">
-                    <div v-if="testing" class="spinner-border spinner-border-sm me-1"></div>
+                <button class="btn btn-normal me-2" type="button" :disabled="verifying" @click="verifyConnection">
+                    <div v-if="verifying" class="spinner-border spinner-border-sm me-1"></div>
+                    {{ $t("Verify Connection") }}
+                </button>
+                <button class="btn btn-normal" type="button" @click="openTestEmailModal">
                     {{ $t("Test SMTP") }}
                 </button>
             </div>
         </form>
+
+        <!-- Recipient prompt for the "Test SMTP" action -->
+        <div ref="testEmailModal" class="modal fade" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form @submit.prevent="submitTestEmail">
+                        <div class="modal-header">
+                            <h5 class="modal-title">{{ $t("Test SMTP") }}</h5>
+                            <button
+                                type="button"
+                                class="btn-close"
+                                data-bs-dismiss="modal"
+                                :aria-label="$t('Close')"
+                            />
+                        </div>
+                        <div class="modal-body">
+                            <label class="form-label" for="testEmailTo">{{ $t("sendTestEmailTo") }}</label>
+                            <input
+                                id="testEmailTo"
+                                v-model="testEmailTo"
+                                type="email"
+                                class="form-control"
+                                autocomplete="off"
+                                required
+                            />
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary" :disabled="testing">
+                                <div v-if="testing" class="spinner-border spinner-border-sm me-1"></div>
+                                {{ $t("Send") }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script>
+import { Modal } from "bootstrap";
 import HiddenInput from "../../components/HiddenInput.vue";
 
 export default {
@@ -86,6 +126,9 @@ export default {
     data() {
         return {
             testing: false,
+            verifying: false,
+            testEmailTo: "",
+            testEmailModal: null,
         };
     },
     computed: {
@@ -99,6 +142,10 @@ export default {
         },
     },
 
+    mounted() {
+        this.testEmailModal = new Modal(this.$refs.testEmailModal);
+    },
+
     methods: {
         /**
          * Save the settings
@@ -109,14 +156,41 @@ export default {
         },
 
         /**
-         * Send a test email using the current (possibly unsaved) form values,
-         * so the SMTP configuration can be confirmed before saving.
+         * Open the recipient-prompt modal for the "Test SMTP" action,
+         * pre-filled with the configured "From" address.
          * @returns {void}
          */
-        testSmtp() {
+        openTestEmailModal() {
+            this.testEmailTo = this.settings.mailFrom || "";
+            this.testEmailModal.show();
+        },
+
+        /**
+         * Send a test email to the chosen recipient using the current
+         * (possibly unsaved) form values, so the SMTP configuration can be
+         * confirmed before saving.
+         * @returns {void}
+         */
+        submitTestEmail() {
             this.testing = true;
-            this.$root.testMailSettings(this.settings, (res) => {
+            this.$root.testMailSettings(this.settings, this.testEmailTo, (res) => {
                 this.testing = false;
+                this.$root.toastRes(res);
+                if (res.ok) {
+                    this.testEmailModal.hide();
+                }
+            });
+        },
+
+        /**
+         * Check SMTP connectivity/authentication only (no email sent) using
+         * the current (possibly unsaved) form values.
+         * @returns {void}
+         */
+        verifyConnection() {
+            this.verifying = true;
+            this.$root.verifyMailConnection(this.settings, (res) => {
+                this.verifying = false;
                 this.$root.toastRes(res);
             });
         },

@@ -1,7 +1,11 @@
 const { checkLogin } = require("../util-server");
-const { R } = require("redbean-node");
 const mailer = require("../mailer");
-const TranslatableError = require("../translatable-error");
+const { z } = require("zod");
+const { validate } = require("../validation");
+
+const testMailSchema = z.object({
+    to: z.string().trim().email().max(255),
+});
 
 /**
  * Handlers for mail (SMTP) settings actions that aren't plain get/setSettings.
@@ -9,25 +13,44 @@ const TranslatableError = require("../translatable-error");
  * @returns {void}
  */
 module.exports.mailSocketHandler = (socket) => {
-    // Send a test email using whatever mail* fields are currently on the
-    // settings form (not necessarily saved yet), so an admin can verify a
-    // configuration before persisting it.
-    socket.on("testMailSettings", async (mailSettings, callback) => {
+    // Send a test email to an admin-chosen recipient, using whatever mail*
+    // fields are currently on the settings form (not necessarily saved yet),
+    // so a configuration can be verified before persisting it.
+    socket.on("testMailSettings", async (input, callback) => {
         try {
             checkLogin(socket);
 
-            const to =
-                (await R.getCell("SELECT email FROM user WHERE id = ?", [socket.userID])) || mailSettings.mailFrom;
-
-            if (!to) {
-                throw new TranslatableError("noTestEmailRecipient");
-            }
+            const { mailSettings, to } = input;
+            validate(testMailSchema, { to });
 
             await mailer.sendTestMail(mailSettings, to);
 
             callback({
                 ok: true,
                 msg: { key: "smtpTestSent", values: { to } },
+                msgi18n: true,
+            });
+        } catch (e) {
+            callback({
+                ok: false,
+                msg: e.message,
+                msgi18n: !!e.msgi18n,
+            });
+        }
+    });
+
+    // Check SMTP connectivity/authentication only (no email sent) -- a
+    // faster, inbox-safe way to confirm host/port/auth/TLS before sending an
+    // actual test message.
+    socket.on("verifyMailConnection", async (mailSettings, callback) => {
+        try {
+            checkLogin(socket);
+
+            await mailer.verifyConnection(mailSettings);
+
+            callback({
+                ok: true,
+                msg: "smtpConnectionOk",
                 msgi18n: true,
             });
         } catch (e) {
