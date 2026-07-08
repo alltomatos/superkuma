@@ -1,6 +1,7 @@
 <template>
     <div class="input-group mb-3">
         <input
+            :id="id"
             ref="input"
             v-model="model"
             :type="visibility"
@@ -24,6 +25,11 @@
 <script>
 export default {
     props: {
+        /** The id to assign to the underlying input element (for label "for" association) */
+        id: {
+            type: String,
+            default: undefined,
+        },
         /** The value of the input */
         modelValue: {
             type: String,

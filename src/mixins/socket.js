@@ -622,6 +622,18 @@ export default {
         },
 
         /**
+         * Set an existing user's password directly to an admin-chosen value.
+         * @param {number} id ID of the user to update
+         * @param {string} password New plaintext password
+         * @param {boolean} sendEmail Whether to also email the user about the change
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        setUserPassword(id, password, sendEmail, callback) {
+            socket.emit("setUserPassword", { id, password, sendEmail }, callback);
+        },
+
+        /**
          * Send a test email to a chosen recipient using the (possibly
          * unsaved) SMTP settings form.
          * @param {object} mailSettings Mail settings from the settings form
