@@ -133,9 +133,27 @@ async function hasActiveSuperadmin() {
     return count > 0;
 }
 
+/**
+ * The team a newly created resource should be assigned to: the actor's
+ * currently active team, falling back to the Default Team if the actor has
+ * none (e.g. was just removed from every team they belonged to). Used by
+ * every resource-creation handler so a new row can never silently end up
+ * team_id = NULL (an invisible orphan outside any team's scope).
+ * @param {object} actor The acting actor (socket.actor), or null/undefined.
+ * @returns {Promise<number|null>} A team id, or null if even the Default Team is missing.
+ */
+async function resolveTeamIdForCreate(actor) {
+    if (actor && actor.activeTeamId) {
+        return actor.activeTeamId;
+    }
+    const defaultTeam = await R.findOne("team", "slug = ?", ["default"]);
+    return defaultTeam ? defaultTeam.id : null;
+}
+
 module.exports = {
     buildActorForUser,
     buildActorForApiKey,
     buildPermissionPayload,
     hasActiveSuperadmin,
+    resolveTeamIdForCreate,
 };

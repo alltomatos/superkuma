@@ -4,8 +4,9 @@ const { R } = require("redbean-node");
 const apicache = require("../modules/apicache");
 const { SuperKumaServer } = require("../superkuma-server");
 const Maintenance = require("../model/maintenance");
-const { requireResource } = require("../security/authz");
+const { requireResource, requirePermission } = require("../security/authz");
 const { teamIdLoader } = require("../security/team-id-loaders");
+const { resolveTeamIdForCreate } = require("../security/actor-repository");
 const server = SuperKumaServer.getInstance();
 
 /**
@@ -18,11 +19,15 @@ module.exports.maintenanceSocketHandler = (socket) => {
     socket.on("addMaintenance", async (maintenance, callback) => {
         try {
             checkLogin(socket);
+            requirePermission(socket.actor, "maintenance:create", {
+                teamId: socket.actor ? socket.actor.activeTeamId : null,
+            });
 
             log.debug("maintenance", maintenance);
 
             let bean = await Maintenance.jsonToBean(R.dispense("maintenance"), maintenance);
             bean.user_id = socket.userID;
+            bean.team_id = await resolveTeamIdForCreate(socket.actor);
             let maintenanceID = await R.store(bean);
 
             server.maintenanceList[maintenanceID] = bean;
@@ -54,6 +59,7 @@ module.exports.maintenanceSocketHandler = (socket) => {
             if (bean.user_id !== socket.userID) {
                 throw new Error("Permission denied.");
             }
+            await requireResource(socket.actor, "maintenance:update", "maintenance", maintenance.id, teamIdLoader);
 
             await Maintenance.jsonToBean(bean, maintenance);
             await R.store(bean);
@@ -269,6 +275,8 @@ module.exports.maintenanceSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
+            await requireResource(socket.actor, "maintenance:update", "maintenance", maintenanceID, teamIdLoader);
+
             log.debug("maintenance", `Pause Maintenance: ${maintenanceID} User ID: ${socket.userID}`);
 
             let maintenance = server.getMaintenance(maintenanceID);
@@ -301,6 +309,8 @@ module.exports.maintenanceSocketHandler = (socket) => {
     socket.on("resumeMaintenance", async (maintenanceID, callback) => {
         try {
             checkLogin(socket);
+
+            await requireResource(socket.actor, "maintenance:update", "maintenance", maintenanceID, teamIdLoader);
 
             log.debug("maintenance", `Resume Maintenance: ${maintenanceID} User ID: ${socket.userID}`);
 

@@ -1,6 +1,7 @@
 const { R } = require("redbean-node");
-const { requireResource } = require("./security/authz");
+const { requireResource, requirePermission } = require("./security/authz");
 const { teamIdLoader } = require("./security/team-id-loaders");
+const { resolveTeamIdForCreate } = require("./security/actor-repository");
 
 class RemoteBrowser {
     /**
@@ -42,7 +43,9 @@ class RemoteBrowser {
                 throw new Error("Remote browser not found");
             }
         } else {
+            requirePermission(actor, "remote_browser:manage", { teamId: actor ? actor.activeTeamId : null });
             bean = R.dispense("remote_browser");
+            bean.team_id = await resolveTeamIdForCreate(actor);
         }
 
         bean.user_id = userID;

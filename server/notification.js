@@ -1,7 +1,8 @@
 const { R } = require("redbean-node");
 const { log } = require("../src/util");
-const { requireResource } = require("./security/authz");
+const { requireResource, requirePermission } = require("./security/authz");
 const { teamIdLoader } = require("./security/team-id-loaders");
+const { resolveTeamIdForCreate } = require("./security/actor-repository");
 const Alerta = require("./notification-providers/alerta");
 const AlertNow = require("./notification-providers/alertnow");
 const AliyunSms = require("./notification-providers/aliyun-sms");
@@ -261,7 +262,9 @@ class Notification {
                 throw new Error("notification not found");
             }
         } else {
+            requirePermission(actor, "notification:manage", { teamId: actor ? actor.activeTeamId : null });
             bean = R.dispense("notification");
+            bean.team_id = await resolveTeamIdForCreate(actor);
         }
 
         // applyExisting is one time only, don't save it to database.

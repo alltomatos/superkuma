@@ -5,8 +5,9 @@ const fsAsync = require("fs").promises;
 const path = require("path");
 const Database = require("./database");
 const { axiosAbortSignal, fsExists } = require("./util-server");
-const { requireResource } = require("./security/authz");
+const { requireResource, requirePermission } = require("./security/authz");
 const { teamIdLoader } = require("./security/team-id-loaders");
+const { resolveTeamIdForCreate } = require("./security/actor-repository");
 
 class DockerHost {
     static CertificateFileNameCA = "ca.pem";
@@ -32,7 +33,9 @@ class DockerHost {
                 throw new Error("docker host not found");
             }
         } else {
+            requirePermission(actor, "docker_host:manage", { teamId: actor ? actor.activeTeamId : null });
             bean = R.dispense("docker_host");
+            bean.team_id = await resolveTeamIdForCreate(actor);
         }
 
         bean.user_id = userID;

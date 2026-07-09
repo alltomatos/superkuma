@@ -217,18 +217,32 @@ describe("Proxy authz retrofit (dark-launch)", () => {
             );
         });
 
-        test("Proxy.save creating a NEW proxy (falsy proxyID) never calls requireResource", async () => {
-            // No membership at all -- if requireResource were (incorrectly) invoked
-            // for the create path it would throw; it must not be, since there is no
-            // existing resourceId to resolve a team from.
-            const noTeams = buildActor({ userId: 1, isSuperadmin: false }, []);
+        test("Proxy.save creating a NEW proxy (falsy proxyID) is gated by proxy:manage instead of requireResource", async () => {
+            // No existing resourceId to resolve a team from, so requireResource is
+            // never invoked -- but the create path must still be gated via
+            // requirePermission against the actor's own active team.
+            const owner = buildActor({ userId: 1, isSuperadmin: false }, [{ teamId: otherTeamId, roleSlug: "owner" }]);
             const bean = await Proxy.save(
                 { protocol: "http", host: "created-while-on.example.com", port: 8000 },
                 null,
                 1,
-                noTeams
+                owner
             );
             assert.ok(bean.id);
+            assert.strictEqual(bean.team_id, otherTeamId);
+        });
+
+        test("Proxy.save creating a NEW proxy is denied for an actor lacking proxy:manage", async () => {
+            const noTeams = buildActor({ userId: 1, isSuperadmin: false }, []);
+            await assert.rejects(
+                Proxy.save(
+                    { protocol: "http", host: "should-not-be-created.example.com", port: 8001 },
+                    null,
+                    1,
+                    noTeams
+                ),
+                ForbiddenError
+            );
         });
 
         test("member of the owning team can delete", async () => {
