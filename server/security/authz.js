@@ -1,37 +1,20 @@
 /**
  * Central authorization choke-point for the Teams + RBAC model.
  *
- * Every authorization decision in the backend is meant to funnel through this
- * module (P3 of ADR-0010). It is intentionally pure and database-free: callers
- * resolve an {@link Actor} (login / API-key middleware in P2) and, for
- * team-scoped resources, resolve the owning team id server-side before asking
+ * Every authorization decision in the backend funnels through this module
+ * (ADR-0010). It is intentionally pure and database-free: callers resolve an
+ * {@link Actor} (login / API-key middleware) and, for team-scoped resources,
+ * resolve the owning team id server-side before asking
  * `can()`/`requirePermission()`. A team id is NEVER accepted from client input.
  *
- * Dark-launch: while enforcement is disabled (the default, driven by the
- * `rbacEnforced` setting), every check passes and list scoping falls back to
- * the legacy per-user filter, keeping behaviour byte-identical to the pre-RBAC
- * single-user model -- for every actor, including superadmins. A superadmin
- * carve-out here would apply to every `scopeFilter()` call site at once
- * (notifications, proxies, remote browsers, API keys, docker hosts, remote
- * instances, monitors), several of which hand back plaintext secrets
- * (SMTP passwords, webhook URLs, bot tokens, proxy passwords, embedded API
- * tokens) with no per-row filtering -- so while enforcement is off, a
- * superadmin seeing everything would mean a superadmin seeing every other
- * user's stored credentials. Callers that need a superadmin to see more than
- * their own rows before the P4 enforcement flip must add a narrow,
- * call-site-local bypass instead (see `getMonitorJSONList` for an example),
- * not touch this shared function.
+ * Enforcement is permanent and unconditional -- there is no flag to disable
+ * it. Superadmins bypass every check (`can()`) and see every row
+ * (`scopeFilter()`); everyone else is scoped to their team membership(s).
  *
  * See docs/adr/0010-teams-rbac-multitenancy.md §4.
  */
 
 const { isValidAction, isTeamScoped, expandBuiltinRole } = require("../permissions/catalog");
-
-/**
- * Whether RBAC enforcement is active. Defaults to false (dark-launch OFF).
- * @type {boolean}
- */
-let enforcementEnabled = false;
 
 /**
  * Error thrown when an actor lacks a required permission. Handlers can catch
@@ -62,23 +45,6 @@ class ForbiddenError extends Error {
  * @property {number|null} activeTeamId The team the actor is currently acting in.
  * @property {Map<number, Membership>} memberships Team id -> membership.
  */
-
-/**
- * Enable or disable RBAC enforcement globally.
- * @param {boolean} enabled Whether enforcement should be active.
- * @returns {void}
- */
-function setEnforcementEnabled(enabled) {
-    enforcementEnabled = Boolean(enabled);
-}
-
-/**
- * Whether RBAC enforcement is currently active.
- * @returns {boolean} True if enforcement is on.
- */
-function isEnforcementEnabled() {
-    return enforcementEnabled;
-}
 
 /**
  * Build an {@link Actor} from an already-resolved principal and its team
@@ -132,10 +98,9 @@ function buildActor(principal, membershipRows, activeTeamId) {
  * Decide whether an actor may perform an action, optionally against a resource.
  *
  * Order of evaluation (ADR-0010 §4):
- * 1. If enforcement is disabled, allow (flag-OFF is fully permissive).
- * 2. Super admins bypass all checks.
- * 3. Global (non-team-scoped) actions: allowed if ANY membership grants them.
- * 4. Team-scoped actions: the resource's server-resolved `teamId` must match a
+ * 1. Super admins bypass all checks.
+ * 2. Global (non-team-scoped) actions: allowed if ANY membership grants them.
+ * 3. Team-scoped actions: the resource's server-resolved `teamId` must match a
  * membership that grants the action. `teamId` is never taken from client
  * input — resolve it from the resource id first (see authorizeResource).
  * @param {Actor} actor The actor requesting access.
@@ -146,9 +111,6 @@ function buildActor(principal, membershipRows, activeTeamId) {
  * @throws {Error} If the action is not part of the permission catalog.
  */
 function can(actor, action, resource) {
-    if (!enforcementEnabled) {
-        return true;
-    }
     if (!isValidAction(action)) {
         throw new Error(`Unknown permission action: ${action}`);
     }
@@ -208,31 +170,21 @@ function requirePermission(actor, action, resource) {
  * @throws {Error} If the action is not part of the permission catalog.
  */
 async function authorizeResource(actor, action, resourceType, resourceId, teamIdLoader) {
-    if (!enforcementEnabled) {
-        return true;
-    }
     const teamId = await teamIdLoader(resourceType, resourceId);
     return can(actor, action, { type: resourceType, teamId });
 }
 
 /**
  * Convenience wrapper around {@link authorizeResource} for call sites that want
- * to throw rather than branch on a boolean. This is the call every retrofitted
- * handler/gate should use (ADR-0010 phase P3): while enforcement is OFF it is a
- * pure no-op (never even calls the loader), so it can be inserted ahead of an
- * existing legacy ownership check without changing today's behaviour. Existing
- * `WHERE ... AND user_id = ?` predicates are intentionally left in place during
- * P3 — only P4 (tied to the enforcement flip) switches the trusted column to
- * `team_id`, avoiding a window where a stale/incomplete team model could grant
- * broader access than the current per-user check for an existing multi-user
- * install.
+ * to throw rather than branch on a boolean. This is the call every
+ * permission-checking handler/gate should use (ADR-0010).
  * @param {Actor} actor The actor requesting access.
  * @param {string} action Canonical (team-scoped) action string.
  * @param {string} resourceType The resource family (e.g. "monitor").
  * @param {number} resourceId The resource id to resolve the owning team from.
  * @param {Function} teamIdLoader Async (resourceType, resourceId) => teamId|null.
  * @returns {Promise<void>}
- * @throws {ForbiddenError} If the actor lacks the permission (enforcement ON only).
+ * @throws {ForbiddenError} If the actor lacks the permission.
  */
 async function requireResource(actor, action, resourceType, resourceId, teamIdLoader) {
     if (!(await authorizeResource(actor, action, resourceType, resourceId, teamIdLoader))) {
@@ -242,14 +194,10 @@ async function requireResource(actor, action, resourceType, resourceId, teamIdLo
 
 /**
  * Build a SQL WHERE fragment restricting a list query to rows an actor may see.
- * Enforced mode filters by the actor's team memberships (optionally only those
- * granting a given read permission); flag-OFF falls back to the legacy
- * per-user filter for every actor, including superadmins, so existing
- * single-user queries -- and what they expose -- are byte-identical to
- * pre-RBAC behaviour until enforcement is actually flipped on. Superadmins
- * only get to see everything once `enforcementEnabled` is true, at which
- * point that's a deliberate, catalog-driven grant rather than a blanket
- * bypass of every list query's row-level filtering.
+ * Filters by the actor's team memberships (optionally only those granting a
+ * given read permission). Superadmins see every row -- a deliberate,
+ * catalog-driven grant, not a blanket bypass of row-level filtering for
+ * anyone else.
  * @param {Actor} actor The actor running the query.
  * @param {object} options Options bag.
  * @param {string} options.column The trusted team-id column name (default "team_id").
@@ -265,9 +213,6 @@ function scopeFilter(actor, options) {
     // rather than crash or, worse, silently fall through to an unfiltered query.
     if (!actor) {
         return { clause: "1 = 0", params: [] };
-    }
-    if (!enforcementEnabled) {
-        return { clause: "user_id = ?", params: [actor.userId] };
     }
     if (actor.isSuperadmin) {
         return { clause: "1 = 1", params: [] };
@@ -293,8 +238,6 @@ function scopeFilter(actor, options) {
 
 module.exports = {
     ForbiddenError,
-    setEnforcementEnabled,
-    isEnforcementEnabled,
     buildActor,
     can,
     requirePermission,

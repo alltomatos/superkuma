@@ -213,13 +213,6 @@ class SuperKumaServer {
         log.debug("DEBUG", "Timezone: " + process.env.TZ);
         log.debug("DEBUG", "Current Time: " + dayjs.tz().format());
 
-        // ADR-0010 P4: sync the persisted enforcement flag into the in-memory
-        // authz module. Settings.get() resolves to null/undefined when the row
-        // doesn't exist yet, and setEnforcementEnabled() coerces via Boolean(),
-        // so a fresh install with no "rbacEnforced" row safely stays OFF.
-        const { setEnforcementEnabled } = require("./security/authz");
-        setEnforcementEnabled(await Settings.get("rbacEnforced"));
-
         await this.loadMaintenanceList();
     }
 
@@ -265,27 +258,10 @@ class SuperKumaServer {
     }
 
     /**
-     * Get a list of monitors visible to the given actor.
-     * @param {object} actor - The RBAC actor to scope the list to (ADR-0010). While
-     * enforcement is OFF, behaves exactly as the legacy per-user filter did --
-     * except for a superadmin, who always sees every monitor. This carve-out is
-     * deliberately local to this function rather than in `scopeFilter()` itself:
-     * several other `scopeFilter()` call sites (notifications, proxies, remote
-     * browsers) hand back plaintext secrets with no per-row filtering, so a
-     * blanket superadmin bypass in the shared function would leak those across
-     * users while enforcement is off. Monitors are the one resource an admin
-     * genuinely needs full (including credential) visibility into to manage them.
-     *
-     * Note this intentionally does NOT gate on `isEnforcementEnabled()` the way
-     * `scopeFilter()`'s own superadmin carve-out does -- it applies as soon as
-     * `is_superadmin` is set, dark-launch or not. That is a deliberate deviation
-     * from ADR-0010's "flag-OFF byte-identical" contract, accepted because on a
-     * single- or few-admin instance there is no one else's monitor to leak. If an
-     * instance ever has multiple users who each own private monitors and only
-     * SOME of them should be promoted to superadmin without inheriting visibility
-     * into everyone else's monitor credentials, gate this on `isEnforcementEnabled()`
-     * too (matching every other `scopeFilter()` call site) instead of granting
-     * that account superadmin.
+     * Get a list of monitors visible to the given actor. A superadmin sees
+     * every monitor (including credentials); everyone else is scoped to their
+     * team membership(s) via `scopeFilter()` (ADR-0010).
+     * @param {object} actor - The RBAC actor to scope the list to.
      * @param {number} monitorID - The ID of monitor for.
      * @returns {Promise<object>} A promise that resolves to an object with monitor IDs as keys and monitor objects as values.
      *
@@ -293,7 +269,7 @@ class SuperKumaServer {
      */
     async getMonitorJSONList(actor, monitorID = null) {
         const { scopeFilter } = require("./security/authz");
-        const filter = actor && actor.isSuperadmin ? { clause: "1 = 1", params: [] } : scopeFilter(actor);
+        const filter = scopeFilter(actor);
         let query = filter.clause + " ";
         let queryParams = [...filter.params];
 
@@ -322,36 +298,78 @@ class SuperKumaServer {
      * @returns {Promise<object>} Maintenance list
      */
     async sendMaintenanceList(socket) {
-        return await this.sendMaintenanceListByUserID(socket.userID, socket.actor && socket.actor.activeTeamId);
-    }
-
-    /**
-     * Send list of maintenances to user
-     * @param {number} userID User to send list to
-     * @param {number} teamId The owning team id (ADR-0010); used only when
-     * enforcement is ON to route to the team's room instead of the legacy
-     * per-user room. Optional so pre-existing model-level callers (which only
-     * have a userID) keep working unchanged while enforcement is OFF.
-     * @returns {Promise<object>} Maintenance list
-     */
-    async sendMaintenanceListByUserID(userID, teamId = null) {
         const { roomFor } = require("./security/rooms");
-        let list = await this.getMaintenanceJSONList(userID);
-        this.io.to(roomFor(userID, teamId)).emit("maintenanceList", list);
+        let list = await this.getMaintenanceJSONList(socket.actor);
+        this.io.to(roomFor(socket.userID, socket.actor && socket.actor.activeTeamId)).emit("maintenanceList", list);
         return list;
     }
 
     /**
-     * Get a list of maintenances for the given user.
-     * @param {string} userID - The ID of the user to get maintenances for.
-     * @returns {Promise<object>} A promise that resolves to an object with maintenance IDs as keys and maintenances objects as values.
+     * Broadcast the maintenance list to a single team's (or, for a teamless
+     * legacy row, a single user's) own room after one of their maintenance
+     * windows changes state (ADR-0010). Deliberately scoped to just that one
+     * team/user rather than actor-aware: Socket.io room delivery already
+     * restricts the recipients to that exact room (see roomFor), so the
+     * payload only needs to match what that room's own members may see --
+     * unlike getMaintenanceJSONList's superadmin-sees-everything /
+     * multi-team handling, which only matters for a specific actor's own
+     * on-demand fetch (sendMaintenanceList above).
+     * @param {number} userID Owning user id, used only as a fallback when teamId is null.
+     * @param {number|null} teamId The team whose room this update is for.
+     * @returns {Promise<object>} Maintenance list scoped to that team/user.
      */
-    async getMaintenanceJSONList(userID) {
+    async sendMaintenanceListByUserID(userID, teamId = null) {
+        const { roomFor } = require("./security/rooms");
         let result = {};
         for (let maintenanceID in this.maintenanceList) {
-            result[maintenanceID] = await this.maintenanceList[maintenanceID].toJSON();
+            const maintenance = this.maintenanceList[maintenanceID];
+            const visible = teamId !== null ? maintenance.team_id === teamId : maintenance.user_id === userID;
+            if (visible) {
+                result[maintenanceID] = await maintenance.toJSON();
+            }
+        }
+        this.io.to(roomFor(userID, teamId)).emit("maintenanceList", result);
+        return result;
+    }
+
+    /**
+     * Get the maintenance windows visible to a given actor (ADR-0010): a
+     * superadmin sees every window; everyone else sees only the ones whose
+     * team_id matches one of their team memberships (mirrors scopeFilter()'s
+     * multi-team handling, applied in-memory since the maintenance list is
+     * cached rather than queried per-request). Falls back to legacy per-user
+     * ownership for the theoretical edge case of a row with no team_id.
+     * @param {object} actor The RBAC actor to scope the list to, or null/undefined.
+     * @returns {Promise<object>} A promise that resolves to an object with maintenance IDs as keys and maintenances objects as values.
+     */
+    async getMaintenanceJSONList(actor) {
+        let result = {};
+        for (let maintenanceID in this.maintenanceList) {
+            const maintenance = this.maintenanceList[maintenanceID];
+            if (this.isMaintenanceVisibleToActor(actor, maintenance)) {
+                result[maintenanceID] = await maintenance.toJSON();
+            }
         }
         return result;
+    }
+
+    /**
+     * Whether an actor may see a given cached maintenance bean (ADR-0010).
+     * @param {object} actor The RBAC actor, or null/undefined.
+     * @param {object} maintenance The cached Maintenance bean.
+     * @returns {boolean} True if the actor may see this maintenance window.
+     */
+    isMaintenanceVisibleToActor(actor, maintenance) {
+        if (!actor) {
+            return false;
+        }
+        if (actor.isSuperadmin) {
+            return true;
+        }
+        if (maintenance.team_id !== null && maintenance.team_id !== undefined) {
+            return Boolean(actor.memberships && actor.memberships.has(maintenance.team_id));
+        }
+        return actor.userId === maintenance.user_id;
     }
 
     /**

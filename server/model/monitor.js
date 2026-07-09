@@ -1069,11 +1069,10 @@ class Monitor extends BeanModel {
      * @param {Server} io Socket server instance
      * @param {number} monitorID ID of monitor to send
      * @param {number} userID ID of user to send to
-     * @param {number} teamId The monitor's owning team id (ADR-0010); used
-     * only when enforcement is ON to route to the team's room instead of the
-     * legacy per-user room. Optional so callers that only have a userID
-     * (none currently do, but keeps this a non-breaking addition) keep
-     * working unchanged while enforcement is OFF.
+     * @param {number} teamId The monitor's owning team id (ADR-0010), used to
+     * route to the team's room instead of the legacy per-user room. Optional
+     * so callers that only have a userID (none currently do, but keeps this a
+     * non-breaking addition) fall back to the legacy per-user room.
      * @returns {void}
      */
     static async sendStats(io, monitorID, userID, teamId = null) {

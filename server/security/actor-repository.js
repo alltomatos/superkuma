@@ -1,10 +1,9 @@
 /**
- * Builds RBAC {@link Actor}s from the database (ADR-0010, phase P2).
+ * Builds RBAC {@link Actor}s from the database (ADR-0010).
  *
  * This is the bridge between the persisted team/role/permission tables and the
  * pure decision logic in authz.js. It is used to attach `socket.actor` at login
- * and to derive the permission payload sent to the frontend. During dark-launch
- * (enforcement OFF) the actor is built but never consulted for access control.
+ * and to derive the permission payload sent to the frontend.
  */
 
 const { R } = require("redbean-node");
@@ -123,9 +122,9 @@ async function buildPermissionPayload(user, actor) {
 }
 
 /**
- * Whether at least one active superadmin exists. Guards against enabling RBAC
- * enforcement (or any future user-deactivation/role-change mutation) in a
- * state that would leave the system with no way to grant global admin access.
+ * Whether at least one active superadmin exists. Intended as a guard before
+ * any user-deactivation/role-change mutation that could leave the system
+ * with no way to grant global admin access.
  * @returns {Promise<boolean>} True if at least one active superadmin exists.
  */
 async function hasActiveSuperadmin() {

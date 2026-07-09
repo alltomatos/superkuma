@@ -1,4 +1,4 @@
-const { describe, test, before, after } = require("node:test");
+const { describe, test } = require("node:test");
 const assert = require("node:assert");
 
 const catalog = require("../../server/permissions/catalog");
@@ -14,17 +14,7 @@ const {
     expandBuiltinRole,
 } = catalog;
 
-const {
-    buildActor,
-    can,
-    requirePermission,
-    authorizeResource,
-    requireResource,
-    scopeFilter,
-    setEnforcementEnabled,
-    isEnforcementEnabled,
-    ForbiddenError,
-} = authz;
+const { buildActor, can, requirePermission, authorizeResource, requireResource, scopeFilter, ForbiddenError } = authz;
 
 // -------------------------------------------------------------------------
 // Catalog
@@ -177,19 +167,12 @@ describe("buildActor", () => {
 });
 
 // -------------------------------------------------------------------------
-// can() / requirePermission() / authorizeResource() — enforcement ON
+// can() / requirePermission() / authorizeResource()
 // -------------------------------------------------------------------------
-describe("authorization with enforcement ON", () => {
-    before(() => setEnforcementEnabled(true));
-    after(() => setEnforcementEnabled(false));
-
+describe("authorization", () => {
     const viewer = buildActor({ userId: 10, isSuperadmin: false }, [{ teamId: 1, roleSlug: "viewer" }], 1);
     const editor = buildActor({ userId: 11, isSuperadmin: false }, [{ teamId: 1, roleSlug: "editor" }], 1);
     const superadmin = buildActor({ userId: 1, isSuperadmin: true }, []);
-
-    test("enforcement flag reports as on", () => {
-        assert.strictEqual(isEnforcementEnabled(), true);
-    });
 
     test("viewer may read but not create within its team", () => {
         assert.strictEqual(can(viewer, "monitor:read", { teamId: 1 }), true);
@@ -264,12 +247,9 @@ describe("authorization with enforcement ON", () => {
 });
 
 // -------------------------------------------------------------------------
-// scopeFilter — enforcement ON
+// scopeFilter
 // -------------------------------------------------------------------------
-describe("scopeFilter with enforcement ON", () => {
-    before(() => setEnforcementEnabled(true));
-    after(() => setEnforcementEnabled(false));
-
+describe("scopeFilter", () => {
     test("super admin sees everything", () => {
         const superadmin = buildActor({ userId: 1, isSuperadmin: true }, []);
         assert.deepStrictEqual(scopeFilter(superadmin), { clause: "1 = 1", params: [] });
@@ -314,62 +294,45 @@ describe("scopeFilter with enforcement ON", () => {
 });
 
 // -------------------------------------------------------------------------
-// Flag-OFF (dark-launch) contract: behaviour must be byte-identical to legacy.
+// Fail-closed behaviour for actors with no real access.
 // -------------------------------------------------------------------------
-describe("flag-OFF dark-launch contract", () => {
-    before(() => setEnforcementEnabled(false));
-
-    test("enforcement defaults to OFF", () => {
-        assert.strictEqual(isEnforcementEnabled(), false);
-    });
-
-    test("can() allows everything, including unknown actions and empty actors", () => {
+describe("fail-closed behaviour", () => {
+    test("can() denies everything for an actor with no memberships, including unknown actions still throwing", () => {
         const nobody = buildActor({ userId: 42, isSuperadmin: false }, []);
-        assert.strictEqual(can(nobody, "monitor:delete", { teamId: 999 }), true);
-        assert.strictEqual(can(nobody, "user:manage", {}), true);
-        // Unknown actions are not even validated while OFF — fully permissive.
-        assert.strictEqual(can(nobody, "monitor:destroy", {}), true);
+        assert.strictEqual(can(nobody, "monitor:delete", { teamId: 999 }), false);
+        assert.strictEqual(can(nobody, "user:manage", {}), false);
+        assert.throws(() => can(nobody, "monitor:destroy", {}), /Unknown permission action/);
     });
 
-    test("requirePermission never throws while OFF", () => {
+    test("requirePermission throws for an actor with no memberships", () => {
         const nobody = buildActor({ userId: 42, isSuperadmin: false }, []);
-        assert.doesNotThrow(() => requirePermission(nobody, "monitor:create", { teamId: 999 }));
+        assert.throws(() => requirePermission(nobody, "monitor:create", { teamId: 999 }), ForbiddenError);
     });
 
-    test("scopeFilter falls back to the legacy per-user filter", () => {
-        const actor = buildActor({ userId: 42, isSuperadmin: false }, [{ teamId: 1, roleSlug: "viewer" }]);
-        assert.deepStrictEqual(scopeFilter(actor), { clause: "user_id = ?", params: [42] });
+    test("scopeFilter returns nothing for an actor with no memberships", () => {
+        const nobody = buildActor({ userId: 42, isSuperadmin: false }, []);
+        assert.deepStrictEqual(scopeFilter(nobody), { clause: "1 = 0", params: [] });
     });
 
-    test("scopeFilter has no superadmin carve-out while OFF -- a superadmin is scoped to their own rows too, since several call sites hand back plaintext secrets with no per-row filtering", () => {
-        const superadmin = buildActor({ userId: 1, isSuperadmin: true }, []);
-        assert.deepStrictEqual(scopeFilter(superadmin), { clause: "user_id = ?", params: [1] });
-    });
-
-    test("scopeFilter never throws on a null/undefined actor, even while OFF", () => {
+    test("scopeFilter never throws on a null/undefined actor", () => {
         assert.deepStrictEqual(scopeFilter(null), { clause: "1 = 0", params: [] });
         assert.deepStrictEqual(scopeFilter(undefined), { clause: "1 = 0", params: [] });
     });
 
-    test("authorizeResource returns true without ever calling the loader", async () => {
+    test("authorizeResource still calls the loader and denies when the actor has no access", async () => {
         let called = false;
         const loader = async () => {
             called = true;
             return 1;
         };
         const actor = buildActor({ userId: 42, isSuperadmin: false }, []);
-        assert.strictEqual(await authorizeResource(actor, "monitor:update", "monitor", 1, loader), true);
-        assert.strictEqual(called, false, "loader must not run while enforcement is OFF");
+        assert.strictEqual(await authorizeResource(actor, "monitor:update", "monitor", 1, loader), false);
+        assert.strictEqual(called, true, "loader must always run");
     });
 
-    test("requireResource never throws and never calls the loader while OFF", async () => {
-        let called = false;
-        const loader = async () => {
-            called = true;
-            return 1;
-        };
+    test("requireResource throws for an actor with no access", async () => {
+        const loader = async () => 1;
         const actor = buildActor({ userId: 42, isSuperadmin: false }, []);
-        await assert.doesNotReject(requireResource(actor, "monitor:delete", "monitor", 1, loader));
-        assert.strictEqual(called, false, "loader must not run while enforcement is OFF");
+        await assert.rejects(requireResource(actor, "monitor:delete", "monitor", 1, loader), ForbiddenError);
     });
 });

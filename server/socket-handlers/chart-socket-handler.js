@@ -3,6 +3,8 @@ const { UptimeCalculator } = require("../uptime-calculator");
 const { log } = require("../../src/util");
 const { z } = require("zod");
 const { validate } = require("../validation");
+const { requireResource } = require("../security/authz");
+const { teamIdLoader } = require("../security/team-id-loaders");
 
 const monitorIDSchema = z.number().int().positive();
 // Bounded to a year in hours (8760) so the frontend's existing period
@@ -22,6 +24,8 @@ module.exports.chartSocketHandler = (socket) => {
 
             monitorID = validate(monitorIDSchema, monitorID);
             period = validate(periodSchema, period);
+
+            await requireResource(socket.actor, "monitor:read", "monitor", monitorID, teamIdLoader);
 
             let uptimeCalculator = await UptimeCalculator.getUptimeCalculator(monitorID);
 

@@ -5,7 +5,7 @@ const assert = require("node:assert");
 const knexLib = require("knex");
 const { R } = require("redbean-node");
 const migration = require("../../db/knex_migrations/2026-07-04-0000-create-rbac-schema");
-const { buildActor, setEnforcementEnabled, ForbiddenError } = require("../../server/security/authz");
+const { buildActor, ForbiddenError } = require("../../server/security/authz");
 const { DockerHost } = require("../../server/docker");
 
 const RESOURCE_TABLES = [
@@ -104,7 +104,7 @@ const actorFor = async (db, userId) => {
     return buildActor({ userId, isSuperadmin: Boolean(user.is_superadmin) }, rows);
 };
 
-describe("docker.js DockerHost authz retrofit (ADR-0010 P3, dark-launch)", () => {
+describe("docker.js DockerHost authz retrofit (ADR-0010)", () => {
     let db;
     let teamBId;
     let actorA;
@@ -148,36 +148,34 @@ describe("docker.js DockerHost authz retrofit (ADR-0010 P3, dark-launch)", () =>
         await db.destroy();
     });
 
-    describe("enforcement OFF (default) - behaviour unchanged", () => {
-        before(() => setEnforcementEnabled(false));
-
-        test("save() creates a new docker host exactly as before, actor ignored", async () => {
-            const bean = await DockerHost.save(
-                { dockerDaemon: "/var/run/docker.sock", dockerType: "socket", name: "new-host" },
-                null,
-                3,
-                actorA
+    describe("actor has no access", () => {
+        test("save() (update) with actor undefined is denied -- no actor-optional escape hatch", async () => {
+            await assert.rejects(
+                DockerHost.save(
+                    { dockerDaemon: "/var/run/docker.sock", dockerType: "socket", name: "no-actor" },
+                    dockerHostInTeamB,
+                    2,
+                    undefined
+                ),
+                ForbiddenError
             );
-            assert.ok(bean.id);
-            assert.strictEqual(bean.name, "new-host");
-            assert.strictEqual(bean.user_id, 3);
         });
 
-        test("save() updates an existing docker host across the user_id check unchanged, even with a foreign actor", async () => {
-            // actorA is a member of team A only; dockerHostInTeamB belongs to team B.
-            // With enforcement OFF this must still succeed exactly like pre-RBAC code,
-            // because requireResource() is a pure no-op.
-            const updated = await DockerHost.save(
-                { dockerDaemon: "/var/run/docker.sock", dockerType: "socket", name: "renamed-by-a" },
-                dockerHostInTeamB,
-                2,
-                actorA
+        test("save() (create) with actor undefined is denied -- no actor-optional escape hatch", async () => {
+            await assert.rejects(
+                DockerHost.save(
+                    { dockerDaemon: "/var/run/docker.sock", dockerType: "socket", name: "no-actor" },
+                    null,
+                    3,
+                    undefined
+                ),
+                ForbiddenError
             );
-            assert.strictEqual(updated.id, dockerHostInTeamB);
-            assert.strictEqual(updated.name, "renamed-by-a");
         });
 
-        test("save() with a foreign actor but wrong userID in the WHERE clause still fails with 'docker host not found' (legacy check untouched)", async () => {
+        test("save() denies a foreign actor before ever reaching the legacy 'not found' check", async () => {
+            // actorA (team A) has no access to dockerHostInTeamB (team B) at all --
+            // requireResource throws before the userID-mismatch would even matter.
             await assert.rejects(
                 DockerHost.save(
                     { dockerDaemon: "/var/run/docker.sock", dockerType: "socket", name: "x" },
@@ -185,37 +183,23 @@ describe("docker.js DockerHost authz retrofit (ADR-0010 P3, dark-launch)", () =>
                     999,
                     actorA
                 ),
-                /docker host not found/
+                ForbiddenError
             );
-        });
-
-        test("save() with actor undefined still works (no null-guard needed; requireResource is a no-op)", async () => {
-            const bean = await DockerHost.save(
-                { dockerDaemon: "/var/run/docker.sock", dockerType: "socket", name: "no-actor" },
-                null,
-                3,
-                undefined
-            );
-            assert.ok(bean.id);
-        });
-
-        test("delete() removes an existing docker host across the user_id check unchanged, even with a foreign actor", async () => {
-            const [id] = await db("docker_host").insert({
-                user_id: 2,
-                docker_daemon: "/var/run/docker.sock",
-                docker_type: "socket",
-                name: "to-delete",
-                team_id: teamBId,
-            });
-            await DockerHost.delete(id, 2, actorA);
-            const row = await db("docker_host").where("id", id).first();
-            assert.strictEqual(row, undefined);
         });
     });
 
-    describe("enforcement ON - real cross-team denial through the actual save()/delete() methods", () => {
-        before(() => setEnforcementEnabled(true));
-        after(() => setEnforcementEnabled(false));
+    describe("real cross-team denial through the actual save()/delete() methods", () => {
+        test("save() with a valid team but wrong userID in the WHERE clause still fails with 'docker host not found' (legacy check preserved as defense-in-depth)", async () => {
+            await assert.rejects(
+                DockerHost.save(
+                    { dockerDaemon: "/var/run/docker.sock", dockerType: "socket", name: "x" },
+                    dockerHostInTeamB,
+                    999,
+                    actorB
+                ),
+                /docker host not found/
+            );
+        });
 
         test("actor in team A cannot save() (update) a docker host owned by team B", async () => {
             await assert.rejects(
@@ -257,7 +241,7 @@ describe("docker.js DockerHost authz retrofit (ADR-0010 P3, dark-launch)", () =>
             assert.strictEqual(row, undefined);
         });
 
-        test("save() creating a brand-new docker host (no dockerHostID) never calls requireResource, so it is unaffected by team membership", async () => {
+        test("save() creating a brand-new docker host (no dockerHostID) is gated by docker_host:manage instead of requireResource", async () => {
             const bean = await DockerHost.save(
                 { dockerDaemon: "/var/run/docker.sock", dockerType: "socket", name: "fresh" },
                 null,
@@ -265,6 +249,20 @@ describe("docker.js DockerHost authz retrofit (ADR-0010 P3, dark-launch)", () =>
                 actorA
             );
             assert.ok(bean.id);
+            assert.strictEqual(bean.team_id, await db("team").where("slug", "team-a").first().then((t) => t.id));
+        });
+
+        test("save() creating a brand-new docker host is denied for an actor lacking docker_host:manage", async () => {
+            const noTeams = buildActor({ userId: 3, isSuperadmin: false }, []);
+            await assert.rejects(
+                DockerHost.save(
+                    { dockerDaemon: "/var/run/docker.sock", dockerType: "socket", name: "should-not-exist" },
+                    null,
+                    3,
+                    noTeams
+                ),
+                ForbiddenError
+            );
         });
     });
 });

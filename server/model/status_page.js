@@ -358,7 +358,8 @@ class StatusPage extends BeanModel {
     }
 
     /**
-     * Send status page list to client
+     * Send status page list to client, scoped to the actor's own team(s) (or
+     * every status page, for a superadmin) (ADR-0010).
      * @param {Server} io io Socket server instance
      * @param {Socket} socket Socket.io instance
      * @returns {Promise<Bean[]>} Status page list
@@ -366,7 +367,9 @@ class StatusPage extends BeanModel {
     static async sendStatusPageList(io, socket) {
         let result = {};
 
-        let list = await R.findAll("status_page", " ORDER BY title ");
+        const { scopeFilter } = require("../security/authz");
+        const filter = scopeFilter(socket.actor);
+        let list = await R.find("status_page", filter.clause + " ORDER BY title", filter.params);
 
         for (let item of list) {
             result[item.id] = await item.toJSON();

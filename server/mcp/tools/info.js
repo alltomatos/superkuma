@@ -15,8 +15,7 @@ function registerInfoTools(server, client, config) {
             "Return the MCP connection status, which capabilities are enabled (mutations/deletes), the number of " +
             "visible monitors, the SuperKuma server info (version, base URL), and the team this connection is " +
             "scoped to (Teams/RBAC). Monitors created via create_monitor land in that team; every list tool " +
-            "(list_monitors, etc.) only returns that team's resources once an instance has RBAC enforcement " +
-            "turned on -- while it's off (the default), every resource is visible regardless of team.",
+            "(list_monitors, etc.) only returns that team's resources -- a superadmin connection sees every team.",
         handler: async () => {
             const info = client.info || {};
             return {

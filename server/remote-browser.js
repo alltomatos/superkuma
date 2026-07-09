@@ -8,7 +8,7 @@ class RemoteBrowser {
      * Gets remote browser from ID
      * @param {number} remoteBrowserID ID of the remote browser
      * @param {number} userID ID of the user who created the remote browser
-     * @param {import("./security/authz").Actor} actor The acting actor (RBAC dark-launch; no-op while enforcement is OFF)
+     * @param {import("./security/authz").Actor} actor The acting actor (ADR-0010)
      * @returns {Promise<Bean>} Remote Browser
      */
     static async get(remoteBrowserID, userID, actor) {
@@ -28,7 +28,7 @@ class RemoteBrowser {
      * @param {object} remoteBrowser Remote Browser to save
      * @param {?number} remoteBrowserID ID of the Remote Browser to update
      * @param {number} userID ID of the user who adds the Remote Browser
-     * @param {import("./security/authz").Actor} actor The acting actor (RBAC dark-launch; no-op while enforcement is OFF)
+     * @param {import("./security/authz").Actor} actor The acting actor (ADR-0010)
      * @returns {Promise<Bean>} Updated Remote Browser
      */
     static async save(remoteBrowser, remoteBrowserID, userID, actor) {
@@ -61,7 +61,7 @@ class RemoteBrowser {
      * Delete a Remote Browser
      * @param {number} remoteBrowserID ID of the Remote Browser to delete
      * @param {number} userID ID of the user who created the Remote Browser
-     * @param {import("./security/authz").Actor} actor The acting actor (RBAC dark-launch; no-op while enforcement is OFF)
+     * @param {import("./security/authz").Actor} actor The acting actor (ADR-0010)
      * @returns {Promise<void>}
      */
     static async delete(remoteBrowserID, userID, actor) {

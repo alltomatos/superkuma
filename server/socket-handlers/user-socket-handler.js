@@ -72,10 +72,10 @@ async function sendCredentialsEmail(username, email, password, subject, intro) {
 
 /**
  * Refuse to let a non-superadmin actor change a superadmin's credentials.
- * The "user:manage" permission is coarse (and, under RBAC's dark-launch
- * default per ADR-0010, a no-op that allows every authenticated actor) --
- * without this check, any caller reaching resendWelcome/setUserPassword
- * could silently take over the superadmin account.
+ * The "user:manage" permission is global and, per the catalog, only ever
+ * granted to the superadmin built-in role -- but this explicit check is kept
+ * as defense-in-depth for a highly sensitive action, independent of whatever
+ * roles a custom permission set might grant "user:manage" to in the future.
  * @param {object} actor The calling actor (socket.actor)
  * @param {object} targetUser The user bean about to have its credentials changed
  * @returns {void}
@@ -310,11 +310,11 @@ module.exports.userSocketHandler = (socket, server) => {
     });
 
     // Grant or revoke superadmin status. Gated on the CALLER already being a
-    // superadmin -- the coarse "user:manage" permission alone isn't enough,
-    // since under RBAC's dark-launch default (ADR-0010) it's a no-op that
-    // passes for every authenticated actor, which would otherwise let anyone
-    // promote themselves. Refuses to demote the last remaining active
-    // superadmin, which would leave the instance with nobody able to manage it.
+    // superadmin, on top of the "user:manage" permission check above -- this
+    // is the most sensitive action user:manage covers, so it gets an explicit
+    // defense-in-depth check rather than relying solely on the permission
+    // catalog. Refuses to demote the last remaining active superadmin, which
+    // would leave the instance with nobody able to manage it.
     socket.on("setUserSuperadmin", async (input, callback) => {
         try {
             checkLogin(socket);

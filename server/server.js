@@ -137,7 +137,7 @@ log.debug("server", "Importing Notification");
 const { Notification } = require("./notification");
 Notification.init();
 
-const { requireResource } = require("./security/authz");
+const { requireResource, ForbiddenError } = require("./security/authz");
 const { teamIdLoader } = require("./security/team-id-loaders");
 log.debug("server", "Importing Web-Push");
 const webpush = require("web-push");
@@ -924,30 +924,11 @@ let needSetup = false;
                     server.disconnectAllSocketClients(socket.userID, socket.id);
                 }
 
-                // ADR-0010 P4: refuse to enable RBAC enforcement if no active
-                // superadmin exists -- otherwise nobody could act with global
-                // admin authority once the dark-launch bypass is turned off.
-                if (data.rbacEnforced) {
-                    const { hasActiveSuperadmin } = require("./security/actor-repository");
-                    if (!(await hasActiveSuperadmin())) {
-                        throw new Error("Cannot enable RBAC enforcement: no active superadmin exists.");
-                    }
-                }
-
                 const previousChromeExecutable = await Settings.get("chromeExecutable");
                 const previousNSCDStatus = await Settings.get("nscd");
 
                 await setSettings("general", data);
                 server.entryPage = data.entryPage;
-
-                // ADR-0010 P4: apply the enforcement flag immediately, like the
-                // other settings below. Only when the field is actually present
-                // in the payload -- forms that don't know about this key yet
-                // must not silently reset an already-enabled flag back to OFF.
-                if (Object.prototype.hasOwnProperty.call(data, "rbacEnforced")) {
-                    const { setEnforcementEnabled } = require("./security/authz");
-                    setEnforcementEnabled(data.rbacEnforced);
-                }
 
                 // Also need to apply timezone globally
                 if (data.serverTimezone) {
@@ -1139,6 +1120,13 @@ let needSetup = false;
         socket.on("clearStatistics", async (callback) => {
             try {
                 checkLogin(socket);
+                // Global, instance-wide action (wipes every monitor's stats, not
+                // just the actor's own team) -- no team-scoped permission fits, so
+                // this is superadmin-only, matching other truly-global actions
+                // (createTeam, setUserSuperadmin).
+                if (!(socket.actor && socket.actor.isSuperadmin)) {
+                    throw new ForbiddenError("Only a superadmin can clear statistics for every monitor.");
+                }
 
                 log.info("manage", `Clear Statistics User ID: ${socket.userID}`);
 
@@ -1234,11 +1222,10 @@ let needSetup = false;
  * @param {number} monitorID ID of monitor to update
  * @param {number[]} notificationIDList List of new notification
  * providers to add
- * @param {object} actor The RBAC actor performing the update (optional; when
- * given, each linked notification is validated to belong to the actor's team
- * before being linked -- a no-op while enforcement is OFF). Closes the
- * cross-tenant hole where a client could link a monitor to a notification it
- * does not own (ADR-0010 §4.4).
+ * @param {object} actor The RBAC actor performing the update. Each linked
+ * notification is validated to belong to the actor's team before being
+ * linked, closing the cross-tenant hole where a client could link a monitor
+ * to a notification it does not own (ADR-0010 §4.4).
  * @returns {Promise<void>}
  */
 async function updateMonitorNotification(monitorID, notificationIDList, actor) {
@@ -1246,9 +1233,7 @@ async function updateMonitorNotification(monitorID, notificationIDList, actor) {
 
     for (let notificationID in notificationIDList) {
         if (notificationIDList[notificationID]) {
-            if (actor) {
-                await requireResource(actor, "notification:read", "notification", notificationID, teamIdLoader);
-            }
+            await requireResource(actor, "notification:read", "notification", notificationID, teamIdLoader);
             let relation = R.dispense("monitor_notification");
             relation.monitor_id = monitorID;
             relation.notification_id = notificationID;
@@ -1286,26 +1271,23 @@ async function checkOwner(userID, monitorID) {
 async function afterLogin(socket, user, actorOverride = null) {
     socket.userID = user.id;
 
-    // Dark-launch (ADR-0010 P2): attach the RBAC actor + permission payload.
-    // Must never break login while enforcement is OFF.
+    // ADR-0010: attach the RBAC actor + permission payload. Must never break login.
     try {
         const { buildActorForUser, buildPermissionPayload } = require("./security/actor-repository");
         socket.actor = actorOverride || (await buildActorForUser(user));
         socket.permissionPayload = await buildPermissionPayload(user, socket.actor);
     } catch (e) {
         // Fall back to a minimal actor carrying the correct userId (never null)
-        // so scopeFilter()'s OFF-path -- which reads actor.userId directly,
-        // matching legacy "WHERE user_id = ?" queries -- keeps working exactly
-        // as before. Empty memberships also make this actor fail closed (deny
-        // everything) if enforcement is ever ON, the safe default for an error.
+        // with empty memberships, so it fails closed (denies everything) rather
+        // than crashing login -- the safe default when the real actor can't be built.
         const { buildActor } = require("./security/authz");
         socket.actor = buildActor({ userId: user.id, isSuperadmin: false }, []);
         socket.permissionPayload = null;
-        log.warn("auth", "RBAC actor build skipped (dark-launch): " + e.message);
+        log.warn("auth", "RBAC actor build failed, falling back to a fail-closed actor: " + e.message);
     }
 
-    // ADR-0010 P4: join the room AFTER the actor is resolved, since roomFor()
-    // needs socket.actor.activeTeamId to route correctly once enforcement is ON.
+    // ADR-0010: join the room AFTER the actor is resolved, since roomFor()
+    // needs socket.actor.activeTeamId to route correctly.
     const { roomFor } = require("./security/rooms");
     socket.join(roomFor(user.id, socket.actor.activeTeamId));
 
