@@ -47,6 +47,7 @@ export default {
             apiKeyList: {},
             remoteInstanceList: [],
             userList: [],
+            teamList: [],
             heartbeatList: {},
             avgPingList: {},
             uptimeList: {},
@@ -642,6 +643,72 @@ export default {
          */
         setUserSuperadmin(id, isSuperadmin, callback) {
             socket.emit("setUserSuperadmin", { id, isSuperadmin }, callback);
+        },
+
+        /**
+         * Fetch and store the list of teams.
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        getTeamList(callback) {
+            if (!callback) {
+                callback = () => {};
+            }
+            socket.emit("getTeamList", (res) => {
+                if (res.ok) {
+                    this.teamList = res.teamList;
+                }
+                callback(res);
+            });
+        },
+
+        /**
+         * Fetch a team's members.
+         * @param {number} teamId ID of the team
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        getTeamMembers(teamId, callback) {
+            socket.emit("getTeamMembers", { teamId }, callback);
+        },
+
+        /**
+         * Create a new team.
+         * @param {string} name Team display name
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        createTeam(name, callback) {
+            socket.emit("createTeam", { name }, (res) => {
+                if (res.ok) {
+                    this.getTeamList();
+                }
+                callback(res);
+            });
+        },
+
+        /**
+         * Add a user to a team with a role, or change their existing role in
+         * that team.
+         * @param {number} teamId ID of the team
+         * @param {number} userId ID of the user
+         * @param {string} roleSlug Role to assign ("owner"/"admin"/"editor"/"viewer")
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        addTeamMember(teamId, userId, roleSlug, callback) {
+            socket.emit("addTeamMember", { teamId, userId, roleSlug }, callback);
+        },
+
+        /**
+         * Remove a user from a team.
+         * @param {number} teamId ID of the team
+         * @param {number} userId ID of the user
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        removeTeamMember(teamId, userId, callback) {
+            socket.emit("removeTeamMember", { teamId, userId }, callback);
         },
 
         /**

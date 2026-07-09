@@ -115,6 +115,9 @@ export default {
                 users: {
                     title: this.$t("Users"),
                 },
+                teams: {
+                    title: this.$t("Teams"),
+                },
                 mail: {
                     title: this.$t("Mail"),
                 },

@@ -33,6 +33,7 @@ import About from "./components/settings/About.vue";
 import RemoteBrowsers from "./components/settings/RemoteBrowsers.vue";
 import Federation from "./components/settings/Federation.vue";
 import Users from "./components/settings/Users.vue";
+import Teams from "./components/settings/Teams.vue";
 import Mail from "./components/settings/Mail.vue";
 
 const routes = [
@@ -129,6 +130,10 @@ const routes = [
                             {
                                 path: "users",
                                 component: Users,
+                            },
+                            {
+                                path: "teams",
+                                component: Teams,
                             },
                             {
                                 path: "mail",

@@ -56,6 +56,7 @@ import {
     faPaperPlane,
     faKey,
     faUserShield,
+    faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 
 library.add(
@@ -109,6 +110,7 @@ library.add(
     faPaperPlane,
     faKey,
     faUserShield,
+    faUsers,
 );
 
 export { FontAwesomeIcon };
