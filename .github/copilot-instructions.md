@@ -13,7 +13,7 @@ Warning: Only maintainers of SuperKuma can use this instructions, for other cont
 **SuperKuma** is a self-hosted monitoring tool for HTTP(s), TCP, DNS, Docker, etc. Built with Vue 3 (frontend) and Node.js/Express (backend), using Socket.IO for real-time communication.
 
 - **Languages**: JavaScript, Vue 3, TypeScript (limited), HTML, CSS/SCSS
-- **Backend**: Node.js >= 20.4, Express.js, Socket.IO, SQLite
+- **Backend**: Node.js >= 20.4, Express.js, Socket.IO, MariaDB (default for new deploys) / SQLite
 - **Frontend**: Vue 3, Vite, Bootstrap 5, Chart.js
 - **Package Manager**: npm with `legacy-peer-deps=true` (.npmrc)
 
@@ -136,7 +136,7 @@ npm run dev  # Starts frontend (port 3000) and backend (port 3001)
 
 ## Database
 
-- Primary: SQLite (also supports MariaDB/MySQL)
+- Default for new deploys (`compose.yaml`): MariaDB. Also supports SQLite, MySQL, Postgres — existing SQLite installs are unaffected
 - Migrations in `db/knex_migrations/` using Knex.js
 - Filename format validated by CI: `node ./extra/check-knex-filenames.mjs`
 

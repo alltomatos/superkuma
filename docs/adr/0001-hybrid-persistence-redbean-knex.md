@@ -5,7 +5,9 @@
 
 ## Contexto
 
-O app precisa suportar múltiplos engines (SQLite default, MariaDB, MySQL, Postgres) com schema evoluindo ao longo de 50+ migrations. Duas necessidades distintas: consultas de runtime simples/ágeis e evolução de schema versionada e reprodutível.
+O app precisa suportar múltiplos engines (MariaDB, SQLite, MySQL, Postgres) com schema evoluindo ao longo de 50+ migrations. Duas necessidades distintas: consultas de runtime simples/ágeis e evolução de schema versionada e reprodutível.
+
+> **Atualização (2026-07-09):** o `compose.yaml` público (deploy novo via Docker Compose) passou a provisionar MariaDB por padrão, com auto-configuração via `SUPERKUMA_DB_*` env vars — o wizard de escolha de banco é pulado inteiramente nesse caminho. SQLite continua um engine plenamente suportado (instâncias existentes não são afetadas; ainda é a opção recomendada para standalone pequeno via `npm run setup` ou `docker run` manual, pelo wizard).
 
 ## Decisão
 

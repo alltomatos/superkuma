@@ -33,17 +33,24 @@ SuperKuma is an easy-to-use self-hosted monitoring tool, with built-in Master-Ag
 
 ### 🐳 Docker Compose
 
+Ships with a dedicated **MariaDB** container out of the box — no database setup step, no manual
+configuration:
+
 ```bash
 mkdir superkuma
 cd superkuma
 curl -o compose.yaml https://raw.githubusercontent.com/alltomatos/superkuma/main/compose.yaml
+echo "SUPERKUMA_DB_PASSWORD=$(openssl rand -hex 24)" > .env
 docker compose up -d
 ```
 
-SuperKuma is now running on all network interfaces (e.g. http://localhost:3001 or http://your-ip:3001).
+SuperKuma is now running on all network interfaces (e.g. http://localhost:3001 or http://your-ip:3001) — go straight to creating your admin account, the database is already configured.
 
 > [!WARNING]
 > File Systems like **NFS** (Network File System) are **NOT** supported. Please map to a local directory or volume.
+
+> [!NOTE]
+> Prefer SQLite for a small, single-file standalone install? Use the "Docker Command" or "Non-Docker" install path below and pick SQLite in the setup wizard — it's still fully supported, just no longer the Docker Compose default.
 
 ### 🐳 Docker Command
 
