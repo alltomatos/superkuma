@@ -68,3 +68,22 @@ Run this loop per site:
 - `delete_*` returns a dry-run unless `confirm: true` — re-check the id first.
 - Discovery uses **read-only** queries only. Never store, log or echo credentials or SNMP
   community strings; keep them in the client's secret store / env.
+
+## Teams (multi-tenant visibility)
+
+An instance can have multiple **Teams** (_Settings → Teams_, superadmin-only): create a team, add
+users to it with a role (Owner/Admin/Editor/Viewer — Viewer is read-only, the others can create and
+edit), and every monitor belongs to exactly one team (the creator's active team at the time it was
+made). This is **dark-launched**: a `rbacEnforced` setting, off by default, gates whether it
+actually restricts anything. While off, every logged-in user (and every MCP API key) sees every
+monitor regardless of team — team membership exists but has no visible effect. Once an admin turns
+enforcement on, each user/API key only sees their own team's resources (a superadmin still sees
+everything).
+
+For MCP specifically: an API key is scoped to exactly one team's role at creation time and never
+inherits its owner's superadmin status, even if the owner is a superadmin. `create_monitor` always
+lands the new monitor in that key's team; `get_info` reports which team a connection is scoped to
+(`team`/`teams` fields) so you can confirm scope before bulk-creating. If enforcement is on and
+`list_monitors`/`get_monitor` return fewer monitors than expected, the API key's team is probably
+not the one you think it is — check `get_info` first, or ask the human to move the key/user into
+the right team via _Settings → Teams_.
