@@ -5,8 +5,9 @@ const { nanoid } = require("nanoid");
 const passwordHash = require("../password-hash");
 const { z } = require("zod");
 const { validate } = require("../validation");
-const { requireResource, scopeFilter } = require("../security/authz");
+const { requireResource, requirePermission, scopeFilter } = require("../security/authz");
 const { teamIdLoader } = require("../security/team-id-loaders");
+const { resolveTeamIdForCreate } = require("../security/actor-repository");
 
 const remoteInstanceIDSchema = z.number().int().positive();
 
@@ -25,6 +26,9 @@ module.exports.remoteInstanceSocketHandler = (socket) => {
     socket.on("addRemoteInstance", async (remoteInstance, callback) => {
         try {
             checkLogin(socket);
+            requirePermission(socket.actor, "remote_instance:manage", {
+                teamId: socket.actor ? socket.actor.activeTeamId : null,
+            });
 
             const data = validate(addRemoteInstanceSchema, remoteInstance);
 
@@ -40,7 +44,7 @@ module.exports.remoteInstanceSocketHandler = (socket) => {
             // ADR-0010 R7: without this, every remote_instance (and every
             // monitor it later mirrors via federation-router.js) is born with
             // team_id=NULL -- a cross-tenant-invisible orphan.
-            bean.team_id = socket.actor ? socket.actor.activeTeamId : null;
+            bean.team_id = await resolveTeamIdForCreate(socket.actor);
 
             try {
                 await R.store(bean);

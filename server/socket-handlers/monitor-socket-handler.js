@@ -8,6 +8,7 @@ const { z } = require("zod");
 const { validate } = require("../validation");
 const { requireResource, requirePermission } = require("../security/authz");
 const { teamIdLoader } = require("../security/team-id-loaders");
+const { resolveTeamIdForCreate } = require("../security/actor-repository");
 
 const monitorTagIDSchema = z.number().int().positive();
 const monitorTagValueSchema = z.string().max(500).nullish();
@@ -35,18 +36,6 @@ async function validateMonitorLinkedResources(actor, monitor) {
     if (monitor.parent !== undefined && monitor.parent !== null) {
         await requireResource(actor, "monitor:read", "monitor", monitor.parent, teamIdLoader);
     }
-}
-
-/**
- * Fallback team id for a new monitor when the creating actor has no active
- * team (e.g. they were removed from every team they belonged to). Used only
- * on that rare path -- avoids ever silently creating a team_id = NULL
- * (orphaned) monitor from the "add" handler.
- * @returns {Promise<number|null>} The Default Team's id, or null if it somehow doesn't exist
- */
-async function getDefaultTeamId() {
-    const defaultTeam = await R.findOne("team", "slug = ?", ["default"]);
-    return defaultTeam ? defaultTeam.id : null;
 }
 
 /**
@@ -119,7 +108,7 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
             // removed from every team they belonged to), so a monitor can
             // never silently end up team_id = NULL (an invisible orphan) from
             // this path.
-            bean.team_id = (socket.actor && socket.actor.activeTeamId) || (await getDefaultTeamId());
+            bean.team_id = await resolveTeamIdForCreate(socket.actor);
 
             bean.validate();
 
@@ -574,10 +563,14 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
     socket.on("addTag", async (tag, callback) => {
         try {
             checkLogin(socket);
+            requirePermission(socket.actor, "tag:manage", {
+                teamId: socket.actor ? socket.actor.activeTeamId : null,
+            });
 
             let bean = R.dispense("tag");
             bean.name = tag.name;
             bean.color = tag.color;
+            bean.team_id = await resolveTeamIdForCreate(socket.actor);
             await R.store(bean);
 
             callback({

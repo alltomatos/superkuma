@@ -8,8 +8,9 @@ const apicache = require("../modules/apicache");
 const StatusPage = require("../model/status_page");
 const { SuperKumaServer } = require("../superkuma-server");
 const { Settings } = require("../settings");
-const { requireResource } = require("../security/authz");
+const { requireResource, requirePermission } = require("../security/authz");
 const { teamIdLoader } = require("../security/team-id-loaders");
+const { resolveTeamIdForCreate } = require("../security/actor-repository");
 
 /**
  * Validates incident data
@@ -484,6 +485,9 @@ module.exports.statusPageSocketHandler = (socket) => {
     socket.on("addStatusPage", async (title, slug, callback) => {
         try {
             checkLogin(socket);
+            requirePermission(socket.actor, "status_page:manage", {
+                teamId: socket.actor ? socket.actor.activeTeamId : null,
+            });
 
             title = title?.trim();
             slug = slug?.trim();
@@ -509,6 +513,7 @@ module.exports.statusPageSocketHandler = (socket) => {
             statusPage.theme = "auto";
             statusPage.icon = "";
             statusPage.autoRefreshInterval = 300;
+            statusPage.team_id = await resolveTeamIdForCreate(socket.actor);
             await R.store(statusPage);
 
             callback({

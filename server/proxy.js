@@ -6,8 +6,9 @@ const { debug } = require("../src/util");
 const { SuperKumaServer } = require("./superkuma-server");
 const { CookieJar } = require("tough-cookie");
 const { createCookieAgent } = require("http-cookie-agent/http");
-const { requireResource } = require("./security/authz");
+const { requireResource, requirePermission } = require("./security/authz");
 const { teamIdLoader } = require("./security/team-id-loaders");
+const { resolveTeamIdForCreate } = require("./security/actor-repository");
 
 class Proxy {
     static SUPPORTED_PROXY_PROTOCOLS = ["http", "https", "socks", "socks5", "socks5h", "socks4"];
@@ -32,7 +33,9 @@ class Proxy {
                 throw new Error("proxy not found");
             }
         } else {
+            requirePermission(actor, "proxy:manage", { teamId: actor ? actor.activeTeamId : null });
             bean = R.dispense("proxy");
+            bean.team_id = await resolveTeamIdForCreate(actor);
         }
 
         // Make sure given proxy protocol is supported
