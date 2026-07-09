@@ -4,9 +4,40 @@ services:
     # To build the image locally instead of pulling it, comment out `image:`
     # above and uncomment the next line:
     # build: .
+    container_name: superkuma
     restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      # Auto-configures the database on first boot -- the in-app setup wizard's
+      # database step is skipped entirely, straight to admin account creation.
+      SUPERKUMA_DB_TYPE: mariadb
+      SUPERKUMA_DB_HOSTNAME: mariadb
+      SUPERKUMA_DB_PORT: 3306
+      SUPERKUMA_DB_NAME: superkuma
+      SUPERKUMA_DB_USERNAME: superkuma
+      SUPERKUMA_DB_PASSWORD: ${SUPERKUMA_DB_PASSWORD:?set SUPERKUMA_DB_PASSWORD in a .env file next to this compose.yaml}
     volumes:
       - ./data:/app/data
     ports:
       # <Host Port>:<Container Port>
       - "3001:3001"
+
+  mariadb:
+    image: mariadb:11
+    container_name: superkuma-mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: superkuma
+      MARIADB_USER: superkuma
+      MARIADB_PASSWORD: ${SUPERKUMA_DB_PASSWORD:?set SUPERKUMA_DB_PASSWORD in a .env file next to this compose.yaml}
+      MARIADB_RANDOM_ROOT_PASSWORD: "yes"
+    volumes:
+      - ./mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s

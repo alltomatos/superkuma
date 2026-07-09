@@ -11,7 +11,7 @@ SuperKuma — ferramenta self-hosted de monitoramento. Stack:
 
 - **Frontend:** Vue 3 + Vite (estado via mixins globais em `src/mixins/`, sem Vuex/Pinia).
 - **Backend:** Node.js (>= 20.4) + Express + Socket.io.
-- **Persistência:** redbean-node (ORM runtime) + Knex (migrations). Engines: SQLite (default), MariaDB, MySQL, Postgres.
+- **Persistência:** redbean-node (ORM runtime) + Knex (migrations). Engines: MariaDB (default do `compose.yaml` para deploy novo), SQLite, MySQL, Postgres.
 - **Tempo real:** dashboard consome eventos Socket.io; páginas públicas/badges via REST.
 
 ### Mapa de arquitetura

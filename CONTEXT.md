@@ -55,7 +55,7 @@ SuperKuma é uma aplicação self-hosted de **monitoramento de disponibilidade**
 ## Persistência
 
 - ORM runtime: **redbean-node** (`R.find`, `R.dispense`, `R.exec`). Migrations: **Knex** (`db/knex_migrations/`).
-- Engines: SQLite (default), MariaDB, MySQL, Postgres.
+- Engines: MariaDB (default do `compose.yaml` para deploy novo, desde 2026-07-09), SQLite, MySQL, Postgres. Instâncias SQLite existentes continuam plenamente suportadas — a mudança afeta só o caminho de instalação nova.
 - ⚠️ Credenciais de monitor/notificação e o JWT secret ficam **em texto plano** no DB — trade-off conhecido; ver [ADR-0007](docs/adr/0007-defer-secret-encryption.md).
 
 ---
