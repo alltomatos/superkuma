@@ -38,6 +38,18 @@ async function validateMonitorLinkedResources(actor, monitor) {
 }
 
 /**
+ * Fallback team id for a new monitor when the creating actor has no active
+ * team (e.g. they were removed from every team they belonged to). Used only
+ * on that rare path -- avoids ever silently creating a team_id = NULL
+ * (orphaned) monitor from the "add" handler.
+ * @returns {Promise<number|null>} The Default Team's id, or null if it somehow doesn't exist
+ */
+async function getDefaultTeamId() {
+    const defaultTeam = await R.findOne("team", "slug = ?", ["default"]);
+    return defaultTeam ? defaultTeam.id : null;
+}
+
+/**
  * Handlers for monitor CRUD/control and tags
  * @param {Socket} socket Socket.io instance
  * @param {SuperKumaServer} server SuperKuma server
@@ -96,6 +108,15 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
                 bean.retry_only_on_status_code_failure = monitor.retryOnlyOnStatusCodeFailure;
             }
             bean.user_id = socket.userID;
+            // Server-side-only: re-asserted after bean.import(monitor) so a
+            // client-supplied "team_id" in the payload can never be imported
+            // verbatim (ADR-0010 §4.3, R3). A monitor's team is always the
+            // creating actor's currently active team -- falling back to the
+            // Default Team if the actor has no active team (e.g. was just
+            // removed from every team they belonged to), so a monitor can
+            // never silently end up team_id = NULL (an invisible orphan) from
+            // this path.
+            bean.team_id = (socket.actor && socket.actor.activeTeamId) || (await getDefaultTeamId());
 
             bean.validate();
 
