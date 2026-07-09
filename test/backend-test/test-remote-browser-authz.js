@@ -6,9 +6,9 @@ const { R } = require("redbean-node");
 const TestDB = require("../mock-testdb");
 const { Settings } = require("../../server/settings");
 const { RemoteBrowser } = require("../../server/remote-browser");
-const { buildActor, setEnforcementEnabled, ForbiddenError } = require("../../server/security/authz");
+const { buildActor, ForbiddenError } = require("../../server/security/authz");
 
-describe("RemoteBrowser model — RBAC retrofit (P3, dark-launch)", () => {
+describe("RemoteBrowser model — RBAC retrofit (ADR-0010)", () => {
     const testDb = new TestDB("./data/test-remote-browser-authz");
 
     // Two real teams, an owner-role member of each, and a remote browser row
@@ -64,72 +64,43 @@ describe("RemoteBrowser model — RBAC retrofit (P3, dark-launch)", () => {
     });
 
     // ---------------------------------------------------------------------
-    // Enforcement OFF (default / dark-launch): behaviour is unchanged.
+    // No actor (or an actor with zero relevant access): everything is denied,
+    // with no actor-optional escape hatch anywhere in the model.
     // ---------------------------------------------------------------------
-    describe("enforcement OFF (dark-launch default)", () => {
-        test("get() returns the row for any actor, including a different team, and even with actor omitted", async () => {
-            const bean = await RemoteBrowser.get(remoteBrowserIdInTeamB, actorInTeamB.userId, actorInTeamB);
-            assert.strictEqual(bean.id, remoteBrowserIdInTeamB);
-
-            // Cross-team actor: still allowed while OFF, matching legacy behaviour
-            // (the legacy user_id check would reject it, but the RBAC gate itself
-            // must not be what blocks it while enforcement is off).
-            let rejected = false;
-            try {
-                await RemoteBrowser.get(remoteBrowserIdInTeamB, actorInTeamA.userId, actorInTeamA);
-            } catch (e) {
-                rejected = true;
-                assert.ok(!(e instanceof ForbiddenError), "must not fail with ForbiddenError while OFF");
-                assert.match(e.message, /not found/i, "must fail via the legacy user_id check, not RBAC");
-            }
-            assert.strictEqual(rejected, true, "legacy user_id mismatch still rejects (unchanged behaviour)");
-
-            // No actor at all (e.g. a caller that hasn't been threaded through yet)
-            // must still work -- requireResource is a true no-op while OFF.
-            const beanNoActor = await RemoteBrowser.get(remoteBrowserIdInTeamB, actorInTeamB.userId, undefined);
-            assert.strictEqual(beanNoActor.id, remoteBrowserIdInTeamB);
+    describe("actor has no access", () => {
+        test("get() denies when actor is omitted", async () => {
+            await assert.rejects(
+                RemoteBrowser.get(remoteBrowserIdInTeamB, actorInTeamB.userId, undefined),
+                ForbiddenError
+            );
         });
 
-        test("save() creates and updates without consulting RBAC", async () => {
+        test("save() (create) denies when actor is omitted", async () => {
+            await assert.rejects(
+                RemoteBrowser.save({ name: "no-actor", url: "ws://example.com/a" }, null, actorInTeamA.userId, undefined),
+                ForbiddenError
+            );
+        });
+
+        test("delete() denies when actor is omitted", async () => {
             const created = await RemoteBrowser.save(
-                { name: "off-create", url: "ws://example.com/a" },
+                { name: "to-delete-no-actor", url: "ws://example.com/b" },
                 null,
                 actorInTeamA.userId,
                 actorInTeamA
             );
-            assert.ok(created.id);
+            await assert.rejects(RemoteBrowser.delete(created.id, actorInTeamA.userId, undefined), ForbiddenError);
 
-            const updated = await RemoteBrowser.save(
-                { name: "off-update", url: "ws://example.com/b" },
-                created.id,
-                actorInTeamA.userId,
-                actorInTeamA
-            );
-            assert.strictEqual(updated.name, "off-update");
-        });
-
-        test("delete() removes the row without consulting RBAC", async () => {
-            const created = await RemoteBrowser.save(
-                { name: "off-delete", url: "ws://example.com/c" },
-                null,
-                actorInTeamA.userId,
-                actorInTeamA
-            );
-            await RemoteBrowser.delete(created.id, actorInTeamA.userId, actorInTeamA);
-
-            const gone = await R.findOne("remote_browser", " id = ? ", [created.id]);
-            assert.strictEqual(gone, null);
+            const stillThere = await R.findOne("remote_browser", " id = ? ", [created.id]);
+            assert.ok(stillThere, "resource must survive a denied delete attempt");
         });
     });
 
     // ---------------------------------------------------------------------
-    // Enforcement ON (test-only): real cross-team denial through the actual
-    // model methods, resolved via the real teamIdLoader against the DB row.
+    // Real cross-team denial through the actual model methods, resolved via
+    // the real teamIdLoader against the DB row.
     // ---------------------------------------------------------------------
-    describe("enforcement ON (test-only)", () => {
-        before(() => setEnforcementEnabled(true));
-        after(() => setEnforcementEnabled(false));
-
+    describe("cross-team access", () => {
         test("get() denies an actor from a different team than the resource's resolved team_id", async () => {
             await assert.rejects(
                 RemoteBrowser.get(remoteBrowserIdInTeamB, actorInTeamB.userId, actorInTeamA),
@@ -154,7 +125,7 @@ describe("RemoteBrowser model — RBAC retrofit (P3, dark-launch)", () => {
             );
         });
 
-        test("save() (create, no id) is unaffected by team scoping since there is no existing resource", async () => {
+        test("save() (create, no id) never calls requireResource (no existing resource to resolve a team from), but is still gated by remote_browser:manage", async () => {
             const created = await RemoteBrowser.save(
                 { name: "on-create", url: "ws://example.com/on-create" },
                 null,
@@ -162,6 +133,15 @@ describe("RemoteBrowser model — RBAC retrofit (P3, dark-launch)", () => {
                 actorInTeamA
             );
             assert.ok(created.id);
+            assert.strictEqual(created.team_id, teamAId);
+        });
+
+        test("save() (create) is denied for an actor lacking remote_browser:manage", async () => {
+            const noTeams = buildActor({ userId: actorInTeamA.userId, isSuperadmin: false }, []);
+            await assert.rejects(
+                RemoteBrowser.save({ name: "should-not-exist", url: "ws://example.com/x" }, null, actorInTeamA.userId, noTeams),
+                ForbiddenError
+            );
         });
 
         test("delete() denies an actor from a different team than the resource's resolved team_id", async () => {
@@ -182,10 +162,7 @@ describe("RemoteBrowser model — RBAC retrofit (P3, dark-launch)", () => {
                 actorInTeamB.userId,
                 actorInTeamB
             );
-            // save() intentionally does not populate team_id on create -- that
-            // column switch is deferred to P4 (ADR-0010). Set it directly here to
-            // simulate a post-P4 row and exercise the "allowed" branch of delete().
-            await R.knex("remote_browser").where("id", created.id).update({ team_id: teamBId });
+            assert.strictEqual(created.team_id, teamBId);
 
             await RemoteBrowser.delete(created.id, actorInTeamB.userId, actorInTeamB);
 

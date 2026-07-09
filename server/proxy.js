@@ -18,7 +18,7 @@ class Proxy {
      * @param {object} proxy Proxy to store
      * @param {number} proxyID ID of proxy to update
      * @param {number} userID ID of user the proxy belongs to
-     * @param {import("./security/authz").Actor} actor RBAC actor performing the action (dark-launch; no-op while enforcement is off)
+     * @param {import("./security/authz").Actor} actor RBAC actor performing the action (ADR-0010)
      * @returns {Promise<Bean>} Updated proxy
      */
     static async save(proxy, proxyID, userID, actor) {
@@ -45,9 +45,11 @@ class Proxy {
                 Supported protocols are ${this.SUPPORTED_PROXY_PROTOCOLS.join(", ")}."`);
         }
 
-        // When proxy is default update deactivate old default proxy
+        // When proxy is default update deactivate old default proxy (scoped to
+        // this proxy's own team -- otherwise a team's own default-proxy change
+        // would silently clobber every OTHER team's default flag too).
         if (proxy.default) {
-            await R.exec("UPDATE proxy SET `default` = 0 WHERE `default` = 1");
+            await R.exec("UPDATE proxy SET `default` = 0 WHERE `default` = 1 AND team_id = ?", [bean.team_id]);
         }
 
         bean.user_id = userID;
@@ -73,7 +75,7 @@ class Proxy {
      * Deletes proxy with given id and removes it from monitors
      * @param {number} proxyID ID of proxy to delete
      * @param {number} userID ID of proxy owner
-     * @param {import("./security/authz").Actor} actor RBAC actor performing the action (dark-launch; no-op while enforcement is off)
+     * @param {import("./security/authz").Actor} actor RBAC actor performing the action (ADR-0010)
      * @returns {Promise<void>}
      */
     static async delete(proxyID, userID, actor) {

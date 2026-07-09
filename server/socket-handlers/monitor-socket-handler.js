@@ -6,7 +6,7 @@ const Database = require("../database");
 const apicache = require("../modules/apicache");
 const { z } = require("zod");
 const { validate } = require("../validation");
-const { requireResource, requirePermission } = require("../security/authz");
+const { requireResource, requirePermission, scopeFilter } = require("../security/authz");
 const { teamIdLoader } = require("../security/team-id-loaders");
 const { resolveTeamIdForCreate } = require("../security/actor-repository");
 
@@ -16,8 +16,8 @@ const monitorTagValueSchema = z.string().max(500).nullish();
 /**
  * Authorize the cross-resource ids a client-supplied monitor payload may
  * reference (ADR-0010 §4.4). Each field is resolved against its own resource
- * type via requireResource, which is a no-op while enforcement is OFF. Only
- * fields present and non-null/undefined on the payload are checked.
+ * type via requireResource. Only fields present and non-null/undefined on the
+ * payload are checked.
  * @param {object} actor The acting actor (socket.actor).
  * @param {object} monitor The client-supplied monitor payload.
  * @returns {Promise<void>}
@@ -114,7 +114,7 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
 
             await R.store(bean);
 
-            await updateMonitorNotification(bean.id, notificationIDList);
+            await updateMonitorNotification(bean.id, notificationIDList, socket.actor);
 
             await server.sendUpdateMonitorIntoList(socket, bean.id);
 
@@ -294,7 +294,7 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
                 await Monitor.unlinkAllChildren(monitor.id);
             }
 
-            await updateMonitorNotification(bean.id, monitor.notificationIDList);
+            await updateMonitorNotification(bean.id, monitor.notificationIDList, socket.actor);
 
             if (await Monitor.isActive(bean.id, bean.active)) {
                 await restartMonitor(socket.userID, bean.id);
@@ -546,7 +546,8 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
         try {
             checkLogin(socket);
 
-            const list = await R.findAll("tag");
+            const filter = scopeFilter(socket.actor);
+            const list = await R.find("tag", filter.clause, filter.params);
 
             callback({
                 ok: true,
@@ -730,8 +731,14 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
 
             let count;
             if (monitorID == null) {
-                count = await R.count("heartbeat", "important = 1");
+                const filter = scopeFilter(socket.actor);
+                count = await R.count(
+                    "heartbeat",
+                    `important = 1 AND monitor_id IN (SELECT id FROM monitor WHERE ${filter.clause})`,
+                    filter.params
+                );
             } else {
+                await requireResource(socket.actor, "monitor:read", "monitor", monitorID, teamIdLoader);
                 count = await R.count("heartbeat", "monitor_id = ? AND important = 1", [monitorID]);
             }
 
@@ -753,17 +760,20 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
 
             let list;
             if (monitorID == null) {
+                const filter = scopeFilter(socket.actor);
                 list = await R.find(
                     "heartbeat",
                     `
                     important = 1
+                    AND monitor_id IN (SELECT id FROM monitor WHERE ${filter.clause})
                     ORDER BY time DESC
                     LIMIT ?
                     OFFSET ?
                 `,
-                    [count, offset]
+                    [...filter.params, count, offset]
                 );
             } else {
+                await requireResource(socket.actor, "monitor:read", "monitor", monitorID, teamIdLoader);
                 list = await R.find(
                     "heartbeat",
                     `

@@ -29,10 +29,9 @@ function validateIncident(incident) {
 
 /**
  * Resolve a status page's numeric id from its slug and, if found, run the
- * RBAC authorization gate against it (ADR-0010 phase P3). A pure no-op while
- * enforcement is OFF (the default). Callers still perform their own
- * not-found handling for a `null`/falsy id -- this helper does not throw for
- * an unresolved slug so existing "slug is not found" flows are unchanged.
+ * RBAC authorization gate against it (ADR-0010). Callers still perform their
+ * own not-found handling for a `null`/falsy id -- this helper does not throw
+ * for an unresolved slug so existing "slug is not found" flows are unchanged.
  * @param {object} actor The requesting socket's actor (may be null).
  * @param {string} action Canonical permission action (e.g. "status_page:read").
  * @param {string} slug The status page slug to resolve.

@@ -6,7 +6,7 @@ const knexLib = require("knex");
 const { R } = require("redbean-node");
 const migration = require("../../db/knex_migrations/2026-07-04-0000-create-rbac-schema");
 const { Proxy } = require("../../server/proxy");
-const { buildActor, setEnforcementEnabled, ForbiddenError } = require("../../server/security/authz");
+const { buildActor, ForbiddenError } = require("../../server/security/authz");
 
 const RESOURCE_TABLES = [
     "monitor",
@@ -56,7 +56,7 @@ const seed = async (db) => {
     await migration.up(db);
 };
 
-describe("Proxy authz retrofit (dark-launch)", () => {
+describe("Proxy authz retrofit (ADR-0010)", () => {
     let db;
     let defaultTeamId;
     let otherTeamId;
@@ -85,16 +85,6 @@ describe("Proxy authz retrofit (dark-launch)", () => {
             active: true,
         });
 
-        // A proxy owned by the Default Team (belongs to user 1) -- used for the
-        // flag-OFF "unchanged behaviour" assertions.
-        const ownBean = R.dispense("proxy");
-        ownBean.user_id = 1;
-        ownBean.protocol = "http";
-        ownBean.host = "own.example.com";
-        ownBean.port = 8080;
-        ownBean.team_id = defaultTeamId;
-        await R.store(ownBean);
-
         // A proxy owned by the OTHER team (simulating another tenant's resource),
         // still nominally attached to user_id=1 in the legacy column so the
         // pre-existing ownership check would (today) still find it -- this is
@@ -109,31 +99,25 @@ describe("Proxy authz retrofit (dark-launch)", () => {
     });
 
     after(async () => {
-        setEnforcementEnabled(false);
         await db.destroy();
     });
 
-    describe("enforcement OFF (default): behaviour unchanged", () => {
-        before(() => setEnforcementEnabled(false));
-
-        test("Proxy.save updates an existing proxy without querying/consulting the actor", async () => {
-            const bean = await Proxy.save(
-                { protocol: "https", host: "updated.example.com", port: 9090 },
-                proxyInOtherTeamId,
-                1,
-                null // actor may legitimately be null/undefined while OFF -- must not throw
+    describe("actor has no access", () => {
+        test("Proxy.save (update) with actor null/undefined is denied -- no actor-optional escape hatch", async () => {
+            await assert.rejects(
+                Proxy.save({ protocol: "https", host: "updated.example.com", port: 9090 }, proxyInOtherTeamId, 1, null),
+                ForbiddenError
             );
-            assert.strictEqual(bean.host, "updated.example.com");
-            assert.strictEqual(bean.protocol, "https");
         });
 
-        test("Proxy.save creates a new proxy when proxyID is falsy, actor unused", async () => {
-            const bean = await Proxy.save({ protocol: "http", host: "new.example.com", port: 1234 }, null, 1, null);
-            assert.ok(bean.id);
-            assert.strictEqual(bean.host, "new.example.com");
+        test("Proxy.save (create) with actor null/undefined is denied -- no actor-optional escape hatch", async () => {
+            await assert.rejects(
+                Proxy.save({ protocol: "http", host: "new.example.com", port: 1234 }, null, 1, null),
+                ForbiddenError
+            );
         });
 
-        test("Proxy.delete removes a proxy regardless of actor", async () => {
+        test("Proxy.delete with actor null/undefined is denied -- no actor-optional escape hatch", async () => {
             const bean = R.dispense("proxy");
             bean.user_id = 1;
             bean.protocol = "http";
@@ -142,23 +126,31 @@ describe("Proxy authz retrofit (dark-launch)", () => {
             bean.team_id = defaultTeamId;
             const id = await R.store(bean);
 
-            await Proxy.delete(id, 1, null);
+            await assert.rejects(Proxy.delete(id, 1, null), ForbiddenError);
 
             const found = await R.findOne("proxy", " id = ? ", [id]);
-            assert.strictEqual(found, null);
+            assert.ok(found, "proxy must survive a denied delete");
         });
 
-        test("Proxy.save still throws 'proxy not found' for a non-owned user_id, untouched by authz", async () => {
+        test("Proxy.save denies a foreign actor before ever reaching the legacy 'not found' check", async () => {
+            const outsider = buildActor({ userId: 1, isSuperadmin: false }, [
+                { teamId: defaultTeamId, roleSlug: "owner" },
+            ]);
             await assert.rejects(
-                Proxy.save({ protocol: "http", host: "x", port: 80 }, proxyInOtherTeamId, 999, null),
-                /proxy not found/
+                Proxy.save({ protocol: "http", host: "x", port: 80 }, proxyInOtherTeamId, 999, outsider),
+                ForbiddenError
             );
         });
     });
 
-    describe("enforcement ON: cross-team access is denied via requireResource", () => {
-        before(() => setEnforcementEnabled(true));
-        after(() => setEnforcementEnabled(false));
+    describe("real cross-team denial through the actual save()/delete() methods", () => {
+        test("Proxy.save with a valid team but wrong userID in the WHERE clause still fails with 'proxy not found' (legacy check preserved as defense-in-depth)", async () => {
+            const member = buildActor({ userId: 1, isSuperadmin: false }, [{ teamId: otherTeamId, roleSlug: "owner" }]);
+            await assert.rejects(
+                Proxy.save({ protocol: "http", host: "x", port: 80 }, proxyInOtherTeamId, 999, member),
+                /proxy not found/
+            );
+        });
 
         test("actor with no membership in the resource's team is denied on save", async () => {
             const outsider = buildActor({ userId: 1, isSuperadmin: false }, [

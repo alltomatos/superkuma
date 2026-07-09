@@ -6,7 +6,7 @@ const { R } = require("redbean-node");
 const TestDB = require("../mock-testdb");
 const { Settings } = require("../../server/settings");
 const { Notification } = require("../../server/notification");
-const { buildActor, setEnforcementEnabled, ForbiddenError } = require("../../server/security/authz");
+const { buildActor, ForbiddenError } = require("../../server/security/authz");
 const { teamIdLoader } = require("../../server/security/team-id-loaders");
 
 /**
@@ -47,7 +47,7 @@ async function makeTwoTeamFixture(defaultTeamId) {
     return { teamB: teamBId, actorInDefault, actorInTeamB };
 }
 
-describe("server.js / notification.js retrofits (ADR-0010 phase P3)", () => {
+describe("server.js / notification.js retrofits (ADR-0010)", () => {
     const testDb = new TestDB("./data/test-server-notification-authz");
     let defaultTeamId;
     let fixture;
@@ -60,7 +60,6 @@ describe("server.js / notification.js retrofits (ADR-0010 phase P3)", () => {
     });
 
     after(async () => {
-        setEnforcementEnabled(false);
         Settings.stopCacheCleaner();
         await testDb.destroy();
     });
@@ -82,27 +81,15 @@ describe("server.js / notification.js retrofits (ADR-0010 phase P3)", () => {
             assert.strictEqual(await teamIdLoader("monitor", monitorId), defaultTeamId);
         });
 
-        test("enforcement OFF: never throws for any actor (matches clearEvents/clearHeartbeats' current unguarded behaviour)", async () => {
+        test("a same-team actor may clear it, a cross-team actor is denied", async () => {
             const { requireResource } = require("../../server/security/authz");
             await assert.doesNotReject(
-                requireResource(fixture.actorInTeamB, "monitor:manage_state", "monitor", monitorId, teamIdLoader)
+                requireResource(fixture.actorInDefault, "monitor:manage_state", "monitor", monitorId, teamIdLoader)
             );
-        });
-
-        test("enforcement ON: a same-team actor may clear it, a cross-team actor is denied", async () => {
-            const { requireResource } = require("../../server/security/authz");
-            setEnforcementEnabled(true);
-            try {
-                await assert.doesNotReject(
-                    requireResource(fixture.actorInDefault, "monitor:manage_state", "monitor", monitorId, teamIdLoader)
-                );
-                await assert.rejects(
-                    requireResource(fixture.actorInTeamB, "monitor:manage_state", "monitor", monitorId, teamIdLoader),
-                    ForbiddenError
-                );
-            } finally {
-                setEnforcementEnabled(false);
-            }
+            await assert.rejects(
+                requireResource(fixture.actorInTeamB, "monitor:manage_state", "monitor", monitorId, teamIdLoader),
+                ForbiddenError
+            );
         });
     });
 
@@ -120,56 +107,55 @@ describe("server.js / notification.js retrofits (ADR-0010 phase P3)", () => {
             notificationId = await R.store(bean);
         });
 
-        test("enforcement OFF: save()/delete() behave exactly as before, actor param is inert", async () => {
-            const saved = await Notification.save(
-                { name: "clear-authz-notification-edited", type: "webhook" },
-                notificationId,
-                fixture.actorInDefault.userId,
-                fixture.actorInTeamB // wrong-team actor passed on purpose: must be a no-op while OFF
+        test("cross-team actor is denied on save(), same-team actor succeeds", async () => {
+            await assert.rejects(
+                Notification.save(
+                    { name: "x", type: "webhook" },
+                    notificationId,
+                    fixture.actorInDefault.userId,
+                    fixture.actorInTeamB
+                ),
+                ForbiddenError
             );
-            assert.strictEqual(saved.id, notificationId);
+            await assert.doesNotReject(
+                Notification.save(
+                    { name: "clear-authz-notification-edited", type: "webhook" },
+                    notificationId,
+                    fixture.actorInDefault.userId,
+                    fixture.actorInDefault
+                )
+            );
         });
 
-        test("enforcement ON: cross-team actor is denied on save(), same-team actor succeeds", async () => {
-            setEnforcementEnabled(true);
-            try {
-                await assert.rejects(
-                    Notification.save(
-                        { name: "x", type: "webhook" },
-                        notificationId,
-                        fixture.actorInDefault.userId,
-                        fixture.actorInTeamB
-                    ),
-                    ForbiddenError
-                );
-                await assert.doesNotReject(
-                    Notification.save(
-                        { name: "clear-authz-notification-edited-2", type: "webhook" },
-                        notificationId,
-                        fixture.actorInDefault.userId,
-                        fixture.actorInDefault
-                    )
-                );
-            } finally {
-                setEnforcementEnabled(false);
-            }
+        test("actor null/undefined is denied on save() -- no actor-optional escape hatch", async () => {
+            await assert.rejects(
+                Notification.save(
+                    { name: "x", type: "webhook" },
+                    notificationId,
+                    fixture.actorInDefault.userId,
+                    undefined
+                ),
+                ForbiddenError
+            );
         });
 
-        test("enforcement ON: cross-team actor is denied on delete()", async () => {
-            setEnforcementEnabled(true);
-            try {
-                await assert.rejects(
-                    Notification.delete(notificationId, fixture.actorInDefault.userId, fixture.actorInTeamB),
-                    ForbiddenError
-                );
-            } finally {
-                setEnforcementEnabled(false);
-            }
+        test("cross-team actor is denied on delete()", async () => {
+            await assert.rejects(
+                Notification.delete(notificationId, fixture.actorInDefault.userId, fixture.actorInTeamB),
+                ForbiddenError
+            );
+        });
+
+        test("actor null/undefined is denied on delete() -- no actor-optional escape hatch", async () => {
+            await assert.rejects(
+                Notification.delete(notificationId, fixture.actorInDefault.userId, undefined),
+                ForbiddenError
+            );
         });
     });
 
     describe("updateMonitorNotification actor-based FK validation", () => {
-        test("enforcement ON: linking a cross-team notification id throws ForbiddenError", async () => {
+        test("linking a cross-team notification id throws ForbiddenError", async () => {
             const notifBean = R.dispense("notification");
             notifBean.name = "team-b-notification";
             notifBean.config = JSON.stringify({ name: "team-b-notification", type: "webhook" });
@@ -180,21 +166,16 @@ describe("server.js / notification.js retrofits (ADR-0010 phase P3)", () => {
             const teamBNotificationId = await R.store(notifBean);
 
             const { requireResource } = require("../../server/security/authz");
-            setEnforcementEnabled(true);
-            try {
-                await assert.rejects(
-                    requireResource(
-                        fixture.actorInDefault,
-                        "notification:read",
-                        "notification",
-                        teamBNotificationId,
-                        teamIdLoader
-                    ),
-                    ForbiddenError
-                );
-            } finally {
-                setEnforcementEnabled(false);
-            }
+            await assert.rejects(
+                requireResource(
+                    fixture.actorInDefault,
+                    "notification:read",
+                    "notification",
+                    teamBNotificationId,
+                    teamIdLoader
+                ),
+                ForbiddenError
+            );
         });
     });
 });

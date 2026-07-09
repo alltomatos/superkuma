@@ -19,7 +19,7 @@ class DockerHost {
      * @param {object} dockerHost Docker host to save
      * @param {?number} dockerHostID ID of the docker host to update
      * @param {number} userID ID of the user who adds the docker host
-     * @param {object} actor RBAC actor performing the save (dark-launch; ADR-0010 P3)
+     * @param {object} actor RBAC actor performing the save (ADR-0010)
      * @returns {Promise<Bean>} Updated docker host
      */
     static async save(dockerHost, dockerHostID, userID, actor) {
@@ -52,7 +52,7 @@ class DockerHost {
      * Delete a Docker host
      * @param {number} dockerHostID ID of the Docker host to delete
      * @param {number} userID ID of the user who created the Docker host
-     * @param {object} actor RBAC actor performing the delete (dark-launch; ADR-0010 P3)
+     * @param {object} actor RBAC actor performing the delete (ADR-0010)
      * @returns {Promise<void>}
      */
     static async delete(dockerHostID, userID, actor) {

@@ -65,10 +65,12 @@ async function isSuperadmin(userId) {
 
 /**
  * Refuse team-management actions (create team, add/remove member, change a
- * member's role) to a non-superadmin actor. requirePermission's "team:create"
- * / "team:member_manage" checks are a no-op while RBAC enforcement is
- * dark-launched (ADR-0010), so this explicit, DB-refreshed check is the only
- * real gate during that window.
+ * member's role) to a non-superadmin actor. This is intentionally stricter
+ * than the permission catalog alone for "team:member_manage" (which owner/
+ * admin roles are also granted, per ADR-0010) -- self-service team
+ * membership management by non-superadmin roles is a deliberate future
+ * expansion, not yet exposed. This explicit, DB-refreshed check is today's
+ * real gate for every team-management action.
  * @param {Socket} socket Socket.io instance
  * @returns {Promise<void>}
  * @throws {ForbiddenError} If the caller is not currently a superadmin
