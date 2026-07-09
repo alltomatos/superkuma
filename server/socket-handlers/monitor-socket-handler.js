@@ -6,7 +6,7 @@ const Database = require("../database");
 const apicache = require("../modules/apicache");
 const { z } = require("zod");
 const { validate } = require("../validation");
-const { requireResource } = require("../security/authz");
+const { requireResource, requirePermission } = require("../security/authz");
 const { teamIdLoader } = require("../security/team-id-loaders");
 
 const monitorTagIDSchema = z.number().int().positive();
@@ -67,6 +67,9 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
     socket.on("add", async (monitor, callback) => {
         try {
             checkLogin(socket);
+            requirePermission(socket.actor, "monitor:create", {
+                teamId: socket.actor ? socket.actor.activeTeamId : null,
+            });
             await validateMonitorLinkedResources(socket.actor, monitor);
             let bean = R.dispense("monitor");
 
