@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+const util = require("util");
 const { Settings } = require("./settings");
 const { log } = require("../src/util");
 
@@ -7,10 +8,11 @@ const { log } = require("../src/util");
  * the "general" settings' mail* fields). Shared by sendMail (DB-backed) and
  * sendTestMail (tests whatever is currently on the settings form, saved or not).
  * @param {object} mailSettings Mail settings (mailHost, mailPort, mailSecure, mailIgnoreTLSError, mailUsername, mailPassword)
+ * @param {object} extra Extra nodemailer transport options to merge in (e.g. debug/logger)
  * @returns {import("nodemailer").Transporter} The configured transporter
  * @throws {Error} If mailHost is not set
  */
-function buildTransporter(mailSettings) {
+function buildTransporter(mailSettings, extra = {}) {
     if (!mailSettings.mailHost) {
         throw new Error("SMTP not configured");
     }
@@ -22,6 +24,7 @@ function buildTransporter(mailSettings) {
         tls: {
             rejectUnauthorized: !mailSettings.mailIgnoreTLSError,
         },
+        ...extra,
     };
 
     if (mailSettings.mailUsername || mailSettings.mailPassword) {
@@ -32,6 +35,42 @@ function buildTransporter(mailSettings) {
     }
 
     return nodemailer.createTransport(config);
+}
+
+/**
+ * Build a nodemailer-compatible logger that appends formatted lines to an
+ * array instead of printing to the console, mirroring nodemailer's own
+ * built-in console logger format (`createDefaultLogger` in
+ * nodemailer/lib/shared/index.js) so the captured transcript reads the same
+ * way. Nodemailer itself redacts AUTH credentials before they ever reach the
+ * logger (replaced with a literal "/* secret *\/" placeholder), so this is
+ * safe to return to the client.
+ * @returns {{logger: object, lines: string[]}} A bunyan-compatible logger and the array it appends to
+ */
+function createCapturingLogger() {
+    const lines = [];
+    const levels = ["trace", "debug", "info", "warn", "error", "fatal"];
+    const logger = {};
+    for (const level of levels) {
+        logger[level] = (entry, message, ...args) => {
+            let prefix = "";
+            if (entry) {
+                if (entry.tnx === "server") {
+                    prefix = "S: ";
+                } else if (entry.tnx === "client") {
+                    prefix = "C: ";
+                }
+                if (entry.sid) {
+                    prefix = `[${entry.sid}] ${prefix}`;
+                }
+            }
+            const formatted = util.format(message, ...args);
+            for (const line of formatted.split(/\r?\n/)) {
+                lines.push(`${level.toUpperCase()} ${prefix}${line}`);
+            }
+        };
+    }
+    return { logger, lines };
 }
 
 /**
@@ -67,11 +106,19 @@ async function sendMail({ to, subject, text, html }) {
  * (not yet saved), so an admin can verify a configuration before persisting it.
  * @param {object} mailSettings Mail settings from the (possibly unsaved) settings form
  * @param {string} to Recipient address for the test email
- * @returns {Promise<void>} Resolves once the test email has been sent
- * @throws {Error} If SMTP is not configured or sending fails
+ * @param {boolean} debug When true, capture the raw SMTP transcript (connection, EHLO, AUTH,
+ * MAIL FROM/RCPT TO/DATA, and the server's final accept/reject response) instead of only
+ * throwing/resolving -- lets an admin see e.g. a "250 OK" from the relay even when the message
+ * never actually reaches the recipient's inbox (a delivery/reputation issue past the relay,
+ * not a SuperKuma bug). Auth credentials are never present in this transcript -- nodemailer
+ * replaces them with a literal placeholder before logging.
+ * @returns {Promise<{logLines: string[]}>} Resolves once the test email has been accepted by the relay
+ * @throws {Error} If SMTP is not configured or sending fails; the thrown error carries a
+ * `logLines` property with whatever transcript was captured before failing
  */
-async function sendTestMail(mailSettings, to) {
-    const transporter = buildTransporter(mailSettings);
+async function sendTestMail(mailSettings, to, debug = false) {
+    const { logger, lines } = debug ? createCapturingLogger() : { logger: undefined, lines: [] };
+    const transporter = buildTransporter(mailSettings, debug ? { debug: true, logger } : {});
 
     try {
         await transporter.sendMail({
@@ -80,8 +127,10 @@ async function sendTestMail(mailSettings, to) {
             subject: "SuperKuma - Teste de SMTP",
             text: "Este é um email de teste do SuperKuma para confirmar que as configurações de SMTP estão funcionando.",
         });
+        return { logLines: lines };
     } catch (e) {
         log.error("mailer", `Failed to send test email to ${to}: ${e.message}`);
+        e.logLines = lines;
         throw e;
     }
 }

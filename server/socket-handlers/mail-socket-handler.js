@@ -5,6 +5,7 @@ const { validate } = require("../validation");
 
 const testMailSchema = z.object({
     to: z.string().trim().email().max(255),
+    debug: z.boolean().optional().default(false),
 });
 
 /**
@@ -20,21 +21,23 @@ module.exports.mailSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
-            const { mailSettings, to } = input;
-            validate(testMailSchema, { to });
+            const { mailSettings } = input;
+            const { to, debug } = validate(testMailSchema, input);
 
-            await mailer.sendTestMail(mailSettings, to);
+            const { logLines } = await mailer.sendTestMail(mailSettings, to, debug);
 
             callback({
                 ok: true,
                 msg: { key: "smtpTestSent", values: { to } },
                 msgi18n: true,
+                logLines,
             });
         } catch (e) {
             callback({
                 ok: false,
                 msg: e.message,
                 msgi18n: !!e.msgi18n,
+                logLines: e.logLines || [],
             });
         }
     });

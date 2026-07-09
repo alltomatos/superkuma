@@ -649,11 +649,14 @@ export default {
          * unsaved) SMTP settings form.
          * @param {object} mailSettings Mail settings from the settings form
          * @param {string} to Recipient address for the test email
+         * @param {boolean} debug When true, ask the server to capture and return the raw SMTP
+         * transcript (connection/EHLO/AUTH/MAIL FROM/RCPT TO/DATA and the relay's final
+         * response) via `res.logLines`, instead of just an ok/fail message
          * @param {socketCB} callback Callback for socket response
          * @returns {void}
          */
-        testMailSettings(mailSettings, to, callback) {
-            socket.emit("testMailSettings", { mailSettings, to }, callback);
+        testMailSettings(mailSettings, to, debug, callback) {
+            socket.emit("testMailSettings", { mailSettings, to, debug }, callback);
         },
 
         /**
