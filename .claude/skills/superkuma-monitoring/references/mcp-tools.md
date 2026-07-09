@@ -1,7 +1,9 @@
 # SuperKuma MCP — connection & tools
 
 The SuperKuma MCP exposes the same operations as the dashboard, scoped by the API key's
-user/role (Teams/RBAC). Full server docs: `server/mcp/README.md` and `docs/adr/0011-*`.
+user/role (Teams/RBAC — see [SKILL.md](../SKILL.md#teams-multi-tenant-visibility) for what that
+means in practice; it only actually restricts anything once an admin turns RBAC enforcement on).
+Full server docs: `server/mcp/README.md` and `docs/adr/0011-*`.
 
 ## Connecting
 
@@ -43,11 +45,16 @@ Create the key in the dashboard: _Settings → API Keys → Add API Key_ → cop
 
 | Area          | Read                                                            | Write                                                                                 | Destructive           |
 | ------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------- |
-| Monitors      | `list_monitors`, `get_monitor`, `get_monitor_beats`, `get_info` | `create_monitor`, `update_monitor`, `pause_monitor`, `resume_monitor`                 | `delete_monitor`      |
+| Monitors      | `list_monitors`, `get_monitor`, `get_monitor_beats`, `get_info`¹ | `create_monitor`, `update_monitor`, `pause_monitor`, `resume_monitor`                 | `delete_monitor`      |
 | Notifications | `list_notifications`                                            | `create_notification`, `update_notification`, `test_notification`                     | `delete_notification` |
 | Tags          | `list_tags`                                                     | `create_tag`, `update_tag`, `add_monitor_tag`, `remove_monitor_tag`                   | `delete_tag`          |
 | Status pages  | `list_status_pages`, `get_status_page`                          | `create_status_page`, `save_status_page`, `post_incident`, `resolve_incident`         | `delete_status_page`  |
 | Maintenance   | `list_maintenances`, `get_maintenance`                          | `create_maintenance`, `update_maintenance`, `pause_maintenance`, `resume_maintenance` | `delete_maintenance`  |
+
+¹ `get_info` also reports `team` (the single team this connection is scoped to: `{id, name, slug,
+role, permissions}`, or `null` if none) and `teams` (same shape, as a list — for an API key this is
+always that one team). Check this before bulk-creating if RBAC enforcement might be on for the
+target instance.
 
 `update_*` tools fetch the current object and overlay your fields (fetch-merge-save); you only
 pass what changes. `delete_*` is a dry-run unless `confirm: true`.
