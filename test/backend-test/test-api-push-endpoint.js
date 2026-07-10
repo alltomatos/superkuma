@@ -331,6 +331,92 @@ describe("API push endpoint (/api/push/:pushToken) - characterization (pre ADR-0
         });
     });
 
+    describe("value query param (ADR-0015 MVP-0: optional generic metric feeding the same ping/stat_* channel)", () => {
+        test("value provided, ping absent -> value flows into bean.ping (the same channel UptimeCalculator/stat_* already consumes)", async () => {
+            const monitor = await createMonitor({ name: "value-only", push_token: "value-only-token" });
+
+            const res = makeRes();
+            await handler(makeReq("value-only-token", { value: "77" }), res);
+
+            assert.strictEqual(res.statusCode, 200);
+            assert.deepStrictEqual(res.body, { ok: true });
+            const hb = await latestHeartbeat(monitor.id);
+            assert.strictEqual(hb.ping, 77);
+        });
+
+        test("value AND ping both provided -> ping wins, value is ignored (existing ping-sending callers are entirely unaffected by this addition)", async () => {
+            const monitor = await createMonitor({ name: "value-and-ping", push_token: "value-and-ping-token" });
+
+            const res = makeRes();
+            await handler(makeReq("value-and-ping-token", { ping: "10", value: "999" }), res);
+
+            assert.strictEqual(res.statusCode, 200);
+            const hb = await latestHeartbeat(monitor.id);
+            assert.strictEqual(hb.ping, 10);
+        });
+
+        test("value omitted entirely (and ping also omitted) -> stored as null, byte-identical to the legacy no-ping/no-value contract", async () => {
+            const monitor = await createMonitor({ name: "value-omitted", push_token: "value-omitted-token" });
+
+            const res = makeRes();
+            await handler(makeReq("value-omitted-token"), res);
+
+            assert.strictEqual(res.statusCode, 200);
+            const hb = await latestHeartbeat(monitor.id);
+            assert.strictEqual(hb.ping, null);
+        });
+
+        test("negative value -> 404 with a dedicated validation message, no heartbeat stored", async () => {
+            const monitor = await createMonitor({ name: "value-negative", push_token: "value-negative-token" });
+
+            const res = makeRes();
+            await handler(makeReq("value-negative-token", { value: "-1" }), res);
+
+            assert.strictEqual(res.statusCode, 404);
+            assert.deepStrictEqual(res.body, {
+                ok: false,
+                msg: "Invalid value. Must be between 0 and 100000000000.",
+            });
+            assert.strictEqual(await countHeartbeats(monitor.id), 0);
+        });
+
+        test("value > 100000000000 (the same MAX_PING_MS bound reused for value) -> 404", async () => {
+            const monitor = await createMonitor({ name: "value-over-max", push_token: "value-over-max-token" });
+
+            const res = makeRes();
+            await handler(makeReq("value-over-max-token", { value: "100000000001" }), res);
+
+            assert.strictEqual(res.statusCode, 404);
+            assert.deepStrictEqual(res.body, {
+                ok: false,
+                msg: "Invalid value. Must be between 0 and 100000000000.",
+            });
+            assert.strictEqual(await countHeartbeats(monitor.id), 0);
+        });
+
+        test("value = 100000000000 exactly (the boundary) -> accepted and stored", async () => {
+            const monitor = await createMonitor({ name: "value-boundary-max", push_token: "value-boundary-max-token" });
+
+            const res = makeRes();
+            await handler(makeReq("value-boundary-max-token", { value: "100000000000" }), res);
+
+            assert.strictEqual(res.statusCode, 200);
+            const hb = await latestHeartbeat(monitor.id);
+            assert.strictEqual(hb.ping, 100000000000);
+        });
+
+        test("value = 0 has the SAME falsy-collapse-to-null quirk as ping=0 (parseFloat(...) || null), for consistency with the channel it shares", async () => {
+            const monitor = await createMonitor({ name: "value-zero", push_token: "value-zero-token" });
+
+            const res = makeRes();
+            await handler(makeReq("value-zero-token", { value: "0" }), res);
+
+            assert.strictEqual(res.statusCode, 200);
+            const hb = await latestHeartbeat(monitor.id);
+            assert.strictEqual(hb.ping, null);
+        });
+    });
+
     describe("status query param mapping", () => {
         test('status=up -> UP status on a first beat (maxretries=0 so determineStatus passes the mapped status straight through)', async () => {
             const monitor = await createMonitor({ name: "status-up", push_token: "status-up-token" });
