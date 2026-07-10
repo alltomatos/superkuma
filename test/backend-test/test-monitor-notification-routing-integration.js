@@ -265,6 +265,37 @@ describe("Monitor.getRoutedNotificationList()/sendNotification() - notification_
         assert.strictEqual(sentCalls.length, 1, "the same notification must only be sent once");
     });
 
+    test("getRoutedNotificationList() severityOverride param: omitting it still uses monitor.alert_severity exactly as before (no regression)", async () => {
+        const teamId = await createTeam();
+        const monitor = await createMonitor({ name: "override-omitted-monitor", team_id: teamId, alert_severity: "critical" });
+        const routedNotifId = await createNotification("override-omitted-notif");
+        await createRoute({ team_id: teamId, min_severity: "warning", notification_id: routedNotifId });
+
+        const result = await Monitor.getRoutedNotificationList(monitor);
+
+        assert.strictEqual(result.length, 1, "route min_severity <= monitor.alert_severity should still match with no override arg");
+        assert.strictEqual(result[0].name, "override-omitted-notif");
+    });
+
+    test("getRoutedNotificationList() severityOverride param: passing an override routes on it INSTEAD of monitor.alert_severity", async () => {
+        const teamId = await createTeam();
+        // monitor.alert_severity is 'warning' -- alone, this would NOT satisfy a 'critical'-only route.
+        const monitor = await createMonitor({ name: "override-applied-monitor", team_id: teamId, alert_severity: "warning" });
+        const routedNotifId = await createNotification("override-applied-notif");
+        await createRoute({ team_id: teamId, min_severity: "critical", notification_id: routedNotifId });
+
+        const withoutOverride = await Monitor.getRoutedNotificationList(monitor);
+        assert.strictEqual(
+            withoutOverride.length,
+            0,
+            "sanity: without an override, the monitor's own 'warning' severity does not satisfy the 'critical' route"
+        );
+
+        const withOverride = await Monitor.getRoutedNotificationList(monitor, "critical");
+        assert.strictEqual(withOverride.length, 1, "an explicit 'critical' override should satisfy the 'critical' route");
+        assert.strictEqual(withOverride[0].name, "override-applied-notif");
+    });
+
     // Deliberately LAST: this route is unscoped (team_id/monitor_id/tag_id all
     // null), so once created it matches every monitor for the rest of the
     // file's shared DB. Every other test above uses a team/monitor/tag-scoped
