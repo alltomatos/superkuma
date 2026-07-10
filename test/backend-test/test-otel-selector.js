@@ -5,6 +5,7 @@ const {
     metricMatchesMonitor,
     aggregate,
     matchDatapointsToMonitors,
+    DEFAULT_MAX_MATCHED_DATAPOINTS_PER_MONITOR,
 } = require("../../server/otel-selector");
 
 describe("otel-selector.js - attributeMatchersMatch()", () => {
@@ -368,5 +369,116 @@ describe("otel-selector.js - matchDatapointsToMonitors()", () => {
 
         assert.doesNotThrow(() => matchDatapointsToMonitors(monitors, datapoints));
         assert.deepStrictEqual(matchDatapointsToMonitors(monitors, datapoints), []);
+    });
+
+    describe("cardinality cap (ADR-0015 TASK-A2-4 hardening)", () => {
+        test("exports a default cap of 1000", () => {
+            assert.strictEqual(DEFAULT_MAX_MATCHED_DATAPOINTS_PER_MONITOR, 1000);
+        });
+
+        test("a batch under the cap is untouched -- result shape is byte-for-byte identical to before this guard existed", () => {
+            const monitors = [
+                { id: 1, otel_metric_name: "cpu.usage", otel_attribute_matchers: null, otel_aggregation: "avg" },
+            ];
+            const datapoints = [
+                { metricName: "cpu.usage", attributes: {}, value: 10 },
+                { metricName: "cpu.usage", attributes: {}, value: 20 },
+            ];
+
+            // Explicit small cap, well above this batch's size -- still no
+            // truncation, so the extra keys must NOT appear.
+            const result = matchDatapointsToMonitors(monitors, datapoints, 10);
+
+            assert.deepStrictEqual(result, [{ monitorId: 1, aggregatedValue: 15, matchedCount: 2 }]);
+        });
+
+        test("a batch exactly AT the cap is not truncated", () => {
+            const monitors = [
+                { id: 1, otel_metric_name: "cpu.usage", otel_attribute_matchers: null, otel_aggregation: "sum" },
+            ];
+            const datapoints = Array.from({ length: 10 }, () => ({
+                metricName: "cpu.usage",
+                attributes: {},
+                value: 1,
+            }));
+
+            const result = matchDatapointsToMonitors(monitors, datapoints, 10);
+
+            assert.deepStrictEqual(result, [{ monitorId: 1, aggregatedValue: 10, matchedCount: 10 }]);
+        });
+
+        test("a batch OVER a small explicit cap is truncated to the first N (payload order), and reports totalMatchedCount", () => {
+            const monitors = [
+                { id: 1, otel_metric_name: "cpu.usage", otel_attribute_matchers: null, otel_aggregation: "avg" },
+            ];
+            // 15 matching datapoints, values 1..15, cap of 10 -- aggregation
+            // must run over the FIRST 10 (1..10), not all 15.
+            const datapoints = Array.from({ length: 15 }, (_, i) => ({
+                metricName: "cpu.usage",
+                attributes: {},
+                value: i + 1,
+            }));
+
+            const result = matchDatapointsToMonitors(monitors, datapoints, 10);
+
+            assert.deepStrictEqual(result, [
+                {
+                    monitorId: 1,
+                    aggregatedValue: 5.5, // avg(1..10)
+                    matchedCount: 10,
+                    truncated: true,
+                    totalMatchedCount: 15,
+                },
+            ]);
+        });
+
+        test("truncation is per-monitor -- a monitor under its own cap is unaffected by a sibling monitor's truncation", () => {
+            const monitors = [
+                { id: 1, otel_metric_name: "cpu.usage", otel_attribute_matchers: null, otel_aggregation: "avg" },
+                {
+                    id: 2,
+                    otel_metric_name: "cpu.usage",
+                    otel_attribute_matchers: '{"host":"web-1"}',
+                    otel_aggregation: "last",
+                },
+            ];
+            // Monitor 1 (wildcard) matches all 12 datapoints -- over the cap
+            // of 10. Monitor 2 only matches the ONE "web-1" datapoint -- well
+            // under the cap, must NOT be marked truncated.
+            const datapoints = Array.from({ length: 12 }, (_, i) => ({
+                metricName: "cpu.usage",
+                attributes: i === 0 ? { host: "web-1" } : {},
+                value: i + 1,
+            }));
+
+            const result = matchDatapointsToMonitors(monitors, datapoints, 10);
+
+            assert.strictEqual(result.length, 2);
+            assert.deepStrictEqual(result[0], {
+                monitorId: 1,
+                aggregatedValue: 5.5, // avg(1..10) -- truncated
+                matchedCount: 10,
+                truncated: true,
+                totalMatchedCount: 12,
+            });
+            assert.deepStrictEqual(result[1], {
+                monitorId: 2,
+                aggregatedValue: 1, // the single "web-1" datapoint's value
+                matchedCount: 1,
+            });
+        });
+
+        test("aggregate() still throws for an invalid otel_aggregation even when the batch is truncated", () => {
+            const monitors = [
+                { id: 1, otel_metric_name: "cpu.usage", otel_attribute_matchers: null, otel_aggregation: "median" },
+            ];
+            const datapoints = Array.from({ length: 15 }, (_, i) => ({
+                metricName: "cpu.usage",
+                attributes: {},
+                value: i + 1,
+            }));
+
+            assert.throws(() => matchDatapointsToMonitors(monitors, datapoints, 10), /Unknown aggregation: median/);
+        });
     });
 });
