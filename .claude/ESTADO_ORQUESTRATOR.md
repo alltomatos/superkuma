@@ -447,6 +447,20 @@
   ref: ADR-0015
   risco: T3
   depends_on: [TASK-A2-1]
+  nota_pesquisa: |
+    2026-07-10, usuário pediu análise de https://forum.proxmox.com/threads/opentelemetry-server.172861/ e
+    https://pve.proxmox.com/wiki/Roadmap (motivação real: Proxmox VE 9.0 tem "Datacenter > Metric Server >
+    OpenTelemetry" nativo, usuário quer apontar pro SuperKuma). Confirmado direto no código-fonte
+    (git.proxmox.com, pve-manager.git, PVE/Status/OpenTelemetry.pm, commit 52305086): Proxmox manda OTLP/HTTP
+    em **JSON** (`Content-Type: application/json`, `JSON->new->utf8->encode($data)`), NÃO protobuf -- de-risca
+    TASK-A2-2 (JSON-only) como suficiente pra essa integração específica, TASK-A2-4 (protobuf) NÃO é
+    pré-requisito pro Proxmox. POST pra `/v1/metrics` por padrão (path configurável), compressão gzip opcional
+    (`Content-Encoding: gzip`), headers customizados via `otel-headers` da config (candidato natural pro
+    ingest token do SuperKuma, ex. `Authorization: Bearer <token>`). Payload no schema OTLP padrão:
+    `resourceMetrics[].resource.attributes` + `resourceMetrics[].scopeMetrics[].metrics`. Fonte: busca web +
+    leitura do blob do código-fonte via WebFetch (resumo de modelo pequeno, não 100% garantido linha-a-linha,
+    mas consistente e específico o suficiente pra informar o design). Roadmap oficial da PVE não menciona OTel
+    além do que já está em produção na 9.0.
   status: blocked # ⛔ aguardando "Go" explícito por item
 
 - id: TASK-A2-3
