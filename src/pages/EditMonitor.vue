@@ -70,6 +70,9 @@
                                         <option value="manual">
                                             {{ $t("Manual") }}
                                         </option>
+                                        <option value="otel">
+                                            {{ $t("OTel Metric (OTLP)") }}
+                                        </option>
                                     </optgroup>
 
                                     <!-- Should sort from A to Z in this category -->
@@ -764,6 +767,55 @@
                                 </div>
                             </template>
 
+                            <!-- OTel Monitor Type -->
+                            <template v-if="monitor.type === 'otel'">
+                                <div class="alert alert-info" role="alert">
+                                    {{ $t("otelMonitorTypeInfo") }}
+                                </div>
+
+                                <div class="my-3">
+                                    <label for="otel_metric_name" class="form-label">
+                                        {{ $t("OTel Metric Name") }}
+                                    </label>
+                                    <input
+                                        id="otel_metric_name"
+                                        v-model="monitor.otelMetricName"
+                                        type="text"
+                                        class="form-control"
+                                        placeholder="http.server.request.duration"
+                                        required
+                                    />
+                                    <div class="form-text">{{ $t("otelMetricNameDescription") }}</div>
+                                </div>
+
+                                <div class="my-3">
+                                    <label for="otel_attribute_matchers" class="form-label">
+                                        {{ $t("OTel Attribute Matchers") }}
+                                    </label>
+                                    <textarea
+                                        id="otel_attribute_matchers"
+                                        v-model="monitor.otelAttributeMatchers"
+                                        class="form-control"
+                                        rows="3"
+                                        placeholder='{"service": "payments"}'
+                                    ></textarea>
+                                    <div class="form-text">{{ $t("otelAttributeMatchersDescription") }}</div>
+                                </div>
+
+                                <div class="my-3">
+                                    <label for="otel_aggregation" class="form-label">
+                                        {{ $t("OTel Aggregation") }}
+                                    </label>
+                                    <select id="otel_aggregation" v-model="monitor.otelAggregation" class="form-select">
+                                        <option value="last">{{ $t("otelAggregation_last") }}</option>
+                                        <option value="avg">{{ $t("otelAggregation_avg") }}</option>
+                                        <option value="max">{{ $t("otelAggregation_max") }}</option>
+                                        <option value="sum">{{ $t("otelAggregation_sum") }}</option>
+                                    </select>
+                                    <div class="form-text">{{ $t("otelAggregationDescription") }}</div>
+                                </div>
+                            </template>
+
                             <div v-if="monitor.type === 'smtp'" class="my-3">
                                 <label for="smtp_security" class="form-label">{{ $t("SMTP Security") }}</label>
                                 <select id="smtp_security" v-model="monitor.smtpSecurity" class="form-select">
@@ -827,16 +879,17 @@
                             </template>
 
                             <!-- Json Query -->
-                            <!-- For Json Query / SNMP -->
+                            <!-- For Json Query / SNMP / Prometheus / OTel -->
                             <div
                                 v-if="
                                     monitor.type === 'json-query' ||
                                         monitor.type === 'snmp' ||
-                                        monitor.type === 'prometheus'
+                                        monitor.type === 'prometheus' ||
+                                        monitor.type === 'otel'
                                 "
                                 class="my-3"
                             >
-                                <div v-if="monitor.type !== 'prometheus'" class="my-2">
+                                <div v-if="monitor.type !== 'prometheus' && monitor.type !== 'otel'" class="my-2">
                                     <label for="jsonPath" class="form-label mb-0">
                                         {{ $t("Json Query Expression") }}
                                     </label>
@@ -912,7 +965,7 @@
                                         class="form-control"
                                         maxlength="20"
                                         placeholder="%"
-                                        :required="monitor.type === 'prometheus'"
+                                        :required="monitor.type === 'prometheus' || monitor.type === 'otel'"
                                     />
                                     <datalist id="metric-unit-suggestions">
                                         <option value="%" />
@@ -1638,7 +1691,9 @@
                                 </select>
                             </div>
 
-                            <h2 v-if="monitor.type !== 'push'" class="mt-5 mb-2">{{ $t("Advanced") }}</h2>
+                            <h2 v-if="monitor.type !== 'push' && monitor.type !== 'otel'" class="mt-5 mb-2">
+                                {{ $t("Advanced") }}
+                            </h2>
 
                             <div
                                 v-if="
@@ -3030,6 +3085,9 @@ const monitorDefaults = {
     rabbitmqPassword: "",
     conditions: [],
     system_service_name: "",
+    otelMetricName: "",
+    otelAttributeMatchers: "",
+    otelAggregation: "last",
 };
 
 export default {
@@ -3791,6 +3849,14 @@ message HealthCheckResponse {
                     JSON.parse(this.monitor.headers);
                 } catch (err) {
                     toast.error(this.$t("HeadersInvalidFormatBecause", { error: err.message }));
+                    return false;
+                }
+            }
+            if (this.monitor.type === "otel" && this.monitor.otelAttributeMatchers) {
+                try {
+                    JSON.parse(this.monitor.otelAttributeMatchers);
+                } catch (err) {
+                    toast.error(this.$t("OtelAttributeMatchersInvalidFormatBecause", { error: err.message }));
                     return false;
                 }
             }

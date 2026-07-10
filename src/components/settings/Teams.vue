@@ -140,6 +140,37 @@
                                 </button>
                             </div>
                         </form>
+
+                        <template v-if="isSuperadmin">
+                            <hr />
+
+                            <h6>{{ $t("OTel Ingest Token") }}</h6>
+                            <p class="form-text">{{ $t("otelIngestTokenSectionDescription") }}</p>
+
+                            <div v-if="otelIngestNewToken" class="mb-3">
+                                <div class="alert alert-warning py-2 mb-2">
+                                    {{ $t("otelIngestTokenShownOnceWarning") }}
+                                </div>
+                                <CopyableInput v-model="otelIngestNewToken" disabled="disabled" />
+                            </div>
+                            <p v-else class="text-muted">
+                                {{
+                                    otelIngestTokenSet
+                                        ? $t("otelIngestTokenConfiguredMsg")
+                                        : $t("otelIngestTokenNotConfiguredMsg")
+                                }}
+                            </p>
+
+                            <button
+                                class="btn btn-primary btn-sm"
+                                type="button"
+                                :disabled="regeneratingOtelToken"
+                                @click="onRegenerateOtelIngestToken"
+                            >
+                                <div v-if="regeneratingOtelToken" class="spinner-border spinner-border-sm me-1"></div>
+                                {{ otelIngestTokenSet ? $t("Regenerate Ingest Token") : $t("Generate Ingest Token") }}
+                            </button>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -154,6 +185,7 @@
 <script>
 import { Modal } from "bootstrap";
 import Confirm from "../Confirm.vue";
+import CopyableInput from "../CopyableInput.vue";
 
 // Assignable per-team roles, in privilege order. "superadmin" is deliberately
 // excluded -- that's the separate, global "Make Admin" toggle in Users.vue,
@@ -163,6 +195,7 @@ const ASSIGNABLE_ROLES = ["owner", "admin", "editor", "viewer"];
 export default {
     components: {
         Confirm,
+        CopyableInput,
     },
     data() {
         return {
@@ -179,6 +212,16 @@ export default {
             pendingRemoveMember: null,
 
             assignableRoles: ASSIGNABLE_ROLES,
+
+            // OTel ingest token (ADR-0015) state for the currently open
+            // Manage Members modal. otelIngestNewToken only ever holds a
+            // value right after a successful (re)generate call, for a
+            // "shown once" display -- it is never populated from the team
+            // list (which only ever carries the hasOtelIngestToken presence
+            // boolean, never the token value itself).
+            otelIngestTokenSet: false,
+            otelIngestNewToken: null,
+            regeneratingOtelToken: false,
         };
     },
     computed: {
@@ -193,6 +236,17 @@ export default {
         addableUsers() {
             const memberIds = new Set(this.members.map((m) => m.id));
             return (this.$root.userList || []).filter((u) => !memberIds.has(u.id));
+        },
+        /**
+         * Whether the current user is a global superadmin. Gates the OTel
+         * Ingest Token section -- every team-mutating action in
+         * team-socket-handler.js is superadmin-only (TASK-R5 audit), and
+         * there is no general permission-gating helper yet, so this mirrors
+         * NotificationRouting.vue's own local isSuperadmin computed.
+         * @returns {boolean} True if the current user is a superadmin
+         */
+        isSuperadmin() {
+            return !!this.$root.info?.currentUser?.isSuperadmin;
         },
     },
 
@@ -238,6 +292,9 @@ export default {
             this.members = [];
             this.newMemberUserId = null;
             this.newMemberRole = "viewer";
+            this.otelIngestTokenSet = !!team.hasOtelIngestToken;
+            this.otelIngestNewToken = null;
+            this.regeneratingOtelToken = false;
             this.membersModal.show();
             this.loadMembers();
         },
@@ -301,6 +358,24 @@ export default {
                 this.$root.toastRes(res);
                 if (res.ok) {
                     this.loadMembers();
+                }
+            });
+        },
+
+        /**
+         * (Re)generate the selected team's OTel telemetry ingest token
+         * (ADR-0015). The cleartext value is shown once, right after this
+         * call succeeds, and is never fetched or displayed again afterward.
+         * @returns {void}
+         */
+        onRegenerateOtelIngestToken() {
+            this.regeneratingOtelToken = true;
+            this.$root.regenerateOtelIngestToken(this.selectedTeam.id, (res) => {
+                this.regeneratingOtelToken = false;
+                this.$root.toastRes(res);
+                if (res.ok) {
+                    this.otelIngestTokenSet = true;
+                    this.otelIngestNewToken = res.token;
                 }
             });
         },
