@@ -8,7 +8,7 @@
 ## Sessão
 
 - **iniciado_em**: `2026-07-03`
-- **fase_atual**: `Fase 4` (tier-gated) · Rebrand SuperKuma: **CONCLUÍDO** — 8 estágios + varredura final + reframe de "fork" pra "projeto independente" (PR #4, #5, #6 todos mergeados) + rename real do repositório no GitHub · **EPIC Multi-Tenancy (Teams+RBAC, ADR-0010)** — P0-P4 done; **flag `rbacEnforced` REMOVIDA PERMANENTEMENTE em 2026-07-09 (TASK-R7)**: enforcement em `server/security/authz.js` agora é incondicional, sem toggle, sem opção de desligar (dark-launch encerrado, GAP-013 corrigido no mesmo lote), PR #2 mergeado; P5 (frontend admin) aguardando "Go" · CI setup (PR #3) mergeado
+- **fase_atual**: `Fase 4` (tier-gated) · Rebrand SuperKuma: **CONCLUÍDO** — 8 estágios + varredura final + reframe de "fork" pra "projeto independente" (PR #4, #5, #6 todos mergeados) + rename real do repositório no GitHub · **EPIC Multi-Tenancy (Teams+RBAC, ADR-0010)** — P0-P4 done; **flag `rbacEnforced` REMOVIDA PERMANENTEMENTE em 2026-07-09 (TASK-R7)**: enforcement em `server/security/authz.js` agora é incondicional, sem toggle, sem opção de desligar (dark-launch encerrado, GAP-013 corrigido no mesmo lote), PR #2 mergeado; P5 (frontend admin) aguardando "Go" · CI setup (PR #3) mergeado · **Feature: Alertas avançados (SigNoz-inspired)** (2026-07-09) — análise + 3 ADRs (0013 anomalia, 0014 severidade/roteamento, 0015 receptor OTLP) escritos em `Status: Proposed`, DAG registrada em `TASK-A0-0..A2` abaixo, **nada commitado, nenhum código escrito**; aguardando "Go" item a item, começando por `TASK-A0-0` (rede de caracterização). **Nota de reconciliação (2026-07-09)**: esta sessão descobriu `develop` local 61 commits atrás de `origin/main` (RBAC permanente, gestão de times, releases até v2.8.0 só existiam em `main`) — sincronizado via fast-forward (`git merge --ff-only origin/main` + push), sem perda (`develop` não tinha nenhum commit próprio). O ADR-0014 foi escrito citando o padrão "dark-launch `rbacEnforced` OFF" do `TASK-R1` como referência de idiom de `team_id` — essa referência ficou **historicamente correta mas desatualizada** (a flag já não existe); o mecanismo de `team_id` nullable/FK RESTRICT em si continua válido como idiom a seguir
 - **repositorio**: `alltomatos/superkuma` — **renomeado pelo usuário manualmente** (não via `gh repo rename` como planejado originalmente; descoberto quando um `git push` pro remote antigo retornou o aviso de redirect do GitHub). Remotes atualizados na árvore principal e nas 2 worktrees (`ci-setup`, `rbac`). GitFlow: `main`/`develop`/`feature/*` no origin; PR #2 (RBAC), #3 (CI), #4/#5 (rebrand) e #6 (drop fork framing) todos mergeados
 - **branch**: `develop` (sincronizada, HEAD em `baef6d84`) · árvore principal de volta a este branch após os 3 rounds de merge (RBAC → rebrand → CI-setup → drop-fork-references)
 
@@ -320,6 +320,63 @@
   depends_on: [TASK-R4]
   status: done # (2026-07-09) authz.js: enforcement incondicional, zero bypass restante. rooms.js: roomFor() sem checar flag + bug novo achado e corrigido no processo (atores sem team antes colidiam todos no mesmo room compartilhado "team:null" assim que o enforcement virasse incondicional -- corrigido com fallback explícito pro room legado por-usuário). superkuma-server.js: removida a sincronização de boot (initAfterDatabaseReady lia o setting rbacEnforced da DB pro flag em memória) + getMonitorJSONList simplificado (scopeFilter já tem bypass de superadmin embutido, o ternário duplicado era redundante) + **GAP-013 corrigido** (getMaintenanceJSONList virou actor-aware via scopeFilter; sendMaintenanceListByUserID também passou a filtrar por team_id/user_id antes de emitir -- fecha o cross-tenant leak achado no TASK-R4). server.js: removido o guard "recusa ligar sem superadmin ativo" e o bloco de sync pro authz.js no setSettings (só faziam sentido pra um flag togglável) + **2º bug real achado**: updateMonitorNotification() tinha um guard "if (actor)" em volta da validação de FK cross-team, E os 2 call sites reais em monitor-socket-handler.js nunca passavam socket.actor como 3º argumento -- ou seja, essa checagem nunca rodava na prática, com flag ou sem flag; corrigidos os 2 call sites + removido o guard (checagem agora incondicional, como nos arquivos de recurso irmãos). model/status_page.js: **3º bug real achado** -- sendStatusPageList() buscava TODAS as status pages da instância sem filtro de time (mesma classe do GAP-013); agora usa scopeFilter(socket.actor) como as demais list queries retrofitadas. notification.js: removido guard "if (actor)" em volta de requireResource() no update/delete de save() -- inofensivo sob o flag antigo, mas fechava um gap latente (actor=null passaria batido). Migrations NÃO tocadas (histórico, a linha de seed do setting rbacEnforced fica órfã mas inofensiva -- nenhum código runtime a lê mais). team-socket-handler.js's hardcoded superadmin-only gate em createTeam/addTeamMember/removeTeamMember DELIBERADAMENTE não tocado (mais estrito que o catálogo de permissões tecnicamente permite -- decisão de produto separada, fora de escopo). Doc-comments (JSDoc) com linguagem "dark-launch"/"no-op enquanto enforcement está OFF" limpos em ~11 arquivos. Testes: test-authz.js, test-rooms.js, test-docker-authz.js, test-proxy-authz.js, test-remote-browser-authz.js, test-server-notification-authz.js -- removido todo uso de setEnforcementEnabled/isEnforcementEnabled e os blocos describe de "enforcement OFF", substituídos por testes de "actor sem acesso" (negação por actor undefined/null) onde o bloco OFF cobria um cenário real que valia manter. 93/93 nos arquivos RBAC-específicos, 82/82 numa varredura de regressão mais ampla. Verificado ao vivo no browser: monitors, lista de manutenção e lista de status pages renderizam corretamente com usuário logado real e dados pré-existentes, sem erros no console. T3 (schema/auth/arquitetura macro) com aprovação humana explícita prévia do usuário para esta ação específica. **[ATUALIZAÇÃO — workflow de revisão adversarial pós-implementação]**: rodada de 4 revisores independentes + síntese achou mais 5 problemas reais, todos corrigidos antes do commit final: (1) **BLOQUEANTE** `monitorImportantHeartbeatListCount`/`monitorImportantHeartbeatListPaged` (monitor-socket-handler.js) sem nenhum filtro de time no modo agregado (`monitorID == null`) -- disparado por padrão no carregamento do dashboard (`DashboardHome.vue`), todo usuário via eventos importantes de todos os times; corrigido com `scopeFilter` numa subquery `monitor_id IN (SELECT id FROM monitor WHERE ...)`, e o modo por-monitor ganhou `requireResource` (faltava, ao contrário do `getMonitorBeats` irmão). (2) **BLOQUEANTE** `getTags` (mesmo arquivo) sem filtro nenhum -- vazava as tags de todos os times via UI (Settings → Tags) e via MCP `list_tags`; corrigido com `scopeFilter`. (3) **BLOQUEANTE** `getMonitorChartData` (chart-socket-handler.js) sem NENHUMA checagem de autorização -- qualquer ator autenticado lia a série temporal de uptime/ping de qualquer monitorID de qualquer time; corrigido com `requireResource`. (4) proxy.js: `UPDATE proxy SET default = 0 WHERE default = 1` sem filtro de time -- marcar seu próprio proxy como padrão apagava silenciosamente a flag "padrão" de outro time; corrigido com `AND team_id = ?`. (5) server.js `clearStatistics`: zero checagem de autorização (ao contrário dos vizinhos `clearEvents`/`clearHeartbeats`) -- qualquer usuário logado zerava as estatísticas de TODOS os monitores da instância; é uma ação verdadeiramente global (não tem team_id único pra checar), corrigida com gate explícito superadmin-only (mesmo padrão de createTeam/setUserSuperadmin). Lint limpo, suíte RBAC completa (119/119) re-rodada e verde após os 5 fixes, boot limpo verificado (sem erros de import/sintaxe).
   concluido_em: "2026-07-09"
+
+# Feature: Alertas avançados (SigNoz-inspired) — T3, design em ADR-0013/0014/0015
+# Origem: docs/analise-signoz.md (análise competitiva do github.com/signoz/signoz), sessão 2026-07-09.
+# Todos os 3 ADRs em Status: Proposed, NÃO commitados ainda (docs/adr/0013*, 0014*, 0015*, docs/analise-signoz.md,
+# docs/diagrams/arquitetura-nucleo-adaptadores.svg -- untracked no git). Ordem estrita: 0014 -> 0013 -> 0015.
+# A0-1/A0-3 tocam schema/caminho crítico de notificação -> T3, param para "Go" explícito por item.
+# A0-0 (rede de caracterização) é T2 de baixo risco e é o único nó desta feature elegível a rodar
+# sem aprovação prévia de schema -- ainda assim NÃO disparado nesta sessão (usuário pediu só governança).
+
+- id: TASK-A0-0
+  desc: "Rede de caracterização em torno de Monitor.sendNotification/getNotificationList (server/model/monitor.js) — baseline verde antes de tocar o caminho de notificação, molde do TASK-105 da EPIC-2"
+  ref: ADR-0014
+  risco: T2 (baixo)
+  depends_on: []
+  status: blocked # pronto para execução assim que houver "Go"; não disparado nesta sessão (só governança)
+
+- id: TASK-A0-1
+  desc: "Migration Knex: monitor.alert_severity (default 'critical') + tabela notification_route (team_id nullable/FK RESTRICT — mesmo idiom do TASK-R1 —, min_severity, monitor_id/tag_id opcionais, notification_id). Dark: zero linhas = comportamento idêntico ao legado."
+  ref: ADR-0014
+  risco: T3
+  depends_on: [TASK-A0-0]
+  status: blocked # ⛔ aguardando "Go"
+
+- id: TASK-A0-2
+  desc: "resolveNotificationTargets() como módulo puro (união + dedupe por notification_id + filtro de severidade), TDD isolado de I/O"
+  ref: ADR-0014
+  risco: T2
+  depends_on: [TASK-A0-1]
+  status: blocked # ⛔ aguardando "Go" (T3 da fase anterior ainda não liberado)
+
+- id: TASK-A0-3
+  desc: "Fiação: sendNotification chama resolveNotificationTargets() no lugar de getNotificationList(); testes de caracterização provando flag OFF/sem rotas = byte-idêntico ao legado (contrato de regressão, mesma disciplina do rbacEnforced)"
+  ref: ADR-0014
+  risco: T3
+  depends_on: [TASK-A0-2]
+  status: blocked # ⛔ aguardando "Go"
+
+- id: TASK-A0-4
+  desc: "UI: tela de rotas (team-scoped, molde APIKeys.vue/Federation.vue) + seletor de alert_severity no EditMonitor.vue"
+  ref: ADR-0014
+  risco: T2
+  depends_on: [TASK-A0-3]
+  status: blocked
+
+- id: TASK-A1
+  desc: "ADR-0013 completo: detector de anomalia (Fase 1 média móvel±Nσ sobre stat_* → Fase 2 sazonal hora/dia/semana), tabela alert_event, campos anomaly_* por monitor, UI em EditMonitor.vue. NÃO fatiado em sub-tarefas ainda — só após A0-3 estar mergeado (severidade é pré-requisito) e o usuário dar 'Go' para detalhar a DAG fina desta ADR."
+  ref: ADR-0013
+  risco: T3
+  depends_on: [TASK-A0-3]
+  status: blocked # ⛔ aguardando "Go" — fatiamento fino fica para quando esta feature entrar em execução
+
+- id: TASK-A2
+  desc: "ADR-0015 completo: telemetry-router.js (POST /v1/metrics OTLP/JSON), tipo de monitor otel (watchdog passivo, molde push), ingest token team-scoped, selector-first (metric+attrs+agregação). MVP-0 opcional (extender /api/push com valor numérico) pode adiantar validação sem OTLP. NÃO fatiado ainda."
+  ref: ADR-0015
+  risco: T3
+  depends_on: [TASK-A1]
+  status: blocked # ⛔ aguardando "Go"
 ```
 
 ---
@@ -376,6 +433,7 @@ Durante o F3 (2026-07-04), o agente escritor do Stage 2 (frontend) rodou ~177min
 
 ## Pendências / Notas
 
+- **Feature: Alertas avançados (2026-07-09)** — `docs/analise-signoz.md`, `docs/adr/0013-*.md`, `docs/adr/0014-*.md`, `docs/adr/0015-*.md` e `docs/diagrams/arquitetura-nucleo-adaptadores.svg` estão **untracked no git** (não commitados, working tree). São propostas de design (todas `Status: Proposed`) fruto de análise do SigNoz, não decisões finais — cada uma pede "Go" humano explícito antes de virar código, e o primeiro nó executável é `TASK-A0-0` (rede de caracterização, T2 baixo risco), seguido de `TASK-A0-1` (a primeira migration real, T3). Ver seção "Feature: Alertas avançados" no `ORCHESTRATOR-ROADMAP.md` para o resumo e dependências.
 - `package-lock.json` tem alteração local não relacionada (remoção de campos `libc` em deps opcionais do rollup) — provável artefato de `npm install`. Não revertido; decidir se restaura.
 - **Descoberta (2026-07-03):** `npm run build` funciona neste ambiente (gera `dist/`) e o E2E Playwright é **totalmente viável** — após `npx playwright install chromium` (browser estava desatualizado: 1228 instalado vs 1084 esperado pelo playwright 1.39), suíte completa rodou **23/23 em 2.1min**. Isso eleva a confiança na rede de segurança do frontend para além de "só teórica".
 - `check()` HTTP **não existe como método isolado** em `monitor.js` — a lógica fica embutida numa closure `beat()` dentro de `start(io)` (confirma o gap do ADR-0002). Por isso a caracterização de monitor.js foca em `toJSON`/`toPublicJSON` (isoláveis) em vez de tentar unit-testar o check em si.
