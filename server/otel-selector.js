@@ -131,6 +131,18 @@ function aggregate(values, aggregation) {
 }
 
 /**
+ * Default cardinality guard (ADR-0015 "OTLP/protobuf + hardening" step,
+ * TASK-A2-4): the maximum number of matched datapoints any ONE monitor will
+ * have aggregated for a single ingest batch. A selector that (mis)matches
+ * far more series than intended (e.g. an empty/near-empty attribute
+ * matcher against a very chatty Collector) must not force this process to
+ * hold/aggregate an unbounded array in memory -- see matchDatapointsToMonitors()
+ * below for how the cap is applied.
+ * @type {number}
+ */
+const DEFAULT_MAX_MATCHED_DATAPOINTS_PER_MONITOR = 1000;
+
+/**
  * The single entry point the future telemetry router will actually call per
  * ingest batch. For every otel monitor, finds all datapoints whose metric
  * name and attributes match that monitor's selector, aggregates their
@@ -143,6 +155,19 @@ function aggregate(values, aggregation) {
  * in the returned array (dropped, not included with a null/zero
  * placeholder), and a datapoint that matches no monitor's selector is never
  * read out of `datapoints` by any iteration, so it is implicitly discarded.
+ *
+ * On top of that, a second cardinality guard (ADR-0015 "hardening" step,
+ * TASK-A2-4) caps how many matched values ANY ONE monitor aggregates in a
+ * single call: once a monitor's matched-values buffer reaches
+ * `maxMatchedDatapointsPerMonitor`, further matches for that SAME monitor
+ * are still counted (`totalMatchedCount`) but no longer pushed into the
+ * array that gets aggregated -- so aggregate() only ever runs over an array
+ * bounded by the cap, never an unbounded one. The `truncated`/
+ * `totalMatchedCount` keys are only present on the returned entry when
+ * truncation actually happened, so every existing caller/test that expects
+ * the plain `{monitorId, aggregatedValue, matchedCount}` shape for a batch
+ * under the cap sees byte-for-byte the same object as before this guard
+ * existed.
  * @param {Array<object>} otelMonitors Monitor-like objects, each with `id`,
  *     `otel_metric_name`, `otel_attribute_matchers` (JSON string or
  *     null/empty), and `otel_aggregation` ("last"|"avg"|"max"|"sum").
@@ -150,33 +175,51 @@ function aggregate(values, aggregation) {
  *     `metricName`, `attributes` (plain object), and `value` (number). This
  *     function does not parse OTLP wire format -- that is a separate
  *     concern for the router to handle before calling this.
- * @returns {Array<{monitorId: number, aggregatedValue: number, matchedCount: number}>}
+ * @param {number} maxMatchedDatapointsPerMonitor The cardinality cap
+ *     described above. Defaults to DEFAULT_MAX_MATCHED_DATAPOINTS_PER_MONITOR;
+ *     callers (tests, mainly) may pass a smaller number to exercise
+ *     truncation without constructing a huge fixture.
+ * @returns {Array<{monitorId: number, aggregatedValue: number, matchedCount: number, truncated: (boolean|undefined), totalMatchedCount: (number|undefined)}>}
  *     One entry per monitor with at least one matching datapoint, in the
  *     same order as otelMonitors. Monitors with zero matches are absent.
+ *     `truncated`/`totalMatchedCount` are only present when the cap was
+ *     actually exceeded for that monitor.
  * @throws {Error} If a monitor's otel_aggregation is not one of "last",
  *     "avg", "max", "sum" (propagated from aggregate()) -- but only for
  *     monitors that actually had at least one matching datapoint, since
  *     aggregate() is never called for a monitor with zero matches.
  */
-function matchDatapointsToMonitors(otelMonitors, datapoints) {
+function matchDatapointsToMonitors(
+    otelMonitors,
+    datapoints,
+    maxMatchedDatapointsPerMonitor = DEFAULT_MAX_MATCHED_DATAPOINTS_PER_MONITOR
+) {
     const results = [];
 
     for (const monitor of otelMonitors) {
         const matchedValues = [];
+        let totalMatchedCount = 0;
+
         for (const datapoint of datapoints) {
             if (metricMatchesMonitor(monitor, datapoint)) {
-                matchedValues.push(datapoint.value);
+                totalMatchedCount += 1;
+                if (matchedValues.length < maxMatchedDatapointsPerMonitor) {
+                    matchedValues.push(datapoint.value);
+                }
             }
         }
 
-        if (matchedValues.length === 0) {
+        if (totalMatchedCount === 0) {
             continue;
         }
+
+        const truncated = totalMatchedCount > matchedValues.length;
 
         results.push({
             monitorId: monitor.id,
             aggregatedValue: aggregate(matchedValues, monitor.otel_aggregation),
             matchedCount: matchedValues.length,
+            ...(truncated ? { truncated: true, totalMatchedCount } : {}),
         });
     }
 
@@ -184,6 +227,7 @@ function matchDatapointsToMonitors(otelMonitors, datapoints) {
 }
 
 module.exports = {
+    DEFAULT_MAX_MATCHED_DATAPOINTS_PER_MONITOR,
     attributeMatchersMatch,
     metricMatchesMonitor,
     aggregate,

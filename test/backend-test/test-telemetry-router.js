@@ -30,6 +30,19 @@ dayjs.extend(require("dayjs/plugin/customParseFormat"));
  * Locate and return the real handler function Express registered for
  * router.post("/v1/metrics", ...) inside the express.Router() instance
  * exported by server/routers/telemetry-router.js.
+ *
+ * TASK-A2-4: the route now has THREE stack entries --
+ * `express.raw({...})`, `express.json({...})`, then the actual async
+ * `(request, response) => {...}` handler -- so the handler is the LAST
+ * entry, not the first. This helper deliberately calls the handler function
+ * directly (bypassing the two body-parser middlewares), matching this
+ * file's existing convention of driving the handler with a hand-built mock
+ * req/res rather than real HTTP -- request.body is supplied pre-"parsed" by
+ * makeReq() below, exactly as if express.json()/express.raw() had already
+ * run. Tests that need to exercise the REAL body-parser middleware chain
+ * (protobuf decoding, payload-size limits) live in
+ * test-telemetry-router-hardening.js instead, driven over a real HTTP
+ * server.
  * @returns {Function} The real async (request, response) => {...} route handler.
  * @throws {Error} If the route can't be located (would mean the route
  *     path/registration changed).
@@ -38,7 +51,7 @@ function extractTelemetryHandler() {
     const router = require("../../server/routers/telemetry-router.js");
     for (const layer of router.stack) {
         if (layer.route && layer.route.path === "/v1/metrics") {
-            return layer.route.stack[0].handle;
+            return layer.route.stack[layer.route.stack.length - 1].handle;
         }
     }
     throw new Error('Could not locate router.post("/v1/metrics", ...) in telemetry-router.js\'s route stack');
