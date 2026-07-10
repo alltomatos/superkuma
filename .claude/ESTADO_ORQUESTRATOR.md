@@ -420,12 +420,53 @@
   depends_on: [TASK-A0-3]
   status: superseded
 
+# Feature: ADR-0015 (receptor de telemetria OTLP) — fatiada em 2026-07-10, mesmo molde do
+# TASK-A0-0..A0-4/A1-0..A1-4. Sequenciamento segue literalmente a seção "Sequenciamento sugerido"
+# do ADR: pré-requisito (0013/0014, já feito) -> MVP-0 -> receptor OTLP/JSON -> selector+avaliação
+# -> protobuf+hardening. Fase 2 (redução de spans/logs) deliberadamente NÃO fatiada -- só entra
+# se houver demanda real, por decisão explícita do próprio ADR (§ Consequências/Sequenciamento).
+
+- id: TASK-A2-0
+  desc: "Caracterização: comportamento atual de POST /api/push/:pushToken (server/routers/api-router.js) sem `value`, do tipo de monitor push (watchdog de inatividade, server/monitor-types/push.js), e de evaluateJsonQuery contra seus 2 call sites reais hoje (prometheus.js/snmp.js) — baseline antes de estender qualquer um dos três para o MVP-0/receptor OTLP."
+  ref: ADR-0015
+  risco: T2 (baixo)
+  depends_on: [TASK-A1-3]
+  status: blocked # pronto pra rodar sem gate adicional (T2 baixo risco, mesmo tratamento dado a TASK-A0-0/TASK-A1-0 pela política de tiers do CLAUDE.md)
+
+- id: TASK-A2-1
+  desc: "MVP-0: estender POST /api/push/:pushToken para aceitar `value` numérico opcional (body/query) e roteá-lo pro stat_*/UptimeCalculator do monitor (mesma vala do ping) quando presente. Ausência de `value` = comportamento idêntico ao legado (mesma disciplina byte-idêntica das ADRs 0013/0014). Valida a redução-no-ingest com esforço mínimo, sem OTLP."
+  ref: ADR-0015
+  risco: T3 # muda contrato de API pública (CLAUDE.md §7) mesmo sendo aditivo
+  depends_on: [TASK-A2-0]
+  status: blocked # ⛔ aguardando "Go" explícito por item
+
+- id: TASK-A2-2
+  desc: "Receptor OTLP/JSON: novo server/routers/telemetry-router.js com POST /v1/metrics (JSON só nesta etapa, sem protobuf), auth por ingest token team-scoped (reusa ou estende o idiom push_token — decisão de schema na hora), novo tipo de monitor server/monitor-types/otel.js (molde push: watchdog passivo, beat() de inatividade)."
+  ref: ADR-0015
+  risco: T3
+  depends_on: [TASK-A2-1]
+  status: blocked # ⛔ aguardando "Go" explícito por item
+
+- id: TASK-A2-3
+  desc: "Selector-first (trava de cardinalidade): matcher metric+attrs contra o payload recebido, agregação (last/avg/max/sum) quando o selector casa N séries, ligação com evaluateJsonQuery (threshold) e opt-in com anomalia (ADR-0013)/severidade-roteamento (ADR-0014). Datapoint que não casa nenhum monitor é descartado, não armazenado (§Decisão 2/3 do ADR)."
+  ref: ADR-0015
+  risco: T3
+  depends_on: [TASK-A2-2]
+  status: blocked # ⛔ aguardando "Go" explícito por item
+
+- id: TASK-A2-4
+  desc: "OTLP/protobuf real (dependência nova, schema versionado) + hardening desde o dia 1: rate-limit, limite de tamanho de payload, teto de séries casadas por monitor (guardrail de cardinalidade)."
+  ref: ADR-0015
+  risco: T3
+  depends_on: [TASK-A2-3]
+  status: blocked # ⛔ aguardando "Go" explícito por item
+
 - id: TASK-A2
-  desc: "ADR-0015 completo: telemetry-router.js (POST /v1/metrics OTLP/JSON), tipo de monitor otel (watchdog passivo, molde push), ingest token team-scoped, selector-first (metric+attrs+agregação). MVP-0 opcional (extender /api/push com valor numérico) pode adiantar validação sem OTLP. NÃO fatiado ainda."
+  desc: "[SUPERSEDIDO — ver TASK-A2-0..A2-4 acima, fatiado em 2026-07-10] ADR-0015 completo: telemetry-router.js (POST /v1/metrics OTLP/JSON), tipo de monitor otel (watchdog passivo, molde push), ingest token team-scoped, selector-first (metric+attrs+agregação). MVP-0 opcional (extender /api/push com valor numérico) pode adiantar validação sem OTLP."
   ref: ADR-0015
   risco: T3
   depends_on: [TASK-A1-3]
-  status: blocked # ⛔ aguardando "Go"
+  status: superseded
 ```
 
 ---
