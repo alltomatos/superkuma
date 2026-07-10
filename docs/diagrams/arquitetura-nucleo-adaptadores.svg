@@ -1,0 +1,123 @@
+<svg width="100%" viewBox="0 0 680 360" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>SuperKuma: um núcleo de avaliação, N adaptadores de ingestão</title>
+<desc>Quatro adaptadores de ingestão (active checks, prometheus, push, otel) reduzem cada sinal a um valor numérico que entra num núcleo de avaliação com threshold e anomalia; a saída se divide em status, que alimenta heartbeat e stat_ para uptime e SLA, e alerta, que gera alert_event com severidade, passa por roteamento e chega a cerca de 90 notificações.</desc>
+<style>
+  svg text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
+  .mono{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;}
+  .hdr{fill:var(--text-muted,#73726c);font-size:11px;letter-spacing:.09em;font-weight:600;}
+  .title{fill:var(--text-primary,#2C2C2A);font-size:12.5px;font-weight:650;}
+  .sub{fill:var(--text-secondary,#5F5E5A);font-size:10.5px;}
+  .nbox{fill:var(--surface-1,#F1EFE8);stroke:var(--border-strong,#B4B2A9);stroke-width:1.2;}
+  .core{fill:var(--surface-2,#E7E5DC);stroke:var(--border-strong,#B4B2A9);stroke-width:1.3;}
+  .pbox{fill:#EEEDFE;stroke:#7F77DD;stroke-width:1.5;}
+  .ptitle{fill:#26215C;font-size:12.5px;font-weight:650;}
+  .psub{fill:#534AB7;font-size:10.5px;}
+  .edge{stroke:var(--border-strong,#888780);stroke-width:1.4;fill:none;}
+  .edgep{stroke:#7F77DD;stroke-width:1.6;fill:none;}
+  .elabel{fill:var(--text-muted,#73726c);font-size:9.5px;}
+  .efill{fill:var(--border-strong,#888780);}
+  .efillp{fill:#7F77DD;}
+  .junc{fill:var(--text-muted,#73726c);}
+  @media (prefers-color-scheme: dark){
+    .hdr{fill:#9c9a92;} .title{fill:#F1EFE8;} .sub{fill:#c2c0b6;}
+    .nbox{fill:#2C2C2A;stroke:#5F5E5A;} .core{fill:#242422;stroke:#5F5E5A;}
+    .edge{stroke:#73726c;} .elabel{fill:#9c9a92;} .efill{fill:#73726c;} .junc{fill:#9c9a92;}
+    .pbox{fill:#26215C;stroke:#7F77DD;} .ptitle{fill:#EEEDFE;} .psub{fill:#CECBF6;}
+  }
+  :root[data-theme="dark"] .hdr{fill:#9c9a92;}
+  :root[data-theme="dark"] .title{fill:#F1EFE8;}
+  :root[data-theme="dark"] .sub{fill:#c2c0b6;}
+  :root[data-theme="dark"] .nbox{fill:#2C2C2A;stroke:#5F5E5A;}
+  :root[data-theme="dark"] .core{fill:#242422;stroke:#5F5E5A;}
+  :root[data-theme="dark"] .edge{stroke:#73726c;}
+  :root[data-theme="dark"] .elabel{fill:#9c9a92;}
+  :root[data-theme="dark"] .efill{fill:#73726c;}
+  :root[data-theme="dark"] .junc{fill:#9c9a92;}
+  :root[data-theme="dark"] .pbox{fill:#26215C;stroke:#7F77DD;}
+  :root[data-theme="dark"] .ptitle{fill:#EEEDFE;}
+  :root[data-theme="dark"] .psub{fill:#CECBF6;}
+  :root[data-theme="light"] .pbox{fill:#EEEDFE;stroke:#7F77DD;}
+  :root[data-theme="light"] .ptitle{fill:#26215C;}
+  :root[data-theme="light"] .psub{fill:#534AB7;}
+</style>
+<defs>
+  <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" class="efill"/>
+  </marker>
+  <marker id="ahp" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" class="efillp"/>
+  </marker>
+</defs>
+
+<!-- Section headers -->
+<text class="hdr" x="36" y="34">INGESTÃO — ADAPTADORES</text>
+<text class="hdr" x="262" y="34">NÚCLEO</text>
+<text class="hdr" x="470" y="34">SAÍDA</text>
+
+<!-- Fan lines: adapters -> junction -> core -->
+<path class="edge" d="M206,80 L232,151"/>
+<path class="edge" d="M206,128 L232,153"/>
+<path class="edge" d="M206,176 L232,155"/>
+<path class="edgep" d="M206,224 L232,157"/>
+<circle class="junc" cx="234" cy="154" r="3"/>
+<path class="edge" d="M238,154 L254,154" marker-end="url(#ah)"/>
+<text class="elabel mono" x="212" y="146">→ nº</text>
+
+<!-- Adapters (Col A) -->
+<rect class="nbox" x="36" y="60" width="170" height="40" rx="7"/>
+<text class="title" x="50" y="83">Active checks</text>
+<text class="sub" x="50" y="95">HTTP · TCP · DNS — pull</text>
+
+<rect class="nbox" x="36" y="108" width="170" height="40" rx="7"/>
+<text class="title mono" x="50" y="131">prometheus</text>
+<text class="sub" x="50" y="143">puxa PromQL — pull</text>
+
+<rect class="nbox" x="36" y="156" width="170" height="40" rx="7"/>
+<text class="title mono" x="50" y="179">push</text>
+<text class="sub" x="50" y="191">recebe heartbeat</text>
+
+<rect class="pbox" x="36" y="204" width="170" height="40" rx="7"/>
+<text class="ptitle mono" x="50" y="227">otel</text>
+<text class="psub" x="50" y="239">recebe OTLP — novo</text>
+
+<!-- Core (Col B) -->
+<rect class="core" x="256" y="96" width="168" height="128" rx="9"/>
+<text class="title" x="270" y="120">Núcleo de avaliação</text>
+<rect class="nbox" x="270" y="132" width="140" height="36" rx="6"/>
+<text class="title" x="282" y="150">Threshold</text>
+<text class="sub mono" x="282" y="162">evaluateJsonQuery</text>
+<rect class="pbox" x="270" y="176" width="140" height="36" rx="6"/>
+<text class="ptitle" x="282" y="194">Anomalia</text>
+<text class="psub mono" x="282" y="206">ADR-0013</text>
+
+<!-- Core -> outputs -->
+<path class="edge" d="M424,140 L466,116" marker-end="url(#ah)"/>
+<text class="elabel" x="430" y="124">status</text>
+<path class="edgep" d="M424,168 L466,170" marker-end="url(#ahp)"/>
+<text class="elabel" x="428" y="186">alerta ≠ DOWN</text>
+
+<!-- Outputs (Col C) -->
+<rect class="nbox" x="470" y="96" width="170" height="40" rx="7"/>
+<text class="title mono" x="484" y="119">Heartbeat + stat_*</text>
+<text class="sub" x="484" y="131">uptime / SLA</text>
+
+<rect class="pbox" x="470" y="150" width="170" height="40" rx="7"/>
+<text class="ptitle mono" x="484" y="173">alert_event</text>
+<text class="psub" x="484" y="185">severidade — novo</text>
+
+<path class="edgep" d="M555,190 L555,199" marker-end="url(#ahp)"/>
+<rect class="pbox" x="470" y="200" width="170" height="40" rx="7"/>
+<text class="ptitle" x="484" y="223">Roteamento (0014)</text>
+<text class="psub" x="484" y="235">team · severidade · tag</text>
+
+<path class="edge" d="M555,240 L555,249" marker-end="url(#ah)"/>
+<rect class="nbox" x="470" y="250" width="170" height="40" rx="7"/>
+<text class="title" x="484" y="273">~90 notificações</text>
+<text class="sub" x="484" y="285">Slack · PagerDuty · …</text>
+
+<!-- Legend -->
+<rect class="nbox" x="36" y="322" width="13" height="13" rx="3"/>
+<text class="sub" x="55" y="332">já existe</text>
+<rect class="pbox" x="150" y="322" width="13" height="13" rx="3"/>
+<text class="sub" x="169" y="332">proposto — ADR 0013 · 0014 · 0015</text>
+</svg>
