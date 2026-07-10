@@ -33,6 +33,9 @@ describe("permission catalog", () => {
         assert.strictEqual(isTeamScoped("monitor:read"), true);
         assert.strictEqual(isTeamScoped("tag:manage"), true);
         assert.strictEqual(isTeamScoped("status_page:manage"), true);
+        assert.ok(isValidAction("dashboard:read"));
+        assert.ok(isValidAction("dashboard:manage"));
+        assert.strictEqual(isTeamScoped("dashboard:manage"), true);
 
         // Global (cross-team) actions
         assert.strictEqual(isTeamScoped("user:manage"), false);
@@ -70,6 +73,17 @@ describe("permission catalog", () => {
         assert.ok(editor.size > viewer.size, "editor must add permissions over viewer");
         assert.ok(admin.size > editor.size, "admin must add permissions over editor");
         assert.ok(owner.size > admin.size, "owner must add permissions over admin");
+    });
+
+    test("viewer can read dashboards but not manage them; editor/admin/owner can manage", () => {
+        assert.ok(new Set(getBuiltinRole("viewer").permissions).has("dashboard:read"));
+        assert.ok(!new Set(getBuiltinRole("viewer").permissions).has("dashboard:manage"));
+        for (const slug of ["editor", "admin", "owner"]) {
+            assert.ok(
+                new Set(getBuiltinRole(slug).permissions).has("dashboard:manage"),
+                `${slug} should manage dashboards`
+            );
+        }
     });
 
     test("only owner can deactivate the team (team:manage)", () => {

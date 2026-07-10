@@ -188,7 +188,15 @@ describe("MCP monitor payload", () => {
     });
 
     test("summarizeMonitor returns a compact view", () => {
-        const s = summarizeMonitor({ id: 3, name: "x", type: "port", hostname: "h", port: 80, interval: 60, active: 1 });
+        const s = summarizeMonitor({
+            id: 3,
+            name: "x",
+            type: "port",
+            hostname: "h",
+            port: 80,
+            interval: 60,
+            active: 1,
+        });
         assert.deepStrictEqual(s, {
             id: 3,
             name: "x",
@@ -199,7 +207,13 @@ describe("MCP monitor payload", () => {
             interval: 60,
             active: true,
             parent: null,
+            teamId: null,
         });
+    });
+
+    test("summarizeMonitor passes through a set teamId", () => {
+        const s = summarizeMonitor({ id: 4, name: "y", type: "http", interval: 60, active: 1, teamId: 7 });
+        assert.strictEqual(s.teamId, 7);
     });
 });
 
@@ -236,7 +250,13 @@ describe("MCP maintenance payload", () => {
     });
 
     test("summarizeMaintenance returns a compact view", () => {
-        const s = summarizeMaintenance({ id: 1, title: "t", strategy: "manual", active: 1, status: "under-maintenance" });
+        const s = summarizeMaintenance({
+            id: 1,
+            title: "t",
+            strategy: "manual",
+            active: 1,
+            status: "under-maintenance",
+        });
         assert.deepStrictEqual(s, { id: 1, title: "t", strategy: "manual", active: true, status: "under-maintenance" });
     });
 });
@@ -246,7 +266,9 @@ describe("MCP tool gating", () => {
         const server = new FakeServer();
         registerAllTools(server, new FakeClient(), { allowMutations: false, allowDelete: false });
         const names = server.names();
-        const mutating = names.filter((n) => /^(create|update|delete|pause|resume|add_monitor_tag|remove_monitor_tag|test_|post_|resolve_)/.test(n));
+        const mutating = names.filter((n) =>
+            /^(create|update|delete|pause|resume|add_monitor_tag|remove_monitor_tag|test_|post_|resolve_)/.test(n)
+        );
         assert.deepStrictEqual(mutating, [], "no mutating tools should be registered read-only");
         assert.ok(names.includes("list_monitors"));
         assert.ok(names.includes("get_info"));
@@ -267,9 +289,20 @@ describe("MCP tool gating", () => {
         registerAllTools(server, new FakeClient(), { allowMutations: true, allowDelete: true });
         const names = server.names();
         for (const expected of [
-            "create_monitor", "delete_monitor", "create_notification", "delete_notification",
-            "create_tag", "add_monitor_tag", "create_status_page", "post_incident",
-            "create_maintenance", "delete_maintenance",
+            "create_monitor",
+            "delete_monitor",
+            "create_notification",
+            "delete_notification",
+            "create_tag",
+            "add_monitor_tag",
+            "create_status_page",
+            "post_incident",
+            "create_maintenance",
+            "delete_maintenance",
+            "list_dashboards",
+            "create_dashboard",
+            "save_dashboard",
+            "delete_dashboard",
         ]) {
             assert.ok(names.includes(expected), `missing ${expected}`);
         }
@@ -278,6 +311,24 @@ describe("MCP tool gating", () => {
 
 describe("MCP tool behaviour", () => {
     const fullConfig = { allowMutations: true, allowDelete: true };
+
+    test("list_monitors filters by teamId when given, returns all otherwise", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        client.monitors = {
+            1: { id: 1, name: "Team A monitor", type: "http", teamId: 1 },
+            2: { id: 2, name: "Team B monitor", type: "http", teamId: 2 },
+        };
+        registerAllTools(server, client, fullConfig);
+
+        const all = await server.call("list_monitors", {});
+        assert.strictEqual(all.data.count, 2);
+
+        const scoped = await server.call("list_monitors", { teamId: 1 });
+        assert.strictEqual(scoped.data.count, 1);
+        assert.strictEqual(scoped.data.monitors[0].id, 1);
+        assert.strictEqual(scoped.data.monitors[0].teamId, 1);
+    });
 
     test("create_monitor forwards a complete payload to 'add'", async () => {
         const server = new FakeServer();
@@ -397,6 +448,37 @@ describe("MCP tool behaviour", () => {
         assert.strictEqual(payload.bearer_token, "tok");
     });
 
+    test("create_monitor maps influxdb fields onto the reused columns, incl. Basic auth", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        client.responses.add = { ok: true, monitorID: 12 };
+        registerAllTools(server, client, fullConfig);
+
+        await server.call("create_monitor", {
+            type: "influxdb",
+            name: "pfsense — CPU",
+            url: "http://influxdb:8086",
+            influxdbDatabase: "telegraf",
+            influxql: 'SELECT last("usage_idle") FROM "cpu" WHERE "cpu"=\'cpu-total\'',
+            conditionOperator: ">=",
+            expectedValue: "20",
+            metricUnit: "%",
+            basicAuthUser: "superkuma",
+            basicAuthPass: "s3cr3t",
+        });
+
+        const payload = lastCall(client, "add").args[0];
+        assert.strictEqual(payload.type, "influxdb");
+        assert.strictEqual(payload.url, "http://influxdb:8086");
+        assert.strictEqual(payload.influxdbDatabase, "telegraf");
+        assert.strictEqual(payload.databaseQuery, 'SELECT last("usage_idle") FROM "cpu" WHERE "cpu"=\'cpu-total\'');
+        assert.strictEqual(payload.jsonPathOperator, ">=");
+        assert.strictEqual(payload.expectedValue, "20");
+        assert.strictEqual(payload.metricUnit, "%");
+        assert.strictEqual(payload.basic_auth_user, "superkuma");
+        assert.strictEqual(payload.basic_auth_pass, "s3cr3t");
+    });
+
     test("save_status_page replaces groups and preserves unset config fields", async () => {
         const server = new FakeServer();
         const client = new FakeClient();
@@ -435,6 +517,86 @@ describe("MCP tool behaviour", () => {
 
         const res = await server.call("save_status_page", { slug: "missing", groups: [] });
         assert.strictEqual(res.isError, true);
+    });
+});
+
+describe("MCP dashboard tools", () => {
+    const fullConfig = { allowMutations: true, allowDelete: true };
+
+    test("list_dashboards forwards to getDashboardList", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        client.responses.getDashboardList = {
+            ok: true,
+            dashboardList: [{ id: 1, title: "Fleet", teamId: 3, widgetCount: 2 }],
+        };
+        registerAllTools(server, client, fullConfig);
+
+        const res = await server.call("list_dashboards", {});
+        assert.strictEqual(res.data.count, 1);
+        assert.strictEqual(res.data.dashboards[0].title, "Fleet");
+    });
+
+    test("get_dashboard forwards the id and returns dashboard + widgets", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        client.responses.getDashboard = {
+            ok: true,
+            dashboard: { id: 1, title: "Fleet", teamId: 3 },
+            widgets: [{ id: 5, monitorId: 9, kind: "metric_gauge" }],
+        };
+        registerAllTools(server, client, fullConfig);
+
+        const res = await server.call("get_dashboard", { id: 1 });
+        assert.strictEqual(res.data.dashboard.title, "Fleet");
+        assert.strictEqual(res.data.widgets[0].monitorId, 9);
+        assert.strictEqual(lastCall(client, "getDashboard").args[0].id, 1);
+    });
+
+    test("create_dashboard forwards the title and returns the new id", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        client.responses.createDashboard = { ok: true, dashboardId: 4 };
+        registerAllTools(server, client, fullConfig);
+
+        const res = await server.call("create_dashboard", { title: "Network" });
+        assert.strictEqual(res.data.dashboardId, 4);
+        assert.strictEqual(lastCall(client, "createDashboard").args[0].title, "Network");
+    });
+
+    test("save_dashboard forwards id/title/widgets and reports the widget count", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        client.responses.saveDashboard = { ok: true, widgetCount: 2 };
+        registerAllTools(server, client, fullConfig);
+
+        const res = await server.call("save_dashboard", {
+            id: 4,
+            title: "Renamed",
+            widgets: [{ monitorId: 9, kind: "metric_gauge", sectionName: "Firewalls" }, { monitorId: 10 }],
+        });
+
+        assert.strictEqual(res.data.ok, true);
+        assert.match(res.data.message, /2 widget/);
+        const call = lastCall(client, "saveDashboard").args[0];
+        assert.strictEqual(call.id, 4);
+        assert.strictEqual(call.title, "Renamed");
+        assert.strictEqual(call.widgets.length, 2);
+        assert.strictEqual(call.widgets[0].sectionName, "Firewalls");
+    });
+
+    test("delete_dashboard is a dry-run without confirm and a real call with it", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        registerAllTools(server, client, fullConfig);
+
+        const dry = await server.call("delete_dashboard", { id: 4, confirm: false });
+        assert.strictEqual(dry.data.dryRun, true);
+        assert.strictEqual(lastCall(client, "deleteDashboard"), undefined, "no delete on dry-run");
+
+        const real = await server.call("delete_dashboard", { id: 4, confirm: true });
+        assert.strictEqual(real.data.ok, true);
+        assert.ok(lastCall(client, "deleteDashboard"), "delete on confirm");
     });
 });
 
