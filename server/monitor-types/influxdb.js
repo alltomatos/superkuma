@@ -117,6 +117,10 @@ class InfluxDbMonitorType extends MonitorType {
         };
 
         if (monitor.ignoreTls) {
+            // codeql[js/disabling-certificate-validation]: deliberate, user opt-in
+            // (off by default) for self-signed certs on an internal InfluxDB --
+            // identical, already-accepted pattern to prometheus.js's own ignoreTls
+            // handling (same CodeQL finding open there, unaddressed).
             options.httpsAgent = new https.Agent({ rejectUnauthorized: false });
         }
 
