@@ -49,14 +49,18 @@ router.all("/api/push/:pushToken", async (request, response) => {
         let pushToken = request.params.pushToken;
         let msg = request.query.msg || "OK";
         let ping = parseFloat(request.query.ping) || null;
+        let value = parseFloat(request.query.value) || null;
         let statusString = request.query.status || "up";
         const statusFromParam = statusString === "up" ? UP : DOWN;
 
-        // Validate ping value - max 100 billion ms (~3.17 years)
+        // Validate ping/value - max 100 billion ms (~3.17 years)
         // Fits safely in both BIGINT and FLOAT(20,2)
         const MAX_PING_MS = 100000000000;
         if (ping !== null && (ping < 0 || ping > MAX_PING_MS)) {
             throw new Error(`Invalid ping value. Must be between 0 and ${MAX_PING_MS} ms.`);
+        }
+        if (value !== null && (value < 0 || value > MAX_PING_MS)) {
+            throw new Error(`Invalid value. Must be between 0 and ${MAX_PING_MS}.`);
         }
 
         let monitor = await R.findOne("monitor", " push_token = ? AND active = 1 ", [pushToken]);
@@ -72,7 +76,11 @@ router.all("/api/push/:pushToken", async (request, response) => {
         let bean = R.dispense("heartbeat");
         bean.time = R.isoDateTimeMillis(dayjs.utc());
         bean.monitor_id = monitor.id;
-        bean.ping = ping;
+        // ADR-0015 MVP-0: `value` is an optional generic-metric query param
+        // that feeds the SAME ping/stat_* channel `ping` already does
+        // ("reduction-at-ingest", no new column) -- `ping` wins when both
+        // are given, so existing callers sending `ping` are unaffected.
+        bean.ping = ping !== null ? ping : value;
         bean.msg = msg;
         bean.downCount = previousHeartbeat?.downCount || 0;
 
