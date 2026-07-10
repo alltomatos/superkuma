@@ -368,18 +368,58 @@
   status: done # commit 5de0f86b. Backend: server/socket-handlers/notification-route-socket-handler.js (get/create/delete) -- rota team-scoped exige notification:manage no time; rota global (team_id=null) exige superadmin ao vivo (mesma fasquia de team:create); notificação/monitor/tag vinculados são validados via requireResource (nunca confiados do cliente, fecha o mesmo buraco que ADR-0010 R3 fechou p/ updateMonitorNotification). Registrado team-id-loaders.js + wired em server.js. 13 testes via mock-socket local -- achado real no processo: scopeFilter() com column "team_id" default colidia com os LEFT JOINs de monitor/tag/notification (cada um também tem team_id) -- corrigido qualificando "nr.team_id". Monitor.toJSON() ganhou alertSeverity (não existia -- teria deixado o campo novo em branco em todo monitor já existente); editMonitor ganhou bean.alertSeverity na lista explícita de campos. Frontend: NotificationRouting.vue (molde Teams.vue, o padrão mixin-wrapped atual, não o raw-socket antigo de Tags.vue) + registro em Settings.vue/router.js; seletor Alert Severity em EditMonitor.vue (default "critical", bate com o default do banco); métodos novos em socket.js mixin; strings só em en.json (convenção do projeto). **Verificado ao vivo**: subiu dev server real (backend :3001 + Vite :3002, SQLite), passou pelo wizard de setup, criou monitor HTTP com alertSeverity=warning e confirmou round-trip completo (save -> banco -> reload), criou notificação webhook real, criou rota team-scoped pelo modal real "Add Route", confirmou na lista, deletou pelo confirm real, lista esvaziou de volta -- zero erro de console, zero erro de servidor, opção "Global" corretamente gateada por superadmin no payload real de permissões. Verificação adversarial via Workflow (5 agentes independentes, worktrees isoladas, 2ª rodada -- a 1ª rodada disparou antes do commit existir e todos os 5 agentes corretamente se recusaram a fabricar testes para código inexistente no histórico, achado e corrigido: eu tinha esquecido de commitar): 5/5 mutações confirmadas (remoção da checagem de permissão team-scoped, bypass de superadmin em criar rota global, remoção da checagem cross-team de notificação, bypass de superadmin em deletar rota global, remoção do escopo da listagem) -- todas pegas exatamente pelo teste certo, todas revertidas de forma limpa. lint (eslint+stylelint) limpo, build limpo, suíte completa 474/474 (uma falha de gRPC na mesma rodada foi confirmada flake de contenção de recursos -- 6/6 isolado, 474/474 numa rodada limpa).
   concluido_em: "2026-07-10"
 
+# Feature: ADR-0013 (detecção de anomalia) — fatiada em 2026-07-10, mesmo molde do TASK-A0-0..A0-4.
+# Achado no fatiamento: uptimeCalculator.update(bean.status, ping) roda em beat() ANTES de qualquer
+# avaliação futura -- o valor atual já entra no bucket em formação antes de qualquer comparação contra
+# histórico. TASK-A1-0 caracteriza esse ordenamento de leitura/escrita ANTES do detector existir.
+
+- id: TASK-A1-0
+  desc: "Caracterização: interação getDataArray()/update() do UptimeCalculator no mesmo tick — confirmar que 'últimos N buckets' exclui o bucket em formação (proteção contra o detector comparar o valor atual contra um histórico que já o contém). Usa a classe já existente e testada, sem tocar produção."
+  ref: ADR-0013
+  risco: T2 (baixo)
+  depends_on: []
+  status: blocked # pronto para execução; próximo nó a rodar
+
+- id: TASK-A1-1
+  desc: "Migration Knex: tabela alert_event (monitor_id, type, value, expected, score, severity, time) + campos monitor.anomaly_enabled/anomaly_metric/anomaly_window/anomaly_z_threshold/anomaly_seasonality/anomaly_direction/anomaly_severity. Dark: anomaly_enabled=false em todo install existente = comportamento idêntico ao legado."
+  ref: ADR-0013
+  risco: T3
+  depends_on: [TASK-A1-0]
+  status: blocked # ⛔ aguardando "Go"
+
+- id: TASK-A1-2
+  desc: "Detector Fase 1 como módulo puro: média móvel ± Nσ sobre uma janela de amostras (sem sazonalidade ainda), TDD isolado de I/O — molde server/notification-routing.js"
+  ref: ADR-0013
+  risco: T2
+  depends_on: [TASK-A1-1]
+  status: blocked # ⛔ aguardando "Go" (T3 da fase anterior ainda não liberado)
+
+- id: TASK-A1-3
+  desc: "Fiação em beat(): avalia anomalia pós-status (sem tocar bean.status/up/down), persiste em alert_event, notifica via o MESMO Monitor.getRoutedNotificationList()/resolveNotificationTargets() do ADR-0014 (severity do evento de anomalia como context.severity) — reuso direto do pipeline de roteamento já construído e verificado. Testes de caracterização provando que o caminho legado (anomaly_enabled=false) fica byte-idêntico."
+  ref: ADR-0013
+  risco: T3
+  depends_on: [TASK-A1-2]
+  status: blocked # ⛔ aguardando "Go"
+
+- id: TASK-A1-4
+  desc: "UI: toggle anomaly_enabled + campos (janela, z-threshold, direção, severidade) no EditMonitor.vue"
+  ref: ADR-0013
+  risco: T2
+  depends_on: [TASK-A1-3]
+  status: blocked # backend entrega valor sozinho antes da UI, mesmo padrão do TASK-A0-4
+
 - id: TASK-A1
-  desc: "ADR-0013 completo: detector de anomalia (Fase 1 média móvel±Nσ sobre stat_* → Fase 2 sazonal hora/dia/semana), tabela alert_event, campos anomaly_* por monitor, UI em EditMonitor.vue. NÃO fatiado em sub-tarefas ainda — só após A0-3 estar mergeado (severidade é pré-requisito) e o usuário dar 'Go' para detalhar a DAG fina desta ADR."
+  desc: "[SUPERSEDIDO — ver TASK-A1-0..A1-4 acima, fatiado em 2026-07-10] ADR-0013 completo: detector de anomalia (Fase 1 média móvel±Nσ sobre stat_* → Fase 2 sazonal hora/dia/semana), tabela alert_event, campos anomaly_* por monitor, UI em EditMonitor.vue."
   ref: ADR-0013
   risco: T3
   depends_on: [TASK-A0-3]
-  status: blocked # ⛔ aguardando "Go" — fatiamento fino fica para quando esta feature entrar em execução
+  status: superseded
 
 - id: TASK-A2
   desc: "ADR-0015 completo: telemetry-router.js (POST /v1/metrics OTLP/JSON), tipo de monitor otel (watchdog passivo, molde push), ingest token team-scoped, selector-first (metric+attrs+agregação). MVP-0 opcional (extender /api/push com valor numérico) pode adiantar validação sem OTLP. NÃO fatiado ainda."
   ref: ADR-0015
   risco: T3
-  depends_on: [TASK-A1]
+  depends_on: [TASK-A1-3]
   status: blocked # ⛔ aguardando "Go"
 ```
 
