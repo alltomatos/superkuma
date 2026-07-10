@@ -220,22 +220,13 @@ const { chartSocketHandler } = require("./socket-handlers/chart-socket-handler")
 
 // Global JSON body parser -- every route EXCEPT POST /v1/metrics (the OTLP
 // telemetry receiver, server/routers/telemetry-router.js, ADR-0015
-// TASK-A2-4). That route registers its OWN size-limited json/raw parsers so
-// its declared payload cap is the one actually enforced: body-parser only
-// reads/parses a request body once per request, so if this app-wide parser
-// (default ~100kb limit) ran first for that path, it would already have
-// parsed/rejected the body -- with ITS OWN limit -- before the
-// route-specific parser (larger, explicit limit) ever got a chance to
-// apply. Every OTHER route's behavior is byte-for-byte identical to plain
-// `express.json()` -- nothing about the app-wide default changes.
-const globalJsonParser = express.json();
-app.use(function (request, response, next) {
-    if (request.path === "/v1/metrics") {
-        next();
-        return;
-    }
-    globalJsonParser(request, response, next);
-});
+// TASK-A2-4), which registers its OWN size-limited json/raw parsers so its
+// declared payload cap is the one actually enforced (see
+// server/middleware/path-excluded-json-parser.js for why the exclusion is
+// necessary and for this exact mechanism's own unit tests). Every OTHER
+// route's behavior is byte-for-byte identical to plain `express.json()`.
+const { pathExcludedJsonParser } = require("./middleware/path-excluded-json-parser");
+app.use(pathExcludedJsonParser(["/v1/metrics"]));
 
 // Global Middleware
 app.use(function (req, res, next) {

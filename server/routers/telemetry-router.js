@@ -311,18 +311,20 @@ function extractDatapoints(body) {
  *     emit a plain JS number instead (precision loss above 2^53, an
  *     accepted trade-off already implicit in extractDatapointValue()'s own
  *     `Number(raw)` cast on the JSON path).
- *   - `defaults: false` -- WITHOUT this, a decoded protobuf Message
- *     instance answers `"stringValue" in value` as `true` for EVERY oneof
- *     member of AnyValue (string_value/bool_value/int_value/double_value),
- *     not just the one actually present on the wire, because protobufjs
- *     defines every declared field on the message's prototype regardless of
- *     whether it was set. That would silently break
- *     attributeValueToString()'s `"stringValue" in value` / `"intValue" in
- *     value` / ... chain (it would always take the first branch). `toObject()`
- *     with `defaults: false` only emits the field that was ACTUALLY decoded
- *     off the wire as an own key -- the same shape OTLP/JSON naturally has,
- *     since a JSON payload only ever contains the AnyValue variant that was
- *     actually set.
+ *   - `defaults: false` -- kept for the general "only emit what was actually
+ *     on the wire" behavior it gives every OTHER (non-oneof) scalar field
+ *     (e.g. `KeyValue.key`, `Metric.name`), matching OTLP/JSON's natural
+ *     shape. NOTE, verified empirically (see git history/PR discussion for
+ *     the investigation): this flag is NOT what protects AnyValue's oneof
+ *     members from the "every declared field answers `in` as true"
+ *     footgun -- that footgun only applies to a raw decoded protobufjs
+ *     Message *instance* (every oneof member lives on its prototype
+ *     regardless of what was set), which this function never touches.
+ *     `toObject()`'s output for a `oneof` group is governed entirely by
+ *     protobufjs's own presence-tracking (independent of `defaults`), so
+ *     `attributeValueToString()`'s `"stringValue" in value` chain is safe
+ *     either way for THIS schema, as long as every AnyValue-like field stays
+ *     declared as a real proto3 `oneof` in server/otlp-proto/metrics.proto.
  *   - `arrays: true` -- without this, an EMPTY repeated field (e.g. a
  *     genuinely empty `resource_metrics: []` export -- a Collector's
  *     keep-alive/empty batch) is omitted from the object entirely rather
