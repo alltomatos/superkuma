@@ -713,6 +713,24 @@ export default {
         },
 
         /**
+         * Generate (or replace) a team's OTLP telemetry ingest token
+         * (ADR-0015). The cleartext token is only ever present in this call's
+         * own response -- refreshes the team list afterward so any cached
+         * team rows pick up the updated hasOtelIngestToken presence flag.
+         * @param {number} teamId ID of the team
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        regenerateOtelIngestToken(teamId, callback) {
+            socket.emit("regenerateOtelIngestToken", { teamId }, (res) => {
+                if (res.ok) {
+                    this.getTeamList();
+                }
+                callback(res);
+            });
+        },
+
+        /**
          * Fetch and store the list of notification routing rules (ADR-0014).
          * @param {socketCB} callback Callback for socket response
          * @returns {void}
