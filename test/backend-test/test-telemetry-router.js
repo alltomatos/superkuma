@@ -400,6 +400,50 @@ describe("Telemetry router (POST /v1/metrics) - ADR-0015 TASK-A2-2", () => {
             assert.strictEqual(rows.length, 1);
             assert.strictEqual(rows[0].ping, 20); // (10+20+30)/3
         });
+
+        test("otel_aggregation = 'last' takes the last matched datapoint in payload order (not sorted/time order)", async () => {
+            const team = await createTeam("last-token");
+            const monitor = await createOtelMonitor(team.id, {
+                name: "last-monitor",
+                otel_metric_name: "cpu.usage",
+                otel_aggregation: "last",
+                jsonPathOperator: "<",
+                expectedValue: "1000", // always UP -- this test is about the aggregated VALUE
+            });
+
+            const body = {
+                resourceMetrics: [
+                    {
+                        resource: { attributes: [] },
+                        scopeMetrics: [
+                            {
+                                scope: {},
+                                metrics: [
+                                    {
+                                        name: "cpu.usage",
+                                        gauge: {
+                                            dataPoints: [
+                                                { attributes: [], asDouble: 10 },
+                                                { attributes: [], asDouble: 20 },
+                                                { attributes: [], asDouble: 30 },
+                                            ],
+                                        },
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            };
+
+            const res = makeRes();
+            await handler(makeReq("last-token", body), res);
+
+            assert.strictEqual(res.statusCode, 200);
+            const rows = await heartbeatsFor(monitor.id);
+            assert.strictEqual(rows.length, 1);
+            assert.strictEqual(rows[0].ping, 30); // last in payload order, not max/avg
+        });
     });
 
     describe("resource-level + datapoint-level attribute merge", () => {
