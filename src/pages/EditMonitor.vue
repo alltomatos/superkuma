@@ -1565,6 +1565,79 @@
                                 <div class="form-text">{{ $t("alertSeverityDescription") }}</div>
                             </div>
 
+                            <div class="my-3">
+                                <div class="form-check">
+                                    <input
+                                        id="anomaly-enabled"
+                                        v-model="monitor.anomalyEnabled"
+                                        type="checkbox"
+                                        class="form-check-input"
+                                    />
+                                    <label for="anomaly-enabled" class="form-check-label">
+                                        {{ $t("Enable Anomaly Detection") }}
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    {{ $t("anomalyDetectionDescription") }}
+                                </div>
+                            </div>
+
+                            <div v-if="monitor.anomalyEnabled" class="my-3">
+                                <label for="anomaly-window" class="form-label">
+                                    {{ $t("Anomaly Window (samples)") }}
+                                </label>
+                                <input
+                                    id="anomaly-window"
+                                    v-model="monitor.anomalyWindow"
+                                    type="number"
+                                    class="form-control"
+                                    required
+                                    min="5"
+                                    max="200"
+                                    step="1"
+                                />
+                                <div class="form-text">{{ $t("anomalyWindowDescription") }}</div>
+                            </div>
+
+                            <div v-if="monitor.anomalyEnabled" class="my-3">
+                                <label for="anomaly-z-threshold" class="form-label">
+                                    {{ $t("Anomaly Sensitivity (z-score threshold)") }}
+                                </label>
+                                <input
+                                    id="anomaly-z-threshold"
+                                    v-model="monitor.anomalyZThreshold"
+                                    type="number"
+                                    class="form-control"
+                                    required
+                                    min="1"
+                                    max="10"
+                                    step="0.1"
+                                />
+                                <div class="form-text">{{ $t("anomalyZThresholdDescription") }}</div>
+                            </div>
+
+                            <div v-if="monitor.anomalyEnabled" class="my-3">
+                                <label for="anomaly-direction" class="form-label">
+                                    {{ $t("Anomaly Direction") }}
+                                </label>
+                                <select id="anomaly-direction" v-model="monitor.anomalyDirection" class="form-select">
+                                    <option value="above">{{ $t("anomalyDirection_above") }}</option>
+                                    <option value="below">{{ $t("anomalyDirection_below") }}</option>
+                                    <option value="both">{{ $t("anomalyDirection_both") }}</option>
+                                </select>
+                            </div>
+
+                            <div v-if="monitor.anomalyEnabled" class="my-3">
+                                <label for="anomaly-severity" class="form-label">
+                                    {{ $t("Anomaly Severity") }}
+                                </label>
+                                <select id="anomaly-severity" v-model="monitor.anomalySeverity" class="form-select">
+                                    <option value="info">{{ $t("severity_info") }}</option>
+                                    <option value="warning">{{ $t("severity_warning") }}</option>
+                                    <option value="critical">{{ $t("severity_critical") }}</option>
+                                </select>
+                            </div>
+
                             <h2 v-if="monitor.type !== 'push'" class="mt-5 mb-2">{{ $t("Advanced") }}</h2>
 
                             <div
@@ -2907,6 +2980,11 @@ const monitorDefaults = {
     retryInterval: 60,
     resendInterval: 0,
     alertSeverity: "critical",
+    anomalyEnabled: false,
+    anomalyWindow: 20,
+    anomalyZThreshold: 3.0,
+    anomalyDirection: "both",
+    anomalySeverity: "warning",
     maxretries: 0,
     retryOnlyOnStatusCodeFailure: false,
     notificationIDList: {},
