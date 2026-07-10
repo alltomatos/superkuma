@@ -393,6 +393,10 @@ let needSetup = false;
     const federationRouter = require("./routers/federation-router");
     app.use(federationRouter);
 
+    // Telemetry Router (OTLP/JSON metrics receiver, ADR-0015)
+    const telemetryRouter = require("./routers/telemetry-router");
+    app.use(telemetryRouter);
+
     // Embedded HTTP MCP endpoint (/mcp). Disabled unless SUPERKUMA_MCP_HTTP_ENABLED=true.
     const mcpRouter = require("./routers/mcp-router");
     app.use(mcpRouter);
