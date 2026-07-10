@@ -35,6 +35,7 @@ SuperKuma — ferramenta self-hosted de monitoramento. Stack:
 - **Projeto próprio.** `alltomatos/superkuma` segue seu próprio caminho — não enviamos PRs para o `louislam/uptime-kuma` original.
 - **Revisão obrigatória.** Toda mudança de código é entendida, revisada e **testada manualmente** antes de qualquer `push`. Não submeter código gerado + descrição de LLM sem revisar.
 - **Nunca** trabalhar direto no `master`: sempre branch. **Nunca** `git push --force` nem `git reset --hard` sem pedido explícito.
+- **Fluxo de branch obrigatório:** `branch (feature/fix/...)` → PR/merge em **`develop`** (roda a suíte de testes) → só depois **PR de `develop` para `main`**. Não abrir PR direto pra `main` a partir de uma branch de feature — `main` só recebe promoções de `develop` já testadas.
 
 ---
 
