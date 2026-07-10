@@ -39,6 +39,7 @@ const {
 const { R } = require("redbean-node");
 const { BeanModel } = require("redbean-node/dist/bean-model");
 const { Notification } = require("../notification");
+const { resolveNotificationTargets } = require("../notification-routing");
 const { demoMode } = require("../config");
 const version = require("../../package.json").version;
 const apicache = require("../modules/apicache");
@@ -1225,7 +1226,7 @@ class Monitor extends BeanModel {
      */
     static async sendNotification(isFirstBeat, monitor, bean) {
         if (!isFirstBeat || bean.status === DOWN) {
-            const notificationList = await Monitor.getNotificationList(monitor);
+            const notificationList = await Monitor.getRoutedNotificationList(monitor);
 
             let text;
             if (bean.status === UP) {
@@ -1303,6 +1304,54 @@ class Monitor extends BeanModel {
             [monitor.id]
         );
         return notificationList;
+    }
+
+    /**
+     * Drop-in replacement for getNotificationList() that additionally applies
+     * team-scoped notification_route entries (ADR-0014). Short-circuits to the
+     * exact legacy result when no route rows exist for this monitor's team (or
+     * globally), which is the byte-identical-to-legacy contract this feature
+     * depends on -- the common case for every install that hasn't configured
+     * a route yet.
+     * @param {Monitor} monitor Monitor to resolve notification targets for
+     * @returns {Promise<LooseObject<any>[]>} List of notifications to send to
+     */
+    static async getRoutedNotificationList(monitor) {
+        const staticNotifications = await Monitor.getNotificationList(monitor);
+
+        const routes = await R.getAll("SELECT * FROM notification_route WHERE team_id IS NULL OR team_id = ?", [
+            monitor.team_id,
+        ]);
+
+        if (routes.length === 0) {
+            return staticNotifications;
+        }
+
+        const tagRows = await R.getAll("SELECT tag_id FROM monitor_tag WHERE monitor_id = ?", [monitor.id]);
+        const tagIds = tagRows.map((row) => row.tag_id);
+
+        const routedNotificationIds = [...new Set(routes.map((route) => route.notification_id))];
+        const routedNotifications =
+            routedNotificationIds.length > 0
+                ? await R.getAll(
+                      `SELECT * FROM notification WHERE id IN (${routedNotificationIds.map(() => "?").join(",")})`,
+                      routedNotificationIds
+                  )
+                : [];
+
+        const allNotifications = [...staticNotifications, ...routedNotifications];
+
+        return resolveNotificationTargets({
+            staticNotifications,
+            routes,
+            allNotifications,
+            context: {
+                teamId: monitor.team_id,
+                monitorId: monitor.id,
+                tagIds,
+                severity: monitor.alert_severity || "critical",
+            },
+        });
     }
 
     /**
