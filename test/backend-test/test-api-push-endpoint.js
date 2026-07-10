@@ -153,15 +153,21 @@ async function putUnderMaintenance(monitorId) {
     SuperKumaServer.getInstance().maintenanceList[bean.id] = bean;
 }
 
+let testUserId;
+
 /**
- * Lazily create a minimal user row to satisfy notification.user_id's NOT
- * NULL constraint, molded on getTestUserId() in test-monitor-send-notification.js.
+ * Lazily create (once, memoized) a minimal user row to satisfy
+ * notification.user_id's NOT NULL constraint. Molded on getTestUserId() in
+ * test-monitor-send-notification.js -- a fixed username is enough since the
+ * insert only ever happens once per test run, no randomness needed.
  * @returns {Promise<number>} The test user's id
  */
 async function createTestUserId() {
-    await R.knex("user").insert({ username: `push-baseline-owner-${Date.now()}-${Math.random()}`, password: "x" });
-    const row = await R.knex("user").orderBy("id", "desc").first();
-    return row.id;
+    if (testUserId === undefined) {
+        await R.knex("user").insert({ username: "push-baseline-owner", password: "x" });
+        testUserId = (await R.knex("user").where("username", "push-baseline-owner").first()).id;
+    }
+    return testUserId;
 }
 
 /**
