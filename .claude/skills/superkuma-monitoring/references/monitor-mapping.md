@@ -19,6 +19,7 @@ How to turn each discovered asset/service into `create_monitor` calls. Defaults:
 | Docker container                               | `docker`                                                   | container name + a configured Docker host in SuperKuma                                                                                |
 | Push-only host (agent behind NAT)              | `push`                                                     | host runs a cron that pings the generated push URL                                                                                    |
 | Host metrics (CPU/RAM/disk I/O, SQL Server)    | `prometheus`                                               | `url` (Prometheus), `promql`, `conditionOperator`, `expectedValue`, `metricUnit` (`%`/`GB`/…) — see below                             |
+| Host metrics via Telegraf → InfluxDB (pfSense) | `influxdb`                                                 | `url` (InfluxDB), `influxdbDatabase`, `influxql`, `conditionOperator`, `expectedValue`, `metricUnit` — see [pfsense-telegraf.md](pfsense-telegraf.md) |
 | Certificate expiry                             | `http`                                                     | `expiryNotification: true` (fires ahead of expiry)                                                                                    |
 
 ## Per-platform recipe
@@ -31,7 +32,9 @@ How to turn each discovered asset/service into `create_monitor` calls. Defaults:
 - **Linux server:** `ping`; `port` 22; one monitor per listening service (80/443 → `http`, DB
   ports → db/`port`). Docker apps → `docker`.
 - **pfSense:** `ping` the WAN gateway (upstream health); `http` the web UI; `dns` the resolver;
-  `port` VPN endpoints.
+  `port` VPN endpoints. Deep metrics (CPU/load/memory/packet-loss/gateway-RTT) come from the pfSense
+  Telegraf package → InfluxDB → `influxdb` monitors: see
+  [pfsense-telegraf.md](pfsense-telegraf.md).
 - **Managed switch:** `ping` + `snmp` (`sysUpTime` `1.3.6.1.2.1.1.3.0`, or per-uplink
   `ifOperStatus`). Tag `role:switch`.
 - **UniFi:** `http` `https://controller:8443` (`ignoreTls: true`); `ping` each device; `snmp` if

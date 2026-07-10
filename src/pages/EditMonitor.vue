@@ -85,6 +85,7 @@
                                         <option v-if="!$root.info.isContainer" value="sip-options">
                                             SIP Options Ping
                                         </option>
+                                        <option value="influxdb">InfluxDB (InfluxQL)</option>
                                         <option value="prometheus">Prometheus (PromQL)</option>
                                         <option value="smtp">SMTP</option>
                                         <option value="snmp">SNMP</option>
@@ -764,6 +765,93 @@
                                 </div>
                             </template>
 
+                            <!-- InfluxDB Monitor Type -->
+                            <template v-if="monitor.type === 'influxdb'">
+                                <div class="my-3">
+                                    <label for="influxdb_url" class="form-label">InfluxDB URL</label>
+                                    <input
+                                        id="influxdb_url"
+                                        v-model="monitor.url"
+                                        type="url"
+                                        class="form-control"
+                                        placeholder="http://192.168.0.23:8086"
+                                        required
+                                    />
+                                    <div class="form-text">
+                                        Base URL of the InfluxDB v1 server (the /query endpoint is appended
+                                        automatically). Point the pfSense Telegraf package's InfluxDB output at this
+                                        same database.
+                                    </div>
+                                </div>
+
+                                <div class="my-3">
+                                    <label for="influxdb_database" class="form-label">InfluxDB Database</label>
+                                    <input
+                                        id="influxdb_database"
+                                        v-model="monitor.influxdbDatabase"
+                                        type="text"
+                                        class="form-control"
+                                        placeholder="telegraf"
+                                        required
+                                    />
+                                    <div class="form-text">
+                                        The database Telegraf writes to (the "db" parameter InfluxDB v1 requires).
+                                    </div>
+                                </div>
+
+                                <div class="my-3">
+                                    <label for="influxdb_query" class="form-label">InfluxQL Query</label>
+                                    <textarea
+                                        id="influxdb_query"
+                                        v-model="monitor.databaseQuery"
+                                        class="form-control"
+                                        rows="3"
+                                        placeholder='SELECT last("load1") FROM "system"'
+                                        required
+                                    ></textarea>
+                                    <div class="form-text">
+                                        An InfluxQL query returning a single numeric value (e.g. last() / mean()). The
+                                        value is compared against the condition below.
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 my-3">
+                                        <label for="influxdb_user" class="form-label">Username</label>
+                                        <input
+                                            id="influxdb_user"
+                                            v-model="monitor.basic_auth_user"
+                                            type="text"
+                                            class="form-control"
+                                            autocomplete="off"
+                                        />
+                                        <div class="form-text">Optional — only if InfluxDB auth is enabled.</div>
+                                    </div>
+                                    <div class="col-md-6 my-3">
+                                        <label for="influxdb_pass" class="form-label">Password</label>
+                                        <input
+                                            id="influxdb_pass"
+                                            v-model="monitor.basic_auth_pass"
+                                            type="password"
+                                            class="form-control"
+                                            autocomplete="new-password"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="my-3 form-check">
+                                    <input
+                                        id="influxdb_ignore_tls"
+                                        v-model="monitor.ignoreTls"
+                                        class="form-check-input"
+                                        type="checkbox"
+                                    />
+                                    <label class="form-check-label" for="influxdb_ignore_tls">
+                                        Ignore TLS/SSL error for HTTPS
+                                    </label>
+                                </div>
+                            </template>
+
                             <div v-if="monitor.type === 'smtp'" class="my-3">
                                 <label for="smtp_security" class="form-label">{{ $t("SMTP Security") }}</label>
                                 <select id="smtp_security" v-model="monitor.smtpSecurity" class="form-select">
@@ -832,11 +920,12 @@
                                 v-if="
                                     monitor.type === 'json-query' ||
                                         monitor.type === 'snmp' ||
-                                        monitor.type === 'prometheus'
+                                        monitor.type === 'prometheus' ||
+                                        monitor.type === 'influxdb'
                                 "
                                 class="my-3"
                             >
-                                <div v-if="monitor.type !== 'prometheus'" class="my-2">
+                                <div v-if="monitor.type !== 'prometheus' && monitor.type !== 'influxdb'" class="my-2">
                                     <label for="jsonPath" class="form-label mb-0">
                                         {{ $t("Json Query Expression") }}
                                     </label>
@@ -3030,6 +3119,7 @@ const monitorDefaults = {
     rabbitmqPassword: "",
     conditions: [],
     system_service_name: "",
+    influxdbDatabase: "",
 };
 
 export default {

@@ -41,3 +41,31 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+
+  # Optional metrics sink for the `influxdb` monitor type -- NOT SuperKuma's own
+  # database (that's mariadb above). Point Telegraf agents (e.g. the pfSense
+  # Telegraf package) at this InfluxDB, then create an `influxdb`-type monitor
+  # in SuperKuma pointing at the same place. InfluxDB v1 (InfluxQL API) is
+  # required here, not v2/v3 -- see .claude/skills/superkuma-monitoring/references/pfsense-telegraf.md.
+  # Auto-creates the "telegraf" database + an admin user on first boot.
+  influxdb:
+    image: influxdb:1.8
+    container_name: superkuma-influxdb
+    restart: unless-stopped
+    environment:
+      INFLUXDB_DB: telegraf
+      INFLUXDB_HTTP_AUTH_ENABLED: "true"
+      INFLUXDB_ADMIN_USER: superkuma
+      INFLUXDB_ADMIN_PASSWORD: ${SUPERKUMA_INFLUXDB_PASSWORD:?set SUPERKUMA_INFLUXDB_PASSWORD in a .env file next to this compose.yaml}
+    volumes:
+      - ./influxdb-data:/var/lib/influxdb
+    ports:
+      # Published (not just internal) because Telegraf agents typically run on
+      # OTHER hosts (e.g. a pfSense firewall), not inside this Compose network.
+      - "8086:8086"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s

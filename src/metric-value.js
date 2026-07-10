@@ -4,21 +4,22 @@
 // instead of adding a redundant server round-trip. Shared by MetricValueChart.vue
 // and the monitor Details page's stat boxes so both stay in sync.
 //
-// Two self-authored formats carry a numeric measurement against a threshold:
+// Self-authored formats that carry a numeric measurement against a threshold:
 //   prometheus:            "PromQL condition passes (<value> <op> <expected>)"
+//   influxdb:              "InfluxQL condition passes (<value> <op> <expected>)"
 //   snmp / json-query:     "JSON query passes (comparing <value> <op> <expected>)"
 // Non-numeric comparisons (e.g. string json-query) simply don't match, so those
 // monitors keep their normal (non-metric) display.
 const METRIC_VALUE_RE =
-    /^(?:PromQL condition (?:passes|does not pass) \(|JSON query (?:passes|does not pass) \(comparing )([-\d.eE+]+)\s/;
+    /^(?:PromQL condition (?:passes|does not pass) \(|InfluxQL condition (?:passes|does not pass) \(|JSON query (?:passes|does not pass) \(comparing )([-\d.eE+]+)\s/;
 
 // Monitor types whose heartbeat can carry an extractable numeric metric value.
-const METRIC_MONITOR_TYPES = ["prometheus", "snmp", "json-query"];
+const METRIC_MONITOR_TYPES = ["prometheus", "influxdb", "snmp", "json-query"];
 
 /**
  * Whether a monitor type can carry a numeric metric (gauge/chart/unit) at all.
  * @param {string} type The monitor's type
- * @returns {boolean} True for prometheus/snmp/json-query
+ * @returns {boolean} True for prometheus/influxdb/snmp/json-query
  */
 export function isMetricMonitorType(type) {
     return METRIC_MONITOR_TYPES.includes(type);
@@ -26,7 +27,7 @@ export function isMetricMonitorType(type) {
 
 /**
  * Extract the numeric result from a metric monitor's heartbeat message
- * (prometheus, snmp or json-query -- see METRIC_VALUE_RE).
+ * (prometheus, influxdb, snmp or json-query -- see METRIC_VALUE_RE).
  * @param {string} msg The heartbeat's message
  * @returns {number|null} The numeric value, or null if not recognized
  */
