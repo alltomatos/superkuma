@@ -1,5 +1,5 @@
 const { checkLogin } = require("../util-server");
-const { log } = require("../../src/util");
+const { log, genSecret } = require("../../src/util");
 const { R } = require("redbean-node");
 const { requirePermission, ForbiddenError } = require("../security/authz");
 const { z } = require("zod");
@@ -113,10 +113,16 @@ module.exports.teamSocketHandler = (socket) => {
         try {
             checkLogin(socket);
 
+            // hasOtelIngestToken is a presence boolean only (ADR-0015) -- never
+            // the token value itself, which this list is never trusted to carry.
+            // The cleartext token is only ever returned once, directly from
+            // regenerateOtelIngestToken's own response below.
             const list = (await isSuperadmin(socket.userID))
-                ? await R.getAll("SELECT id, name, slug, active FROM team ORDER BY name")
+                ? await R.getAll(
+                      "SELECT id, name, slug, active, (otel_ingest_token IS NOT NULL) AS hasOtelIngestToken FROM team ORDER BY name"
+                  )
                 : await R.getAll(
-                      `SELECT t.id, t.name, t.slug, t.active
+                      `SELECT t.id, t.name, t.slug, t.active, (t.otel_ingest_token IS NOT NULL) AS hasOtelIngestToken
                        FROM team t
                        JOIN team_user tu ON tu.team_id = t.id
                        WHERE tu.user_id = ?
@@ -294,6 +300,52 @@ module.exports.teamSocketHandler = (socket) => {
                 ok: true,
                 msg: "teamMemberRemoved",
                 msgi18n: true,
+            });
+        } catch (e) {
+            callback({
+                ok: false,
+                msg: e.message,
+                msgi18n: !!e.msgi18n,
+            });
+        }
+    });
+
+    // Generate (or replace) a team's OTLP telemetry ingest token (ADR-0015,
+    // TASK-A2-5). Unlike PushUrlField's client-side genSecret() convention for
+    // a per-monitor push token (a value the client picks once, and the server
+    // merely stores as-is), a team-wide ingest credential is more sensitive --
+    // it authenticates every otel monitor's telemetry for the whole team, not
+    // just one monitor's push URL -- so it is generated SERVER-SIDE only. The
+    // caller never supplies or influences the token's value; the cleartext is
+    // returned in this response and never again afterward (getTeamList only
+    // ever exposes a hasOtelIngestToken presence boolean, never the value).
+    socket.on("regenerateOtelIngestToken", async (input, callback) => {
+        try {
+            checkLogin(socket);
+
+            const { teamId } = validate(teamIdSchema, input);
+
+            requirePermission(socket.actor, "team:manage", { teamId });
+            await assertCallerIsSuperadmin(socket);
+
+            const team = await R.findOne("team", "id = ?", [teamId]);
+            if (!team) {
+                throw new Error("Team not found.");
+            }
+
+            // 64 chars to exactly fill the otel_ingest_token column's width
+            // (db/knex_migrations/2026-07-10-0002-add-otel-telemetry-receiver.js).
+            const token = genSecret(64);
+            team.otel_ingest_token = token;
+            await R.store(team);
+
+            log.debug("team", `Team ${teamId}: regenerated OTLP ingest token`);
+
+            callback({
+                ok: true,
+                msg: "otelIngestTokenRegenerated",
+                msgi18n: true,
+                token,
             });
         } catch (e) {
             callback({

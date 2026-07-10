@@ -1,0 +1,105 @@
+// Minimal OTLP metrics schema for server/routers/telemetry-router.js's
+// protobuf ingestion path (ADR-0015, TASK-A2-4).
+//
+// This is a DELIBERATE SUBSET of the public, stable OpenTelemetry Protocol
+// spec (https://github.com/open-telemetry/opentelemetry-proto) -- every
+// message/field here is copied verbatim (same field NUMBERS and wire TYPES)
+// from:
+//   - opentelemetry/proto/common/v1/common.proto      (AnyValue, KeyValue)
+//   - opentelemetry/proto/resource/v1/resource.proto   (Resource)
+//   - opentelemetry/proto/metrics/v1/metrics.proto     (ResourceMetrics,
+//     ScopeMetrics, Metric, Gauge, Sum, NumberDataPoint)
+//   - opentelemetry/proto/collector/metrics/v1/metrics_service.proto
+//     (ExportMetricsServiceRequest)
+//
+// Field NUMBERS matter for wire compatibility with real OTel
+// SDKs/Collectors -- protobuf decodes purely by field number+wire type, so
+// inventing our own numbering here would silently misinterpret bytes sent
+// by any real exporter. Anything NOT needed for v1 scope (traces, logs,
+// histogram/summary/exponentialHistogram metric shapes, InstrumentationScope,
+// schema_url, Exemplar, flags, dropped_attributes_count, ...) is simply
+// omitted from this file rather than declared -- proto3 has no "required"
+// fields, so omitted fields are decoded as unknown/skipped, which is exactly
+// the "unsupported metric type is dropped, not fatal" behavior the OTLP/JSON
+// path (extractDatapoints() in telemetry-router.js) already implements.
+syntax = "proto3";
+
+package superkuma.otlp.metrics.v1;
+
+// opentelemetry.proto.common.v1.AnyValue (subset: only the 4 scalar
+// variants the JSON path's attributeValueToString() understands -- array_value/
+// kvlist_value/bytes_value are out of v1 scope, same as the JSON path).
+message AnyValue {
+    oneof value {
+        string string_value = 1;
+        bool bool_value = 2;
+        int64 int_value = 3;
+        double double_value = 4;
+    }
+}
+
+// opentelemetry.proto.common.v1.KeyValue
+message KeyValue {
+    string key = 1;
+    AnyValue value = 2;
+}
+
+// opentelemetry.proto.resource.v1.Resource (subset: attributes only).
+message Resource {
+    repeated KeyValue attributes = 1;
+}
+
+// opentelemetry.proto.metrics.v1.NumberDataPoint (subset: attributes +
+// as_double/as_int -- start_time_unix_nano/time_unix_nano/exemplars/flags
+// are out of v1 scope, mirroring extractDatapointValue()'s JSON handling).
+message NumberDataPoint {
+    repeated KeyValue attributes = 7;
+    oneof value {
+        double as_double = 4;
+        sfixed64 as_int = 6;
+    }
+}
+
+// opentelemetry.proto.metrics.v1.Gauge
+message Gauge {
+    repeated NumberDataPoint data_points = 1;
+}
+
+// opentelemetry.proto.metrics.v1.Sum (subset: data_points only -- v1 does
+// not distinguish delta/cumulative temporality, same simplification the
+// JSON path already makes).
+message Sum {
+    repeated NumberDataPoint data_points = 1;
+}
+
+// opentelemetry.proto.metrics.v1.Metric (subset: name + gauge/sum oneof
+// members only -- histogram/exponential_histogram/summary are intentionally
+// NOT declared here, so a real Collector sending one of those metric shapes
+// decodes as an unknown/skipped field on this Metric message, exactly like
+// extractDatapoints()'s `metric?.gauge || metric?.sum` check silently drops
+// them on the JSON path).
+message Metric {
+    string name = 1;
+    oneof data {
+        Gauge gauge = 5;
+        Sum sum = 7;
+    }
+}
+
+// opentelemetry.proto.metrics.v1.ScopeMetrics (subset: metrics only --
+// `scope` (InstrumentationScope) is out of v1 scope).
+message ScopeMetrics {
+    repeated Metric metrics = 2;
+}
+
+// opentelemetry.proto.metrics.v1.ResourceMetrics (subset: resource +
+// scope_metrics only -- schema_url is out of v1 scope).
+message ResourceMetrics {
+    Resource resource = 1;
+    repeated ScopeMetrics scope_metrics = 2;
+}
+
+// opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest
+message ExportMetricsServiceRequest {
+    repeated ResourceMetrics resource_metrics = 1;
+}
