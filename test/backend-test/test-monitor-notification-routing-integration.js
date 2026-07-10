@@ -57,19 +57,26 @@ async function createTeam() {
     return (await R.knex("team").where("slug", slug).first()).id;
 }
 
-let testUserId;
+let testUserIdPromise;
 
 /**
  * Lazily create a minimal user row to satisfy notification.user_id's NOT NULL
  * constraint, same as test-monitor-send-notification.js.
+ *
+ * Caches the in-flight promise, not just the resolved id -- see the longer
+ * note on the sibling helper in test-monitor-send-notification.js for why
+ * caching only the resolved value races when node:test runs this file's
+ * top-level tests concurrently.
  * @returns {Promise<number>} The test user's id
  */
-async function getTestUserId() {
-    if (testUserId === undefined) {
-        await R.knex("user").insert({ username: "routing-baseline-owner", password: "x" });
-        testUserId = (await R.knex("user").where("username", "routing-baseline-owner").first()).id;
+function getTestUserId() {
+    if (!testUserIdPromise) {
+        testUserIdPromise = (async () => {
+            await R.knex("user").insert({ username: "routing-baseline-owner", password: "x" });
+            return (await R.knex("user").where("username", "routing-baseline-owner").first()).id;
+        })();
     }
-    return testUserId;
+    return testUserIdPromise;
 }
 
 /**

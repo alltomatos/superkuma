@@ -102,7 +102,7 @@ class Monitor extends BeanModel {
         }
 
         // Metric-capable types (keep in sync with Heartbeat.METRIC_MONITOR_TYPES).
-        if (["prometheus", "snmp", "json-query"].includes(this.type)) {
+        if (["prometheus", "influxdb", "snmp", "json-query"].includes(this.type)) {
             // Not secret (a threshold like ">90" and a display unit), and needed by the
             // status page's metric gauge widget to render its colored zones and unit --
             // see MetricGaugeWidget.vue. The query itself stays internal.
@@ -138,6 +138,7 @@ class Monitor extends BeanModel {
             path,
             pathName,
             parent: this.parent,
+            teamId: this.team_id,
             childrenIDs: preloadData.childrenIDs.get(this.id) || [],
             url: this.url,
             wsIgnoreSecWebsocketAcceptHeader: this.getWsIgnoreSecWebsocketAcceptHeader(),
@@ -192,6 +193,7 @@ class Monitor extends BeanModel {
             mqttSuccessMessage: this.mqttSuccessMessage,
             mqttCheckType: this.mqttCheckType,
             databaseQuery: this.databaseQuery,
+            influxdbDatabase: this.influxdbDatabase,
             metricUnit: this.metricUnit,
             authMethod: this.authMethod,
             grpcUrl: this.grpcUrl,

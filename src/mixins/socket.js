@@ -49,6 +49,7 @@ export default {
             userList: [],
             teamList: [],
             routeList: [],
+            dashboardList: [],
             heartbeatList: {},
             avgPingList: {},
             uptimeList: {},
@@ -772,6 +773,80 @@ export default {
             socket.emit("deleteNotificationRoute", { id }, (res) => {
                 if (res.ok) {
                     this.getNotificationRouteList();
+                }
+                callback(res);
+            });
+        },
+
+        /**
+         * Fetch and store the list of team dashboards (ADR-0016).
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        getDashboardList(callback) {
+            if (!callback) {
+                callback = () => {};
+            }
+            socket.emit("getDashboardList", (res) => {
+                if (res.ok) {
+                    this.dashboardList = res.dashboardList;
+                }
+                callback(res);
+            });
+        },
+
+        /**
+         * Fetch a single dashboard with its full, ordered widget list. Not
+         * routed through dashboardList -- this is a one-off detail fetch the
+         * caller keeps in its own local state.
+         * @param {number} id Dashboard id
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        getDashboard(id, callback) {
+            socket.emit("getDashboard", { id }, callback);
+        },
+
+        /**
+         * Create a new, initially empty dashboard in the caller's active team.
+         * @param {object} dashboard Fields ({ title })
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        createDashboard(dashboard, callback) {
+            socket.emit("createDashboard", dashboard, (res) => {
+                if (res.ok) {
+                    this.getDashboardList();
+                }
+                callback(res);
+            });
+        },
+
+        /**
+         * Replace a dashboard's full widget list (and optionally its title).
+         * @param {object} payload Fields ({ id, title, widgets })
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        saveDashboard(payload, callback) {
+            socket.emit("saveDashboard", payload, (res) => {
+                if (res.ok) {
+                    this.getDashboardList();
+                }
+                callback(res);
+            });
+        },
+
+        /**
+         * Delete a dashboard.
+         * @param {number} id ID of the dashboard to delete
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        deleteDashboard(id, callback) {
+            socket.emit("deleteDashboard", { id }, (res) => {
+                if (res.ok) {
+                    this.getDashboardList();
                 }
                 callback(res);
             });

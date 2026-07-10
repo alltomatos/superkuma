@@ -46,13 +46,17 @@ SuperKuma is an easy-to-use self-hosted monitoring tool, with built-in Master-Ag
 ### 🐳 Docker Compose
 
 Ships with a dedicated **MariaDB** container out of the box — no database setup step, no manual
-configuration:
+configuration. It also bundles an **InfluxDB** container for the optional `influxdb` monitor type
+(e.g. pulling metrics that a pfSense firewall's Telegraf package writes) — see
+[references/pfsense-telegraf.md](.claude/skills/superkuma-monitoring/references/pfsense-telegraf.md).
+You don't need to touch it if you're not using that monitor type.
 
 ```bash
 mkdir superkuma
 cd superkuma
 curl -o compose.yaml https://raw.githubusercontent.com/alltomatos/superkuma/main/compose.yaml
 echo "SUPERKUMA_DB_PASSWORD=$(openssl rand -hex 24)" > .env
+echo "SUPERKUMA_INFLUXDB_PASSWORD=$(openssl rand -hex 24)" >> .env
 docker compose up -d
 ```
 

@@ -85,6 +85,17 @@
 
                             <li>
                                 <router-link
+                                    to="/team-dashboards"
+                                    class="dropdown-item"
+                                    :class="{ active: $route.path.includes('team-dashboards') }"
+                                >
+                                    <font-awesome-icon icon="th" />
+                                    {{ $t("Dashboards") }}
+                                </router-link>
+                            </li>
+
+                            <li>
+                                <router-link
                                     to="/settings/general"
                                     class="dropdown-item"
                                     :class="{ active: $route.path.includes('settings') }"

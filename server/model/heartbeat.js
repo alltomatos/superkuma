@@ -12,13 +12,13 @@ const brotliDecompress = promisify(zlib.brotliDecompress);
  */
 class Heartbeat extends BeanModel {
     /** Monitor types whose heartbeat can carry an extractable numeric metric value. */
-    static METRIC_MONITOR_TYPES = ["prometheus", "snmp", "json-query"];
+    static METRIC_MONITOR_TYPES = ["prometheus", "influxdb", "snmp", "json-query"];
 
     /**
      * Return an object that ready to parse to JSON for public
      * Only show necessary data to public
      * @param {string} monitorType The owning monitor's type. For metric
-     * monitors (prometheus/snmp/json-query), a `metricValue` number is
+     * monitors (prometheus/influxdb/snmp/json-query), a `metricValue` number is
      * additionally extracted from the (otherwise hidden) internal message --
      * see extractPublicMetricValue.
      * @returns {object} Object ready to parse
@@ -45,7 +45,8 @@ class Heartbeat extends BeanModel {
      * Extract the numeric measurement from a metric monitor's internal
      * heartbeat message, for public display (status-page gauges). Only ever
      * recognizes SuperKuma's own message formats (prometheus's "PromQL
-     * condition ..." and snmp/json-query's "JSON query ... (comparing ...)")
+     * condition ...", influxdb's "InfluxQL condition ..." and snmp/json-query's
+     * "JSON query ... (comparing ...)")
      * -- never forwards arbitrary message text, so this cannot leak whatever
      * an unrelated monitor type put in its own `msg` (hostnames, error
      * details, etc).
@@ -57,7 +58,7 @@ class Heartbeat extends BeanModel {
             return null;
         }
         const match =
-            /^(?:PromQL condition (?:passes|does not pass) \(|JSON query (?:passes|does not pass) \(comparing )([-\d.eE+]+)\s/.exec(
+            /^(?:PromQL condition (?:passes|does not pass) \(|InfluxQL condition (?:passes|does not pass) \(|JSON query (?:passes|does not pass) \(comparing )([-\d.eE+]+)\s/.exec(
                 msg
             );
         if (!match) {

@@ -25,6 +25,7 @@ const TABLE_BY_RESOURCE_TYPE = {
     tag: "tag",
     status_page: "status_page",
     notification_route: "notification_route",
+    dashboard: "dashboard",
 };
 
 /**

@@ -31,6 +31,11 @@ describe("Heartbeat model", () => {
             assert.strictEqual(value, 12.5);
         });
 
+        test("parses the value out of passing and failing InfluxQL messages (influxdb)", () => {
+            assert.strictEqual(Heartbeat.extractPublicMetricValue("InfluxQL condition passes (2.9 <= 30)"), 2.9);
+            assert.strictEqual(Heartbeat.extractPublicMetricValue("InfluxQL condition does not pass (95 <= 90)"), 95);
+        });
+
         test("returns null for a non-numeric JSON query comparison (string, not a metric)", () => {
             assert.strictEqual(Heartbeat.extractPublicMetricValue("JSON query passes (comparing OK == OK)"), null);
         });
@@ -84,6 +89,21 @@ describe("Heartbeat model", () => {
             assert.deepStrictEqual(Object.keys(json).sort(), ["metricValue", "msg", "ping", "status", "time"]);
             assert.strictEqual(json.metricValue, 72.3);
             assert.strictEqual(json.msg, "", "msg itself must still be hidden even though a value was extracted");
+        });
+
+        test("adds metricValue for an influxdb monitor (InfluxQL message)", () => {
+            const hb = makeHeartbeat({
+                status: 1,
+                time: "2026-01-01 00:00:00",
+                ping: 10,
+                msg: "InfluxQL condition passes (2.9 <= 30)",
+            });
+
+            const json = hb.toPublicJSON("influxdb");
+
+            assert.deepStrictEqual(Object.keys(json).sort(), ["metricValue", "msg", "ping", "status", "time"]);
+            assert.strictEqual(json.metricValue, 2.9);
+            assert.strictEqual(json.msg, "");
         });
 
         test("omits metricValue for a prometheus monitor whose message doesn't match (fails safe, no crash)", () => {
