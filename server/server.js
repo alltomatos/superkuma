@@ -219,7 +219,15 @@ const { EmbeddedMariaDB } = require("./embedded-mariadb");
 const { SetupDatabase } = require("./setup-database");
 const { chartSocketHandler } = require("./socket-handlers/chart-socket-handler");
 
-app.use(express.json());
+// Global JSON body parser -- every route EXCEPT POST /v1/metrics (the OTLP
+// telemetry receiver, server/routers/telemetry-router.js, ADR-0015
+// TASK-A2-4), which registers its OWN size-limited json/raw parsers so its
+// declared payload cap is the one actually enforced (see
+// server/middleware/path-excluded-json-parser.js for why the exclusion is
+// necessary and for this exact mechanism's own unit tests). Every OTHER
+// route's behavior is byte-for-byte identical to plain `express.json()`.
+const { pathExcludedJsonParser } = require("./middleware/path-excluded-json-parser");
+app.use(pathExcludedJsonParser(["/v1/metrics"]));
 
 // Global Middleware
 app.use(function (req, res, next) {
@@ -393,6 +401,10 @@ let needSetup = false;
     // Federation Router
     const federationRouter = require("./routers/federation-router");
     app.use(federationRouter);
+
+    // Telemetry Router (OTLP/JSON metrics receiver, ADR-0015)
+    const telemetryRouter = require("./routers/telemetry-router");
+    app.use(telemetryRouter);
 
     // Embedded HTTP MCP endpoint (/mcp). Disabled unless SUPERKUMA_MCP_HTTP_ENABLED=true.
     const mcpRouter = require("./routers/mcp-router");

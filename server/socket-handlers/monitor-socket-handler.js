@@ -280,6 +280,9 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
             bean.snmpVersion = monitor.snmpVersion;
             bean.snmpOid = monitor.snmpOid;
             bean.jsonPathOperator = monitor.jsonPathOperator;
+            bean.otelMetricName = monitor.otelMetricName;
+            bean.otelAttributeMatchers = monitor.otelAttributeMatchers;
+            bean.otelAggregation = monitor.otelAggregation;
             bean.retry_only_on_status_code_failure = Boolean(monitor.retryOnlyOnStatusCodeFailure);
             bean.timeout = monitor.timeout;
             bean.rabbitmqNodes = JSON.stringify(monitor.rabbitmqNodes);

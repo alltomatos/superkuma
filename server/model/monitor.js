@@ -225,6 +225,10 @@ class Monitor extends BeanModel {
             conditions: JSON.parse(this.conditions),
             ipFamily: this.ipFamily,
             expectedTlsAlert: this.expected_tls_alert,
+            // type=otel selector (ADR-0015)
+            otelMetricName: this.otel_metric_name,
+            otelAttributeMatchers: this.otel_attribute_matchers,
+            otelAggregation: this.otel_aggregation,
 
             // ping advanced options
             ping_numeric: this.isPingNumeric(),
@@ -460,7 +464,7 @@ class Monitor extends BeanModel {
             // undefined if not https
             let tlsInfo = undefined;
 
-            if (!previousBeat || this.type === "push") {
+            if (!previousBeat || this.type === "push" || this.type === "otel") {
                 previousBeat = await R.findOne("heartbeat", " monitor_id = ? ORDER BY time DESC", [this.id]);
                 if (previousBeat) {
                     retries = previousBeat.retries;
@@ -501,8 +505,13 @@ class Monitor extends BeanModel {
                     );
                     bean.msg = "";
                     bean.status = UP;
-                } else if (this.type === "push") {
-                    // Type: Push
+                } else if (this.type === "push" || this.type === "otel") {
+                    // Type: Push / Type: OTel (ADR-0015) -- both are passive,
+                    // externally-fed types with the exact same dead-man's-switch
+                    // watchdog semantics: no active check happens here, this only
+                    // detects the ABSENCE of a heartbeat/datapoint within the
+                    // window. The otel type's actual condition evaluation happens
+                    // per-datapoint in server/routers/telemetry-router.js, not here.
                     log.debug(
                         "monitor",
                         `[${this.name}] Checking monitor at ${dayjs().format("YYYY-MM-DD HH:mm:ss.SSS")}`
@@ -880,8 +889,10 @@ class Monitor extends BeanModel {
             }
         };
 
-        // Delay Push Type
-        if (this.type === "push") {
+        // Delay Push Type (and OTel, ADR-0015 -- same passive/externally-fed
+        // reasoning: give the first datapoint/heartbeat a full interval's grace
+        // period to arrive before the watchdog's first check can possibly fire)
+        if (this.type === "push" || this.type === "otel") {
             setTimeout(() => {
                 safeBeat();
             }, this.interval * 1000);

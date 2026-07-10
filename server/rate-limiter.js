@@ -69,6 +69,7 @@ const twoFaRateLimiter = new KumaRateLimiter({
 });
 
 module.exports = {
+    KumaRateLimiter,
     loginRateLimiter,
     apiRateLimiter,
     twoFaRateLimiter,
