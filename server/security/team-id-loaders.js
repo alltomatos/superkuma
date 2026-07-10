@@ -24,6 +24,7 @@ const TABLE_BY_RESOURCE_TYPE = {
     api_key: "api_key",
     tag: "tag",
     status_page: "status_page",
+    notification_route: "notification_route",
 };
 
 /**

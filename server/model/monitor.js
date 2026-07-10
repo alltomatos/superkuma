@@ -39,6 +39,8 @@ const {
 const { R } = require("redbean-node");
 const { BeanModel } = require("redbean-node/dist/bean-model");
 const { Notification } = require("../notification");
+const { resolveNotificationTargets } = require("../notification-routing");
+const { detectAnomaly } = require("../anomaly-detection");
 const { demoMode } = require("../config");
 const version = require("../../package.json").version;
 const apicache = require("../modules/apicache");
@@ -156,6 +158,14 @@ class Monitor extends BeanModel {
             retryInterval: this.retryInterval,
             retryOnlyOnStatusCodeFailure: Boolean(this.retry_only_on_status_code_failure),
             resendInterval: this.resendInterval,
+            alertSeverity: this.alert_severity,
+            anomalyEnabled: this.anomaly_enabled,
+            anomalyMetric: this.anomaly_metric,
+            anomalyWindow: this.anomaly_window,
+            anomalyZThreshold: this.anomaly_z_threshold,
+            anomalySeasonality: this.anomaly_seasonality,
+            anomalyDirection: this.anomaly_direction,
+            anomalySeverity: this.anomaly_severity,
             keyword: this.keyword,
             invertKeyword: this.isInvertKeyword(),
             expiryNotification: this.isEnabledExpiryNotification(),
@@ -806,6 +816,12 @@ class Monitor extends BeanModel {
             let endTimeDayjs = await uptimeCalculator.update(bean.status, parseFloat(bean.ping));
             bean.end_time = R.isoDateTimeMillis(endTimeDayjs);
 
+            // Evaluate response-time anomaly (ADR-0013), decoupled from the up/down
+            // accounting uptimeCalculator.update() just did above -- must run AFTER
+            // it so the current beat's ping is already the in-progress bucket's head
+            // (see test/backend-test/test-uptime-calculator-anomaly-window.js).
+            await Monitor.evaluateAnomaly(this, bean, uptimeCalculator);
+
             // Send to frontend
             log.debug("monitor", `[${this.name}] Send to socket`);
             {
@@ -1225,7 +1241,7 @@ class Monitor extends BeanModel {
      */
     static async sendNotification(isFirstBeat, monitor, bean) {
         if (!isFirstBeat || bean.status === DOWN) {
-            const notificationList = await Monitor.getNotificationList(monitor);
+            const notificationList = await Monitor.getRoutedNotificationList(monitor);
 
             let text;
             if (bean.status === UP) {
@@ -1303,6 +1319,187 @@ class Monitor extends BeanModel {
             [monitor.id]
         );
         return notificationList;
+    }
+
+    /**
+     * Drop-in replacement for getNotificationList() that additionally applies
+     * team-scoped notification_route entries (ADR-0014). Short-circuits to the
+     * exact legacy result when no route rows exist for this monitor's team (or
+     * globally), which is the byte-identical-to-legacy contract this feature
+     * depends on -- the common case for every install that hasn't configured
+     * a route yet.
+     * @param {Monitor} monitor Monitor to resolve notification targets for
+     * @param {?string} severityOverride Optional severity to route on INSTEAD
+     * of monitor.alert_severity, for callers evaluating a different kind of
+     * alert against this same monitor's routing config (ADR-0013's anomaly
+     * events use monitor.anomaly_severity, not monitor.alert_severity). When
+     * omitted/falsy, behavior is completely unchanged from before this
+     * parameter existed -- the ADR-0014 sendNotification() call site (which
+     * never passes it) is unaffected.
+     * @returns {Promise<LooseObject<any>[]>} List of notifications to send to
+     */
+    static async getRoutedNotificationList(monitor, severityOverride) {
+        const staticNotifications = await Monitor.getNotificationList(monitor);
+
+        const routes = await R.getAll("SELECT * FROM notification_route WHERE team_id IS NULL OR team_id = ?", [
+            monitor.team_id,
+        ]);
+
+        if (routes.length === 0) {
+            return staticNotifications;
+        }
+
+        const tagRows = await R.getAll("SELECT tag_id FROM monitor_tag WHERE monitor_id = ?", [monitor.id]);
+        const tagIds = tagRows.map((row) => row.tag_id);
+
+        const routedNotificationIds = [...new Set(routes.map((route) => route.notification_id))];
+        const routedNotifications =
+            routedNotificationIds.length > 0
+                ? await R.getAll(
+                      `SELECT * FROM notification WHERE id IN (${routedNotificationIds.map(() => "?").join(",")})`,
+                      routedNotificationIds
+                  )
+                : [];
+
+        const allNotifications = [...staticNotifications, ...routedNotifications];
+
+        return resolveNotificationTargets({
+            staticNotifications,
+            routes,
+            allNotifications,
+            context: {
+                teamId: monitor.team_id,
+                monitorId: monitor.id,
+                tagIds,
+                severity: severityOverride || monitor.alert_severity || "critical",
+            },
+        });
+    }
+
+    /**
+     * Evaluate this beat's response time for a statistical anomaly and, if
+     * one fires, persist an alert_event row and notify -- entirely decoupled
+     * from bean.status/up/down accounting (ADR-0013's central design
+     * invariant: an anomaly is never a DOWN, so it can never contaminate
+     * uptime/SLA). A guaranteed no-op unless monitor.anomaly_enabled is
+     * truthy -- every existing install defaults to `anomaly_enabled = false`
+     * (TASK-A1-1's migration), so this is the dark-launch, byte-identical-to
+     * -legacy contract this method's characterization tests exist to prove.
+     *
+     * Must be called AFTER uptimeCalculator.update() has already recorded
+     * this beat's own ping into the current, in-progress minute bucket --
+     * see test/backend-test/test-uptime-calculator-anomaly-window.js
+     * (TASK-A1-0), which is why the historical window fetched below asks for
+     * one MORE bucket than anomaly_window and drops index 0 (the
+     * in-progress bucket that already contains this beat's own ping).
+     *
+     * Deliberately swallows every error internally instead of letting it
+     * propagate: this is a brand-new, still-maturing feature bolted onto the
+     * single most business-critical function in this file (beat()), and a
+     * bug in it (e.g. a bad anomaly_direction value, a transient DB error on
+     * the alert_event insert) must never be able to take down the core
+     * heartbeat/notification pipeline. Mirrors the try/catch already wrapped
+     * around the domain-expiry check earlier in beat().
+     * @param {Monitor} monitor The monitor being evaluated.
+     * @param {import("./heartbeat")} bean This beat's heartbeat bean. Read
+     * only (status/ping) -- never mutated, so up/down counters are
+     * untouched by anomaly evaluation.
+     * @param {import("../uptime-calculator").UptimeCalculator} uptimeCalculator
+     * The monitor's uptime calculator, already updated with this beat.
+     * @returns {Promise<void>}
+     */
+    static async evaluateAnomaly(monitor, bean, uptimeCalculator) {
+        try {
+            if (!monitor.anomaly_enabled) {
+                return;
+            }
+
+            // Anomaly detection only makes sense on a real, just-measured UP ping.
+            // Note this is deliberately the strict `bean.status === UP` check, NOT
+            // uptimeCalculator.flatStatus() (which lumps MAINTENANCE in with UP for
+            // uptime-accounting purposes) -- during MAINTENANCE, update() above never
+            // writes avgPing at all, so there is no real sample to evaluate.
+            if (bean.status !== UP) {
+                return;
+            }
+
+            const currentPing = parseFloat(bean.ping);
+            if (!Number.isFinite(currentPing)) {
+                return;
+            }
+
+            const window = uptimeCalculator.getDataArray(monitor.anomaly_window + 1, "minute");
+            const historicalSamples = window
+                .slice(1) // drop index 0: the current, in-progress bucket this beat just wrote.
+                .map((bucket) => bucket.avgPing)
+                .filter((value) => typeof value === "number" && Number.isFinite(value));
+
+            // historicalSamples empty ("not enough data yet", e.g. a monitor's first
+            // few beats) is passed straight through -- detectAnomaly() already treats
+            // an empty array as a normal, expected null-return case, not an error.
+            const result = detectAnomaly({
+                currentValue: currentPing,
+                historicalSamples,
+                zThreshold: monitor.anomaly_z_threshold,
+                direction: monitor.anomaly_direction,
+            });
+
+            if (!result || !result.isAnomalous) {
+                return;
+            }
+
+            // Anti-noise cooldown: a flat 15 minutes, chosen over the monitor's own
+            // check interval because that interval can be as short as a few seconds
+            // -- a degraded monitor checked every 20s would otherwise re-alert on
+            // almost every single beat. Mirrors the intent (not the mechanism) of
+            // the existing resendInterval down-alert throttle. Query ordered by
+            // time DESC LIMIT 1 -- only the most recent anomaly event matters.
+            const anomalyCooldownMs = 15 * 60 * 1000;
+            const lastEvent = await R.getRow(
+                "SELECT time FROM alert_event WHERE monitor_id = ? AND type = ? ORDER BY time DESC LIMIT 1",
+                [monitor.id, "anomaly"]
+            );
+            if (lastEvent && lastEvent.time && dayjs.utc().diff(dayjs.utc(lastEvent.time)) < anomalyCooldownMs) {
+                return;
+            }
+
+            await R.knex("alert_event").insert({
+                monitor_id: monitor.id,
+                type: "anomaly",
+                value: currentPing,
+                expected: result.expected,
+                score: result.score,
+                severity: monitor.anomaly_severity,
+                time: R.isoDateTimeMillis(dayjs.utc()),
+            });
+
+            const notificationList = await Monitor.getRoutedNotificationList(monitor, monitor.anomaly_severity);
+            if (notificationList.length === 0) {
+                return;
+            }
+
+            const msg = `[${monitor.name}] [Anomaly] response time ${currentPing}ms (expected ~${result.expected.toFixed(0)}ms, score ${result.score.toFixed(1)})`;
+            const monitorData = [{ id: monitor.id, active: monitor.active, name: monitor.name }];
+            const preloadData = await Monitor.preparePreloadData(monitorData);
+            const heartbeatJSON = await bean.toJSONAsync({ decodeResponse: false });
+
+            for (let notification of notificationList) {
+                try {
+                    await Notification.send(
+                        JSON.parse(notification.config),
+                        msg,
+                        monitor.toJSON(preloadData, false),
+                        heartbeatJSON
+                    );
+                } catch (e) {
+                    log.error("monitor", "Cannot send anomaly notification to " + notification.name);
+                    log.error("monitor", e);
+                }
+            }
+        } catch (error) {
+            log.error("monitor", `[${monitor.name}] evaluateAnomaly failed: ${error.message}`);
+            log.debug("monitor", error);
+        }
     }
 
     /**

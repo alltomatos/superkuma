@@ -200,6 +200,14 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
             bean.interval = monitor.interval;
             bean.retryInterval = monitor.retryInterval;
             bean.resendInterval = monitor.resendInterval;
+            bean.alertSeverity = monitor.alertSeverity;
+            bean.anomalyEnabled = monitor.anomalyEnabled;
+            bean.anomalyMetric = monitor.anomalyMetric;
+            bean.anomalyWindow = monitor.anomalyWindow;
+            bean.anomalyZThreshold = monitor.anomalyZThreshold;
+            bean.anomalySeasonality = monitor.anomalySeasonality;
+            bean.anomalyDirection = monitor.anomalyDirection;
+            bean.anomalySeverity = monitor.anomalySeverity;
             bean.hostname = monitor.hostname;
             bean.game = monitor.game;
             bean.maxretries = monitor.maxretries;

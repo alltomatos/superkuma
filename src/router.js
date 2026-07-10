@@ -34,6 +34,7 @@ import RemoteBrowsers from "./components/settings/RemoteBrowsers.vue";
 import Federation from "./components/settings/Federation.vue";
 import Users from "./components/settings/Users.vue";
 import Teams from "./components/settings/Teams.vue";
+const NotificationRouting = () => import("./components/settings/NotificationRouting.vue");
 import Mail from "./components/settings/Mail.vue";
 
 const routes = [
@@ -134,6 +135,10 @@ const routes = [
                             {
                                 path: "teams",
                                 component: Teams,
+                            },
+                            {
+                                path: "notification-routing",
+                                component: NotificationRouting,
                             },
                             {
                                 path: "mail",
