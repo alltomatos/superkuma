@@ -118,12 +118,33 @@ Salvaguarda transversal: **flag OFF byte-idêntico valeu como contrato de regres
 
 ---
 
-## Ordem sugerida (atualizada 2026-07-04)
+## 🔔 Feature: Alertas avançados (inspirado em SigNoz) — em design (T3)
+
+> Origem: análise competitiva de [SigNoz](https://github.com/signoz/signoz) ([`docs/analise-signoz.md`](docs/analise-signoz.md)). Três ADRs propostos, **ainda não commitados**, todos `Status: Proposed`, **aguardando "Go" humano** antes de qualquer código (T3 — schema novo e/ou toque no caminho crítico `beat()`/notificação): [ADR-0014](docs/adr/0014-alert-severity-and-notification-routing.md) · [ADR-0013](docs/adr/0013-anomaly-detection-alerts.md) · [ADR-0015](docs/adr/0015-otlp-telemetry-receiver.md). Diagrama de arquitetura: [`docs/diagrams/arquitetura-nucleo-adaptadores.svg`](docs/diagrams/arquitetura-nucleo-adaptadores.svg).
+
+Insight central: hoje "alerta" e "heartbeat DOWN" são a mesma coisa, e o vínculo notificação↔monitor é estático (sem severidade, sem roteamento). As três ADRs generalizam isso em **um núcleo de avaliação (threshold + anomalia), N adaptadores de ingestão (pull ativo / push-heartbeat / push-OTLP)**, com a saída se bifurcando em `status` (uptime/SLA, intocado) e `alerta` (severidade → roteamento → notificação), **sem nunca contaminar o cálculo de uptime**.
+
+**Ordem de dependência estrita:** ADR-0014 (fundação, menor risco) → ADR-0013 (anomalia, consome a fundação) → ADR-0015 (receptor OTLP, consome as duas anteriores).
+
+| ADR | Entrega | Tier | Depende de | Status |
+| --- | --- | --- | --- | --- |
+| **[0014](docs/adr/0014-alert-severity-and-notification-routing.md)** | `alert_severity` por monitor + tabela `notification_route` (aditiva, team-scoped) + `resolveNotificationTargets()` substituindo `getNotificationList()` | T3 | — | ⛔ Proposed, aguardando "Go" |
+| **[0013](docs/adr/0013-anomaly-detection-alerts.md)** | Detecção de anomalia (média móvel±Nσ → sazonal) sobre `stat_*`; notifica via `alert_event` **sem** marcar DOWN | T3 | 0014 (severidade) | ⛔ Proposed, aguardando "Go" |
+| **[0015](docs/adr/0015-otlp-telemetry-receiver.md)** | Novo tipo de monitor `otel` (watchdog passivo, molde do tipo `push`) + `POST /v1/metrics` (OTLP/JSON), selector-first para não estourar cardinalidade | T3 | 0013 + 0014 | ⛔ Proposed, aguardando "Go" |
+
+**Coordenação de schema com o Multi-tenant (ADR-0010):** a tabela `notification_route` (ADR-0014) **deve seguir o mesmo idiom de `team_id`** já estabelecido na migração `TASK-R1` (nullable, FK `RESTRICT`) — idiom hoje **comprovado em produção**, não mais hipotético: `team_id` está ativo, o enforcement é permanente (flag `rbacEnforced` removida, ver seção acima) e a gestão de times já embarcou UI própria (`src/components/settings/Teams.vue`/`Users.vue`, PRs #61/#62) — **a tabela de status P5/P6 nesta seção do roadmap está desatualizada e precisa de uma varredura própria** (fora do escopo desta feature de alertas; achado durante a reconciliação `develop`↔`main` de 2026-07-09).
+
+**Não-escopo (ver ADR-0015 §"Não-escopo"):** isto não é observabilidade — sem tracing, sem log storage, sem ClickHouse. É "pegue uma métrica que a app já emite (Prometheus ou OTLP) e transforme num alerta self-hosted", reusando o motor de threshold/anomalia/roteamento.
+
+---
+
+## Ordem sugerida (atualizada 2026-07-09)
 
 1. ✅ **Governança + documentação de domínio** (CONTEXT.md, ADRs) — concluída.
 2. ✅ **EPIC-2 — quebra de monólitos** — concluída.
 3. ✅ **EPIC-4 — testes** do que foi extraído — concluída.
 4. ✅ **EPIC-3 — validação** (zod) — concluída (escopo parcial deliberado; ver EPIC-3b acima).
 5. ⏸ **EPIC-1 — cifragem de segredos**: adiada por [ADR-0007](docs/adr/0007-defer-secret-encryption.md). É a única Epic do roadmap original que resta.
+6. ⛔ **Feature: Alertas avançados (0014→0013→0015)**: em design, aguardando "Go" humano item a item. Não compete por schema com o Multi-tenant (P5/P6 também bloqueados) — podem avançar em paralelo assim que aprovados.
 
 > Refactor sem testes novos (decisão do usuário) → a salvaguarda é: **extração mecânica pura + suíte existente + lint + build como gate**, em worktree isolada. Os alvos 🔴 sem rede (`monitor.js`, `EditMonitor.vue`) exigem decisão explícita de salvaguarda antes de executar.
