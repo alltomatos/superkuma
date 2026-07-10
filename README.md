@@ -8,11 +8,11 @@ SuperKuma is an easy-to-use self-hosted monitoring tool, with built-in Master-Ag
 
 <a target="_blank" href="https://github.com/alltomatos/superkuma"><img src="https://img.shields.io/github/stars/alltomatos/superkuma?style=flat" /></a> <a target="_blank" href="https://github.com/alltomatos/superkuma"><img src="https://img.shields.io/github/last-commit/alltomatos/superkuma" /></a>
 
-<img src="https://user-images.githubusercontent.com/1336778/212262296-e6205815-ad62-488c-83ec-a5b0d0689f7c.jpg" width="700" alt="SuperKuma Dashboard Screenshot" />
+<img src="./docs/images/dashboard.png" width="700" alt="SuperKuma Dashboard Screenshot" />
 
 ## ⭐ Features
 
-- Monitoring uptime for HTTP(s) / TCP / HTTP(s) Keyword / HTTP(s) Json Query / Websocket / Ping / DNS Record / Push / Steam Game Server / Docker Containers
+- ~30 monitor types: HTTP(s) / Keyword / JSON Query / Browser Engine, TCP Port, Ping, DNS, Docker Container, System Service, Push, gRPC(s), MQTT, RabbitMQ, Kafka Producer, SNMP, SMTP, Websocket, Globalping, Steam / GameDig game servers, and direct database checks for MySQL/MariaDB, PostgreSQL, MongoDB, Redis, MSSQL, Oracle and Radius — [full list](server/monitor-types/)
 - Fancy, Reactive, Fast UI/UX
 - Notifications via Telegram, Discord, Gotify, Slack, Pushover, Email (SMTP), and [90+ notification services, click here for the full list](https://github.com/alltomatos/superkuma/tree/main/src/components/notifications)
 - 20-second intervals
@@ -28,6 +28,18 @@ SuperKuma is an easy-to-use self-hosted monitoring tool, with built-in Master-Ag
 - Query **Prometheus** with PromQL to alert on host metrics — CPU / RAM / disk I/O, SQL Server, and anything an exporter exposes
 - Multi-tenant **Teams** with granular **role-based access control (RBAC)**
 - Built-in **MCP server** — let an AI agent add/edit monitors, notifications, tags, status pages and maintenance ([docs](server/mcp/README.md))
+
+## 📸 Screenshots
+
+<table>
+  <tr>
+    <td><img src="./docs/images/monitor-detail.png" width="380" alt="Monitor detail with response-time chart" /><br />Monitor detail with response-time chart</td>
+    <td><img src="./docs/images/teams-settings.png" width="380" alt="Teams / RBAC settings" /><br />Teams / RBAC settings</td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="./docs/images/status-page.png" width="780" alt="Public status page" /><br />Public status page</td>
+  </tr>
+</table>
 
 ## 🔧 How to Install
 
@@ -74,13 +86,14 @@ step — no pre-published base images required:
 ```bash
 git clone https://github.com/alltomatos/superkuma.git
 cd superkuma
-docker build -t superkuma .        # or: npm run docker-build
+docker build -t superkuma .
 docker run -d --restart=always -p 3001:3001 -v superkuma:/app/data --name superkuma superkuma
 ```
 
 > The published `ronaldodavi/superkuma` image is built from this same `Dockerfile` and
 > pushed by the [Release Docker workflow](.github/workflows/release-docker.yml) on each
-> version tag.
+> version tag. It's currently published for **linux/amd64 only**; on arm64 (e.g. Raspberry Pi)
+> build it yourself with the command above instead of pulling the published image.
 
 ### 💪🏻 Non-Docker
 
@@ -88,7 +101,7 @@ Requirements:
 
 - Platform
   - ✅ Major Linux distros such as Debian, Ubuntu, Fedora and ArchLinux etc.
-  - ✅ Windows 10 (x64), Windows Server 2012 R2 (x64) or higher
+  - ✅ Windows 10 (x64), Windows Server 2016 (x64) or higher
   - ❌ FreeBSD / OpenBSD / NetBSD
   - ❌ Replit / Heroku
 - [Node.js](https://nodejs.org/en/download/) >= 20.4
@@ -133,6 +146,8 @@ SuperKuma ships a built-in [MCP (Model Context Protocol)](https://modelcontextpr
 
 See [`server/mcp/README.md`](server/mcp/README.md) for setup, and [ADR-0011](docs/adr/0011-mcp-server-for-agent-configuration.md) for the design.
 
+Using [Claude Code](https://claude.com/claude-code)? The [`superkuma-monitoring` skill](.claude/skills/superkuma-monitoring) drives the MCP server to discover a site's infrastructure and set up monitors, tags and status pages for you, and includes a playbook for standing up a new instance.
+
 ## 🆕 What's Next?
 
 Requests/issues are assigned to upcoming milestones.
@@ -141,9 +156,13 @@ Requests/issues are assigned to upcoming milestones.
 
 ## Credits
 
-SuperKuma began as a fork of [Uptime Kuma](https://github.com/louislam/uptime-kuma) — an excellent self-hosted monitoring tool built by Louis Lam and its contributors — and builds on that foundation. It has since grown into its own project, extending the original with Master-Agent federation, long-term metrics history, and multi-tenant Teams/RBAC.
+SuperKuma began as a fork of [Uptime Kuma](https://github.com/louislam/uptime-kuma) — an excellent self-hosted monitoring tool built by Louis Lam and its contributors — and builds on that foundation. It has since grown into its own project, extending the original with [Master-Agent federation](docs/adr/0008-master-agent-federation.md) for multi-instance monitoring, long-term metrics history, PromQL-based host-metrics alerting, multi-tenant [Teams/RBAC](docs/adr/0010-teams-rbac-multitenancy.md), and a built-in [MCP server](server/mcp/README.md) for AI agents.
 
 If you find SuperKuma useful, consider giving it a ⭐ — and if you'd like to support the project it's built on, [Uptime Kuma](https://github.com/louislam/uptime-kuma) deserves one too.
+
+## License
+
+SuperKuma is [MIT licensed](LICENSE).
 
 ## 🗣️ Discussion / Ask for Help
 
@@ -154,7 +173,11 @@ If you find SuperKuma useful, consider giving it a ⭐ — and if you'd like to 
 ### Create Pull Requests
 
 Pull requests are awesome.
-To keep reviews fast and effective, please make sure you've [read our pull request guidelines](https://github.com/alltomatos/superkuma/blob/main/CONTRIBUTING.md#can-i-create-a-pull-request-for-superkuma).
+To keep reviews fast and effective, please make sure you've [read our pull request guidelines](https://github.com/alltomatos/superkuma/blob/main/CONTRIBUTING.md#can-i-create-a-pull-request-for-superkuma). New to the codebase? [`CONTEXT.md`](CONTEXT.md) has a domain glossary and map of the main areas.
+
+### Releases / Changelog
+
+See what changed in each version: <https://github.com/alltomatos/superkuma/releases>
 
 ### Test Beta Version
 
