@@ -1553,6 +1553,18 @@
                                 />
                             </div>
 
+                            <div class="my-3">
+                                <label for="alert-severity" class="form-label">
+                                    {{ $t("Alert Severity") }}
+                                </label>
+                                <select id="alert-severity" v-model="monitor.alertSeverity" class="form-select">
+                                    <option value="info">{{ $t("severity_info") }}</option>
+                                    <option value="warning">{{ $t("severity_warning") }}</option>
+                                    <option value="critical">{{ $t("severity_critical") }}</option>
+                                </select>
+                                <div class="form-text">{{ $t("alertSeverityDescription") }}</div>
+                            </div>
+
                             <h2 v-if="monitor.type !== 'push'" class="mt-5 mb-2">{{ $t("Advanced") }}</h2>
 
                             <div
@@ -2894,6 +2906,7 @@ const monitorDefaults = {
     humanReadableInterval: timeDurationFormatter.secondsToHumanReadableFormat(60),
     retryInterval: 60,
     resendInterval: 0,
+    alertSeverity: "critical",
     maxretries: 0,
     retryOnlyOnStatusCodeFailure: false,
     notificationIDList: {},

@@ -157,6 +157,7 @@ class Monitor extends BeanModel {
             retryInterval: this.retryInterval,
             retryOnlyOnStatusCodeFailure: Boolean(this.retry_only_on_status_code_failure),
             resendInterval: this.resendInterval,
+            alertSeverity: this.alert_severity,
             keyword: this.keyword,
             invertKeyword: this.isInvertKeyword(),
             expiryNotification: this.isEnabledExpiryNotification(),

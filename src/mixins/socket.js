@@ -48,6 +48,7 @@ export default {
             remoteInstanceList: [],
             userList: [],
             teamList: [],
+            routeList: [],
             heartbeatList: {},
             avgPingList: {},
             uptimeList: {},
@@ -709,6 +710,53 @@ export default {
          */
         removeTeamMember(teamId, userId, callback) {
             socket.emit("removeTeamMember", { teamId, userId }, callback);
+        },
+
+        /**
+         * Fetch and store the list of notification routing rules (ADR-0014).
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        getNotificationRouteList(callback) {
+            if (!callback) {
+                callback = () => {};
+            }
+            socket.emit("getNotificationRouteList", (res) => {
+                if (res.ok) {
+                    this.routeList = res.routeList;
+                }
+                callback(res);
+            });
+        },
+
+        /**
+         * Create a notification routing rule.
+         * @param {object} route Route fields ({ teamId, minSeverity, monitorId, tagId, notificationId })
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        createNotificationRoute(route, callback) {
+            socket.emit("createNotificationRoute", route, (res) => {
+                if (res.ok) {
+                    this.getNotificationRouteList();
+                }
+                callback(res);
+            });
+        },
+
+        /**
+         * Delete a notification routing rule.
+         * @param {number} id ID of the route to delete
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        deleteNotificationRoute(id, callback) {
+            socket.emit("deleteNotificationRoute", { id }, (res) => {
+                if (res.ok) {
+                    this.getNotificationRouteList();
+                }
+                callback(res);
+            });
         },
 
         /**

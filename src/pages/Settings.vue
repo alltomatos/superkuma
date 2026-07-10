@@ -118,6 +118,9 @@ export default {
                 teams: {
                     title: this.$t("Teams"),
                 },
+                "notification-routing": {
+                    title: this.$t("Notification Routing"),
+                },
                 mail: {
                     title: this.$t("Mail"),
                 },

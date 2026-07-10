@@ -208,6 +208,7 @@ const { apiKeySocketHandler } = require("./socket-handlers/api-key-socket-handle
 const { remoteInstanceSocketHandler } = require("./socket-handlers/remote-instance-socket-handler");
 const { userSocketHandler } = require("./socket-handlers/user-socket-handler");
 const { teamSocketHandler } = require("./socket-handlers/team-socket-handler");
+const { notificationRouteSocketHandler } = require("./socket-handlers/notification-route-socket-handler");
 const { mailSocketHandler } = require("./socket-handlers/mail-socket-handler");
 const { generalSocketHandler } = require("./socket-handlers/general-socket-handler");
 const { monitorSocketHandler } = require("./socket-handlers/monitor-socket-handler");
@@ -1163,6 +1164,7 @@ let needSetup = false;
         remoteBrowserSocketHandler(socket);
         userSocketHandler(socket, server);
         teamSocketHandler(socket);
+        notificationRouteSocketHandler(socket);
         mailSocketHandler(socket);
         generalSocketHandler(socket, server);
         chartSocketHandler(socket);
