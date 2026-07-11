@@ -324,6 +324,37 @@ describe("dashboard-socket-handler.js (ADR-0016)", () => {
             assert.ok(await R.findOne("dashboard", "id = ?", [created.dashboardId]), "must survive a denied delete");
         });
 
+        test("a forged teamId in the payload has no effect -- the permission check always uses the dashboard's real team", async () => {
+            // Regression test for a mutation-testing gap found during the ADR-0016
+            // post-merge audit (2026-07-11): an artificial mutation preferring
+            // `input.teamId` over the dashboard's real `team_id` in the
+            // requirePermission() call went UNCAUGHT, because dashboardIdSchema has
+            // no `teamId` field -- zod silently strips it before the handler ever
+            // runs, so `input.teamId` is always undefined regardless of payload.
+            // This test locks that invariant in explicitly: even sending the
+            // outsider's own (real) teamId alongside the id must not let them
+            // delete a dashboard belonging to a different team.
+            const teamId = await createTeam();
+            const outsiderTeamId = await createTeam();
+            const userId = await createUser();
+            const ownerSocket = makeMockSocket(actorFor(userId, teamId, "owner"), userId);
+            dashboardSocketHandler(ownerSocket);
+            const created = await ownerSocket.trigger("createDashboard", { title: "Forge-Proof" });
+
+            const outsiderSocket = makeMockSocket(actorFor(userId, outsiderTeamId, "owner"), userId);
+            dashboardSocketHandler(outsiderSocket);
+            const res = await outsiderSocket.trigger("deleteDashboard", {
+                id: created.dashboardId,
+                teamId: outsiderTeamId,
+            });
+
+            assert.strictEqual(res.ok, false);
+            assert.ok(
+                await R.findOne("dashboard", "id = ?", [created.dashboardId]),
+                "must survive a forged-teamId delete"
+            );
+        });
+
         test("deleting a nonexistent dashboard id returns a clean error, not a crash", async () => {
             const teamId = await createTeam();
             const userId = await createUser();
