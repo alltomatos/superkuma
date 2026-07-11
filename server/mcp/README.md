@@ -2,7 +2,8 @@
 
 An [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server that lets an
 AI agent inspect and configure a running SuperKuma instance — **monitors, notifications,
-tags, status pages and maintenance windows** — through a safe, gated set of **34 tools**.
+tags, status pages, maintenance windows and team dashboards** — through a safe, gated set
+of **39 tools**.
 
 It runs in two ways: as a local **stdio** process, or as a **remote HTTP endpoint** hosted
 by the instance itself. Design rationale: [ADR-0011](../../docs/adr/0011-mcp-server-for-agent-configuration.md).
@@ -202,6 +203,24 @@ the API key in the `Authorization` header.
 | `pause_maintenance`  | write       | Pause a maintenance window.                               |
 | `resume_maintenance` | write       | Resume a maintenance window.                              |
 | `delete_maintenance` | destructive | Delete a maintenance (needs delete gate + `confirm`).     |
+
+**Team dashboards**
+
+| Tool               | Kind        | Purpose                                                                         |
+| ------------------ | ----------- | ------------------------------------------------------------------------------- |
+| `list_dashboards`  | read        | Summaries (id, title, teamId, widgetCount) visible to the API key.              |
+| `get_dashboard`    | read        | A dashboard's full, ordered widget list by id.                                  |
+| `create_dashboard` | write       | Create an empty dashboard in the API key's own team.                            |
+| `save_dashboard`   | write       | Replace a dashboard's widget list (status_tile / metric_gauge / group_summary). |
+| `delete_dashboard` | destructive | Delete a dashboard (needs delete gate + `confirm`).                             |
+
+Dashboards (ADR-0016) are the RMM-style operational view SuperKuma is building toward: an
+internal, always team-scoped composition of widgets over existing monitors, distinct from
+the public Status Page. `team_id` is always resolved server-side from the API key's own
+team — never accepted from the agent, so an agent can only build dashboards for the team
+its key belongs to. Ask an agent to "create a dashboard for team X's firewalls" and it can
+do the whole flow itself: `list_monitors` (with `teamId`) to find the right monitors,
+`create_dashboard`, then `save_dashboard` to lay out the widgets.
 
 All read/write/destructive tools honour the same gating: read-only by default,
 writes need `SUPERKUMA_ALLOW_MUTATIONS=true`, deletes need `SUPERKUMA_ALLOW_DELETE=true`
