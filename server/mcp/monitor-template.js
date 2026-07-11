@@ -73,6 +73,7 @@ const MONITOR_DEFAULTS = {
     rabbitmqPassword: "",
     conditions: [],
     system_service_name: "",
+    influxdbDatabase: "",
 };
 
 /**
@@ -102,6 +103,7 @@ const DIRECT_FIELDS = [
     "active",
     "expectedValue",
     "metricUnit",
+    "influxdbDatabase",
 ];
 
 /**
@@ -152,12 +154,28 @@ function buildMonitorPayload(base, input) {
         monitor.databaseQuery = input.promql;
     }
 
+    // InfluxDB monitor type: the InfluxQL goes in databaseQuery (shared column),
+    // the database name in influxdbDatabase, the threshold in
+    // conditionOperator/expectedValue (reused columns).
+    if (input.influxql !== undefined) {
+        monitor.databaseQuery = input.influxql;
+    }
+
     if (input.conditionOperator !== undefined) {
         monitor.jsonPathOperator = input.conditionOperator;
     }
 
     if (input.bearerToken !== undefined) {
         monitor.bearer_token = input.bearerToken;
+    }
+
+    // HTTP Basic auth (http/prometheus/influxdb types).
+    if (input.basicAuthUser !== undefined) {
+        monitor.basic_auth_user = input.basicAuthUser;
+    }
+
+    if (input.basicAuthPass !== undefined) {
+        monitor.basic_auth_pass = input.basicAuthPass;
     }
 
     return monitor;
@@ -179,6 +197,7 @@ function summarizeMonitor(monitor) {
         interval: monitor.interval,
         active: Boolean(monitor.active),
         parent: monitor.parent ?? null,
+        teamId: monitor.teamId ?? null,
     };
 }
 

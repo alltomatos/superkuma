@@ -42,6 +42,17 @@ describe("team-id-loaders (resolves team_id from real tables)", () => {
         assert.strictEqual(resolved, team.id);
     });
 
+    test("resolves the team_id of a real dashboard row", async () => {
+        const team = await R.knex("team").where("slug", "default").first();
+        const bean = R.dispense("dashboard");
+        bean.team_id = team.id;
+        bean.title = "loader-test-dashboard";
+        const id = await R.store(bean);
+
+        const resolved = await teamIdLoader("dashboard", id);
+        assert.strictEqual(resolved, team.id);
+    });
+
     test("returns null for a non-existent row", async () => {
         const resolved = await teamIdLoader("monitor", 999999);
         assert.strictEqual(resolved, null);

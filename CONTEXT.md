@@ -5,6 +5,10 @@
 
 SuperKuma é uma aplicação self-hosted de **monitoramento de disponibilidade**. O núcleo bate periodicamente em alvos, registra o resultado, agrega estatísticas e notifica em mudanças de estado.
 
+> **Direção em exploração (não construída ainda):** evoluir para uma central operacional estilo
+> **RMM** — dashboards internos por time, compostos por agente via MCP, agregando monitores e
+> métricas (`prometheus`/`influxdb`/`snmp`) de múltiplos clientes/sites. Ver [ADR-0016](docs/adr/0016-team-dashboards.md) (Proposed, aguardando "Go").
+
 ---
 
 ## Subdomínios (bounded contexts)

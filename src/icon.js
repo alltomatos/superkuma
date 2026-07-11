@@ -57,6 +57,8 @@ import {
     faKey,
     faUserShield,
     faUsers,
+    faCircle,
+    faTh,
 } from "@fortawesome/free-solid-svg-icons";
 
 library.add(
@@ -111,6 +113,8 @@ library.add(
     faKey,
     faUserShield,
     faUsers,
+    faCircle,
+    faTh,
 );
 
 export { FontAwesomeIcon };

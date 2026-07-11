@@ -5,7 +5,7 @@ const { MONITOR_DEFAULTS, buildMonitorPayload, summarizeMonitor } = require("../
 const TYPE_HELP =
     "Monitor type. Common values: http, port, ping, dns, keyword, json-query, push, docker, group, " +
     "grpc-keyword, steam, gamedig, mqtt, postgres, mysql, mongodb, redis, sqlserver, radius, snmp, " +
-    "prometheus, real-browser, kafka-producer, rabbitmq, tailscale-ping. The server validates the type.";
+    "prometheus, influxdb, real-browser, kafka-producer, rabbitmq, tailscale-ping. The server validates the type.";
 
 const CONDITION_OPERATORS = [">", ">=", "<", "<=", "==", "!=", "contains"];
 
@@ -64,7 +64,7 @@ const commonMonitorShape = {
     conditionOperator: z
         .enum(CONDITION_OPERATORS)
         .optional()
-        .describe("Threshold operator for prometheus/snmp/json-query (>, >=, <, <=, ==, !=, contains)"),
+        .describe("Threshold operator for prometheus/influxdb/snmp/json-query (>, >=, <, <=, ==, !=, contains)"),
     expectedValue: z
         .string()
         .optional()
@@ -73,11 +73,32 @@ const commonMonitorShape = {
         .string()
         .optional()
         .describe(
-            "Display unit for a metric monitor (prometheus/snmp/json-query), e.g. '%', 'GB', 'MB', 's'. Shown " +
+            "Display unit for a metric monitor (prometheus/influxdb/snmp/json-query), e.g. '%', 'GB', 'MB', 's'. Shown " +
                 "next to the value, gauge and chart on the monitor page. '%' puts the gauge and chart on a fixed " +
                 "0-100 scale; any other unit auto-scales. Does not change the query -- match it to what the query returns."
         ),
     bearerToken: z.string().optional().describe("Optional Bearer token for auth (http/prometheus types)"),
+    basicAuthUser: z
+        .string()
+        .optional()
+        .describe(
+            "HTTP Basic auth username (http/prometheus/influxdb types). For influxdb, this is the " +
+                "recommended way to authenticate against InfluxDB v1's HTTP API."
+        ),
+    basicAuthPass: z.string().optional().describe("HTTP Basic auth password, paired with basicAuthUser"),
+    // influxdb type (also: url = InfluxDB base URL, ignoreTls). The threshold reuses
+    // conditionOperator/expectedValue/metricUnit. Prefer basicAuthUser/basicAuthPass over bearerToken --
+    // InfluxDB v1's "Token" auth scheme is actually `username:password`, not an opaque v2-style token.
+    influxdbDatabase: z
+        .string()
+        .optional()
+        .describe("InfluxDB v1 database name -- the `db` query param (influxdb type)"),
+    influxql: z
+        .string()
+        .optional()
+        .describe(
+            'InfluxQL query returning a single number (influxdb type), e.g. \'SELECT last("load1") FROM "system"\''
+        ),
 };
 
 /**
@@ -93,9 +114,15 @@ function registerMonitorTools(server, client, config) {
         name: "list_monitors",
         title: "List monitors",
         description:
-            "List all monitors visible to the authenticated API key, as compact summaries (id, name, type, target, interval, active).",
-        handler: async () => {
-            const monitors = await client.listMonitors();
+            "List all monitors visible to the authenticated API key, as compact summaries (id, name, type, target, interval, active, teamId). Pass teamId to filter to a single team's monitors, e.g. to build a dashboard for that team.",
+        inputSchema: {
+            teamId: z.number().int().optional().describe("Only return monitors belonging to this team id"),
+        },
+        handler: async (args) => {
+            let monitors = await client.listMonitors();
+            if (args.teamId !== undefined) {
+                monitors = monitors.filter((m) => m.teamId === args.teamId);
+            }
             return {
                 count: monitors.length,
                 monitors: monitors.map(summarizeMonitor),

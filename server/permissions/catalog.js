@@ -91,6 +91,10 @@ const PERMISSIONS = [
     perm("status_page", "read", true, "View status pages"),
     perm("status_page", "manage", true, "Create, edit and delete status pages and incidents"),
 
+    // Team dashboards (ADR-0016)
+    perm("dashboard", "read", true, "View team dashboards"),
+    perm("dashboard", "manage", true, "Create, edit and delete team dashboards"),
+
     // API keys
     perm("api_key", "read", true, "View API keys"),
     perm("api_key", "manage", true, "Create, renew and revoke API keys"),
@@ -147,6 +151,7 @@ const EDITOR_EXTRA = [
     "remote_instance:manage",
     "status_page:manage",
     "tag:manage",
+    "dashboard:manage",
 ];
 
 // Admin manages the team's resources, members, keys and settings, but cannot

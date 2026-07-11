@@ -17,6 +17,7 @@ import AddStatusPage from "./pages/AddStatusPage.vue";
 import NotFound from "./pages/NotFound.vue";
 import DockerHosts from "./components/settings/Docker.vue";
 import ManageMaintenance from "./pages/ManageMaintenance.vue";
+import TeamDashboards from "./pages/TeamDashboards.vue";
 import APIKeys from "./components/settings/APIKeys.vue";
 import SetupDatabase from "./pages/SetupDatabase.vue";
 
@@ -185,6 +186,10 @@ const routes = [
                     {
                         path: "/maintenance/clone/:id",
                         component: EditMaintenance,
+                    },
+                    {
+                        path: "/team-dashboards",
+                        component: TeamDashboards,
                     },
                 ],
             },

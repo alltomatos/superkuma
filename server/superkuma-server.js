@@ -137,6 +137,7 @@ class SuperKumaServer {
         SuperKumaServer.monitorTypeList["mysql"] = new MysqlMonitorType();
         SuperKumaServer.monitorTypeList["oracledb"] = new OracleDbMonitorType();
         SuperKumaServer.monitorTypeList["prometheus"] = new PrometheusMonitorType();
+        SuperKumaServer.monitorTypeList["influxdb"] = new InfluxDbMonitorType();
 
         // Allow all CORS origins (polling) in development
         let cors = undefined;
@@ -650,4 +651,5 @@ const { MssqlMonitorType } = require("./monitor-types/mssql");
 const { MysqlMonitorType } = require("./monitor-types/mysql");
 const { OracleDbMonitorType } = require("./monitor-types/oracledb");
 const { PrometheusMonitorType } = require("./monitor-types/prometheus");
+const { InfluxDbMonitorType } = require("./monitor-types/influxdb");
 const Monitor = require("./model/monitor");

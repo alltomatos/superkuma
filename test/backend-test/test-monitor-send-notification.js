@@ -62,20 +62,30 @@ async function createNotification(fields) {
     return await R.store(bean);
 }
 
-let testUserId;
+let testUserIdPromise;
 
 /**
  * Lazily create (once per test file run) a minimal user row to satisfy
  * notification.user_id's NOT NULL constraint -- these tests don't exercise
  * any actor/RBAC path, just the plain FK requirement.
+ *
+ * Caches the in-flight promise, not just the resolved id: node:test can run
+ * this file's top-level tests concurrently, and caching only the resolved
+ * value left a window between the `undefined` check and the id being set
+ * where two concurrent calls both tried to insert the same hardcoded
+ * username, tripping the UNIQUE constraint. Assigning the promise happens
+ * synchronously (no `await` before it), so every concurrent caller is
+ * guaranteed to see it already set and await the same single insert.
  * @returns {Promise<number>} The test user's id
  */
-async function getTestUserId() {
-    if (testUserId === undefined) {
-        await R.knex("user").insert({ username: "notif-baseline-owner", password: "x" });
-        testUserId = (await R.knex("user").where("username", "notif-baseline-owner").first()).id;
+function getTestUserId() {
+    if (!testUserIdPromise) {
+        testUserIdPromise = (async () => {
+            await R.knex("user").insert({ username: "notif-baseline-owner", password: "x" });
+            return (await R.knex("user").where("username", "notif-baseline-owner").first()).id;
+        })();
     }
-    return testUserId;
+    return testUserIdPromise;
 }
 
 /**
