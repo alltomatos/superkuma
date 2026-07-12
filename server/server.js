@@ -398,6 +398,10 @@ let needSetup = false;
     const statusPageRouter = require("./routers/status-page-router");
     app.use(statusPageRouter);
 
+    // Public Dashboard Router (ADR-0017: published /dashboards/:slug + data API)
+    const dashboardRouter = require("./routers/dashboard-router");
+    app.use(dashboardRouter);
+
     // Federation Router
     const federationRouter = require("./routers/federation-router");
     app.use(federationRouter);

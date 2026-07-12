@@ -2,14 +2,14 @@
 
 - **Status:** Proposed
 - **Data:** 2026-07-12
-- **Tier:** T3 (evolui schema de `dashboard`/`dashboard_widget` + **nova superfície pública** `/dashboard/:slug` + nova dependência frontend) — exige "Go" humano.
+- **Tier:** T3 (evolui schema de `dashboard`/`dashboard_widget` + **nova superfície pública** `/panel/:slug` + nova dependência frontend) — exige "Go" humano.
 - **Relacionado:** [ADR-0016](0016-team-dashboards.md) (o conceito de dashboard por time que isto evolui), [ADR-0015](0015-otel-telemetry-receiver.md) / monitor-type `influxdb` (a telemetria que os painéis consomem — o valor da métrica já vai no canal `ping`/heartbeat), [ADR-0010](0010-teams-rbac-multitenancy.md) (autorização por `team_id`), [ADR-0009](0009-master-long-term-metrics-history.md) (séries `stat_*` para janelas longas de trend).
 
 ## Contexto
 
 A ADR-0016 entregou dashboards internos por time como uma **lista ordenada de widgets** (3 tipos: `status_tile`, `metric_gauge`, `group_summary`) sobre monitores existentes, acessados via `/team-dashboards`. O usuário pediu para evoluir isso num **builder visual estilo Grafana**:
 
-- Um botão **"Novo Dashboard"** par ao "Nova Página de Status", com URL `/dashboard/<slug>` (espelhando `/status/<slug>`).
+- Um botão **"Novo Dashboard"** par ao "Nova Página de Status", com URL `/panel/<slug>` (espelhando `/status/<slug>`).
 - Um **builder de edição drag-and-drop** com grade redimensionável ("telas estilo Grafana").
 - Catálogo de painéis rico: **gauge de CPU, gráfico de pizza, trend (linha), velocímetro de placa de rede, número único (stat)** — além dos 3 tipos já existentes.
 - Dados de **telemetria Prometheus/InfluxDB** — que hoje já chegam via o monitor-type `influxdb` (o monitor "omniroute - CPU" do usuário já é uma query InfluxQL cujo valor está no canal `ping`).
@@ -50,8 +50,8 @@ Migração aditiva, **sem renomear tabelas** (evita churn e preserva dashboards 
 
 - Cada dashboard é **sempre de um time** (posse via `team_id`, RBAC de edição inalterado: `dashboard:read`/`dashboard:manage`), e tem um flag `published`:
   - `published = false` (default): interno, só visível para o time via socket.io autenticado (comportamento ADR-0016).
-  - `published = true`: legível publicamente via `/dashboard/<slug>`, **sem autenticação**, como uma status page.
-- **Nova rota pública** (superfície de leitura nova — ver "Segurança"): `server/routers/dashboard-router.js`, `GET /dashboard/:slug` (página) + um endpoint REST de dados, espelhando `status-page-router.js` (validação de slug `[a-z0-9-]+`, `cache`, rate-limit).
+  - `published = true`: legível publicamente via `/panel/<slug>`, **sem autenticação**, como uma status page.
+- **Nova rota pública** (superfície de leitura nova — ver "Segurança"): `server/routers/dashboard-router.js`, `GET /panel/:slug` (página) + um endpoint REST de dados, espelhando `status-page-router.js` (validação de slug `[a-z0-9-]+`, `cache`, rate-limit).
 - Isto é uma **mudança consciente em relação à decisão "nunca público" da ADR-0016** — justificada pelo pedido explícito do usuário e por já existir toda a infraestrutura de `slug`/`published`/rota pública nas status pages para replicar.
 
 ### D4 — Layout: grid drag-and-drop redimensionável
@@ -94,7 +94,7 @@ A rota pública é a única superfície nova sensível. Regras:
 ## Sequenciamento (Fase 1)
 
 1. Migração de schema (slug/published/description/refresh/theme em `dashboard`; pos/size/title/config_json em `dashboard_widget`) + backfill de slug. **[T3 — precisa de "Go"]**
-2. Backend: `dashboardSocketHandler`/`saveDashboard` carregam geometria+tipo+config; `dashboard-router.js` público (`/dashboard/:slug`, só `published`).
+2. Backend: `dashboardSocketHandler`/`saveDashboard` carregam geometria+tipo+config; `dashboard-router.js` público (`/panel/:slug`, só `published`).
 3. Frontend: dependência `grid-layout-plus`; `DashboardEditor.vue` (grid drag-drop) + `DashboardView.vue` (leitura/pública); painéis novos (`StatPanel`/`SpeedometerPanel`/`TrendPanel`/`PiePanel`); botão "Novo Dashboard" + fluxo de slug; nav/rotas.
 4. MCP: `create_dashboard`/`save_dashboard` ganham slug/published/geometria/tipo/config.
 5. i18n (en + pt-BR), testes (migração, authz da rota pública, geometria round-trip) com verificação adversarial, e verificação ao vivo no dev server.
