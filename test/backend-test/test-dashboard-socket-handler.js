@@ -449,4 +449,122 @@ describe("dashboard-socket-handler.js (ADR-0016)", () => {
             assert.strictEqual(res.ok, false);
         });
     });
+
+    describe("ADR-0017 panels + slug + published", () => {
+        test("createDashboard auto-generates a slug from the title, unpublished by default", async () => {
+            const teamId = await createTeam();
+            const userId = await createUser();
+            const socket = makeMockSocket(actorFor(userId, teamId, "owner"), userId);
+            dashboardSocketHandler(socket);
+
+            const res = await socket.trigger("createDashboard", { title: "My WAN Fleet!" });
+
+            assert.strictEqual(res.ok, true, res.msg);
+            assert.match(res.slug, /^my-wan-fleet-\d+$/);
+            const stored = await R.findOne("dashboard", "id = ?", [res.dashboardId]);
+            assert.strictEqual(stored.slug, res.slug);
+            assert.ok(!stored.published, "new dashboards must not be published by default");
+        });
+
+        test("createDashboard accepts an explicit slug and rejects a duplicate", async () => {
+            const teamId = await createTeam();
+            const userId = await createUser();
+            const socket = makeMockSocket(actorFor(userId, teamId, "owner"), userId);
+            dashboardSocketHandler(socket);
+
+            const first = await socket.trigger("createDashboard", { title: "A", slug: "shared-slug" });
+            assert.strictEqual(first.ok, true, first.msg);
+            assert.strictEqual(first.slug, "shared-slug");
+
+            const dup = await socket.trigger("createDashboard", { title: "B", slug: "shared-slug" });
+            assert.strictEqual(dup.ok, false);
+            assert.match(dup.msg, /already in use/);
+        });
+
+        test("an invalid slug (spaces/uppercase) is rejected by validation", async () => {
+            const teamId = await createTeam();
+            const userId = await createUser();
+            const socket = makeMockSocket(actorFor(userId, teamId, "owner"), userId);
+            dashboardSocketHandler(socket);
+
+            const res = await socket.trigger("createDashboard", { title: "X", slug: "Not A Slug" });
+            assert.strictEqual(res.ok, false);
+        });
+
+        test("saveDashboard round-trips panel geometry, title, config and a widened kind", async () => {
+            const teamId = await createTeam();
+            const userId = await createUser();
+            const m1 = await createMonitor(teamId);
+            const socket = makeMockSocket(actorFor(userId, teamId, "owner"), userId);
+            dashboardSocketHandler(socket);
+
+            const created = await socket.trigger("createDashboard", { title: "Geo" });
+            const res = await socket.trigger("saveDashboard", {
+                id: created.dashboardId,
+                widgets: [
+                    {
+                        monitorId: m1,
+                        kind: "speedometer",
+                        title: "WAN",
+                        posX: 4,
+                        posY: 8,
+                        width: 6,
+                        height: 3,
+                        config: { unit: "Mb/s", max: 1000 },
+                    },
+                ],
+            });
+            assert.strictEqual(res.ok, true, res.msg);
+
+            const got = await socket.trigger("getDashboard", { id: created.dashboardId });
+            const p = got.widgets[0];
+            assert.strictEqual(p.kind, "speedometer");
+            assert.strictEqual(p.title, "WAN");
+            assert.strictEqual(p.posX, 4);
+            assert.strictEqual(p.posY, 8);
+            assert.strictEqual(p.width, 6);
+            assert.strictEqual(p.height, 3);
+            assert.deepStrictEqual(p.config, { unit: "Mb/s", max: 1000 });
+        });
+
+        test("saveDashboard toggles published and updates slug/theme/description/refresh", async () => {
+            const teamId = await createTeam();
+            const userId = await createUser();
+            const socket = makeMockSocket(actorFor(userId, teamId, "owner"), userId);
+            dashboardSocketHandler(socket);
+
+            const created = await socket.trigger("createDashboard", { title: "Pub" });
+            const res = await socket.trigger("saveDashboard", {
+                id: created.dashboardId,
+                published: true,
+                slug: "public-fleet",
+                theme: "dark",
+                description: "Ops view",
+                refreshInterval: 60,
+                widgets: [],
+            });
+            assert.strictEqual(res.ok, true, res.msg);
+
+            const got = await socket.trigger("getDashboard", { id: created.dashboardId });
+            assert.strictEqual(got.dashboard.published, true);
+            assert.strictEqual(got.dashboard.slug, "public-fleet");
+            assert.strictEqual(got.dashboard.theme, "dark");
+            assert.strictEqual(got.dashboard.description, "Ops view");
+            assert.strictEqual(got.dashboard.refreshInterval, 60);
+        });
+
+        test("saveDashboard rejects a slug already used by another dashboard", async () => {
+            const teamId = await createTeam();
+            const userId = await createUser();
+            const socket = makeMockSocket(actorFor(userId, teamId, "owner"), userId);
+            dashboardSocketHandler(socket);
+
+            await socket.trigger("createDashboard", { title: "A", slug: "taken" });
+            const b = await socket.trigger("createDashboard", { title: "B" });
+            const res = await socket.trigger("saveDashboard", { id: b.dashboardId, slug: "taken", widgets: [] });
+
+            assert.strictEqual(res.ok, false);
+            assert.match(res.msg, /already in use/);
+        });
+    });
 });
