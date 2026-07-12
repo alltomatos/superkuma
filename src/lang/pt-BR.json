@@ -1712,5 +1712,16 @@
     "Bearer Token": "Bearer Token",
     "Connection Timeout": "Tempo limite de conexão",
     "smtpAdditionalHeadersTitle": "Cabeçalhos adicionais",
-    "smtpAdditionalHeadersDesc": "Consulte os cabeçalhos personalizados do Nodemailer {0} para obter informações sobre o uso."
+    "smtpAdditionalHeadersDesc": "Consulte os cabeçalhos personalizados do Nodemailer {0} para obter informações sobre o uso.",
+    "Dashboards": "Painéis",
+    "teamDashboardsDescription": "Visões operacionais internas, restritas ao time, compostas por widgets sobre os monitores já existentes -- blocos de status, gauges de métrica e resumos de grupo, lado a lado.",
+    "New Dashboard": "Novo Painel",
+    "widgets": "widgets",
+    "Widget Type": "Tipo de Widget",
+    "Metric Gauge": "Gauge de Métrica",
+    "Group Summary": "Resumo do Grupo",
+    "Section": "Seção",
+    "Select a dashboard to view its widgets": "Selecione um painel para ver seus widgets",
+    "confirmDeleteDashboardMsg": "Excluir este painel? Os widgets dele também serão excluídos.",
+    "Paused": "Pausado"
 }
