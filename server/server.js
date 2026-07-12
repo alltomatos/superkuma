@@ -398,6 +398,10 @@ let needSetup = false;
     const statusPageRouter = require("./routers/status-page-router");
     app.use(statusPageRouter);
 
+    // Public Dashboard Router (ADR-0017: published /dashboards/:slug + data API)
+    const dashboardRouter = require("./routers/dashboard-router");
+    app.use(dashboardRouter);
+
     // Federation Router
     const federationRouter = require("./routers/federation-router");
     app.use(federationRouter);
@@ -812,6 +816,13 @@ let needSetup = false;
         });
 
         socket.on("setup", async (username, password, callback) => {
+            // Setup Rate Limit (GAP-008): reuse the same login limiter so a
+            // socket cannot flood the setup event, e.g. to race the
+            // count-check/insert below.
+            if (!(await loginRateLimiter.pass(callback))) {
+                return;
+            }
+
             try {
                 if (passwordStrength(password).value === "Too weak") {
                     throw new TranslatableError("passwordTooWeak");

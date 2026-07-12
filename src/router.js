@@ -18,6 +18,8 @@ import NotFound from "./pages/NotFound.vue";
 import DockerHosts from "./components/settings/Docker.vue";
 import ManageMaintenance from "./pages/ManageMaintenance.vue";
 import TeamDashboards from "./pages/TeamDashboards.vue";
+import DashboardBuilder from "./pages/DashboardBuilder.vue";
+import DashboardPublicView from "./pages/DashboardPublicView.vue";
 import APIKeys from "./components/settings/APIKeys.vue";
 import SetupDatabase from "./pages/SetupDatabase.vue";
 
@@ -191,6 +193,10 @@ const routes = [
                         path: "/team-dashboards",
                         component: TeamDashboards,
                     },
+                    {
+                        path: "/dashboard-builder/:id",
+                        component: DashboardBuilder,
+                    },
                 ],
             },
         ],
@@ -214,6 +220,10 @@ const routes = [
     {
         path: "/status/:slug",
         component: StatusPage,
+    },
+    {
+        path: "/panel/:slug",
+        component: DashboardPublicView,
     },
     {
         path: "/:pathMatch(.*)*",

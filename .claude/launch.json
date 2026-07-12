@@ -8,6 +8,12 @@
             "port": 3001
         },
         {
+            "name": "superkuma-backend-3099",
+            "runtimeExecutable": "npx",
+            "runtimeArgs": ["cross-env", "NODE_ENV=development", "SUPERKUMA_PORT=3099", "node", "server/server.js"],
+            "port": 3099
+        },
+        {
             "name": "superkuma-frontend",
             "runtimeExecutable": "npx",
             "runtimeArgs": ["cross-env", "NODE_ENV=development", "vite", "--host", "--config", "./config/vite.config.js", "--port", "3002"],
