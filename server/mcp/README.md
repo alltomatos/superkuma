@@ -206,21 +206,24 @@ the API key in the `Authorization` header.
 
 **Team dashboards**
 
-| Tool               | Kind        | Purpose                                                                         |
-| ------------------ | ----------- | ------------------------------------------------------------------------------- |
-| `list_dashboards`  | read        | Summaries (id, title, teamId, widgetCount) visible to the API key.              |
-| `get_dashboard`    | read        | A dashboard's full, ordered widget list by id.                                  |
-| `create_dashboard` | write       | Create an empty dashboard in the API key's own team.                            |
-| `save_dashboard`   | write       | Replace a dashboard's widget list (status_tile / metric_gauge / group_summary). |
-| `delete_dashboard` | destructive | Delete a dashboard (needs delete gate + `confirm`).                             |
+| Tool               | Kind        | Purpose                                                                                                                                                 |
+| ------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_dashboards`  | read        | Summaries (id, title, slug, published, teamId, widgetCount) visible to the API key.                                                                     |
+| `get_dashboard`    | read        | A dashboard's full, ordered panel list by id, with each panel's grid geometry.                                                                          |
+| `create_dashboard` | write       | Create an empty dashboard in the API key's own team (slug auto-generated if omitted).                                                                   |
+| `save_dashboard`   | write       | Replace a dashboard's panel grid (status_tile / metric_gauge / stat / speedometer / trend / pie / group_summary) and/or its title/slug/published/theme. |
+| `delete_dashboard` | destructive | Delete a dashboard (needs delete gate + `confirm`).                                                                                                     |
 
-Dashboards (ADR-0016) are the RMM-style operational view SuperKuma is building toward: an
-internal, always team-scoped composition of widgets over existing monitors, distinct from
-the public Status Page. `team_id` is always resolved server-side from the API key's own
-team — never accepted from the agent, so an agent can only build dashboards for the team
-its key belongs to. Ask an agent to "create a dashboard for team X's firewalls" and it can
-do the whole flow itself: `list_monitors` (with `teamId`) to find the right monitors,
-`create_dashboard`, then `save_dashboard` to lay out the widgets.
+Dashboards (ADR-0016/ADR-0017) are the RMM-style operational view SuperKuma is building
+toward: a Grafana-style, drag-and-drop-editable grid of panels over existing monitors,
+internal by default and always team-scoped. `team_id` is always resolved server-side from
+the API key's own team — never accepted from the agent, so an agent can only build
+dashboards for the team its key belongs to. Ask an agent to "create a dashboard for team
+X's firewalls" and it can do the whole flow itself: `list_monitors` (with `teamId`) to find
+the right monitors, `create_dashboard`, then `save_dashboard` to lay out the panels on the
+grid (`posX`/`posY`/`width`/`height`, 12 columns wide). Set `published: true` (via
+`create_dashboard` or `save_dashboard`) to make it readable, unauthenticated, at
+`/panel/<slug>` — otherwise it stays internal to the team.
 
 All read/write/destructive tools honour the same gating: read-only by default,
 writes need `SUPERKUMA_ALLOW_MUTATIONS=true`, deletes need `SUPERKUMA_ALLOW_DELETE=true`
