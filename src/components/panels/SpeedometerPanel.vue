@@ -138,12 +138,12 @@ export default {
     text-anchor: middle;
     font-size: 15px;
     font-weight: 700;
-    fill: currentColor;
+    fill: currentcolor;
 }
 
 .u {
     font-size: 9px;
-    fill: currentColor;
+    fill: currentcolor;
     opacity: 0.65;
 }
 </style>
