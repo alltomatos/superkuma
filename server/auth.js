@@ -6,6 +6,15 @@ const { loginRateLimiter, apiRateLimiter } = require("./rate-limiter");
 const { Settings } = require("./settings");
 const dayjs = require("dayjs");
 
+// A fixed, valid bcrypt hash with no matching real password -- comparing
+// against it when `user` is null keeps login() at a roughly constant time
+// cost regardless of whether `username` refers to a real user, closing a
+// user-enumeration timing side channel (GAP-008): without this, a
+// nonexistent username used to short-circuit before the (slow) bcrypt
+// compare ever ran, making the response measurably faster than for an
+// existing username with a wrong password.
+const DUMMY_HASH = "$2a$10$poL4RBvb6EtkR3X98XRdOum6Zd.4F8DFLdATQnPuEdGoixYFoFaPW";
+
 /**
  * Login to web app
  * @param {string} username Username to login with
@@ -18,8 +27,9 @@ exports.login = async function (username, password) {
     }
 
     let user = await R.findOne("user", "TRIM(username) = ? AND active = 1 ", [username.trim()]);
+    let passwordMatches = passwordHash.verify(password, user ? user.password : DUMMY_HASH);
 
-    if (user && passwordHash.verify(password, user.password)) {
+    if (user && passwordMatches) {
         // Upgrade the hash to bcrypt
         if (passwordHash.needRehash(user.password)) {
             await R.exec("UPDATE `user` SET password = ? WHERE id = ? ", [

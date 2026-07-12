@@ -59,6 +59,10 @@ import {
     faUsers,
     faCircle,
     faTh,
+    faGripVertical,
+    faChartPie,
+    faChartLine,
+    faHashtag,
 } from "@fortawesome/free-solid-svg-icons";
 
 library.add(
@@ -115,6 +119,10 @@ library.add(
     faUsers,
     faCircle,
     faTh,
+    faGripVertical,
+    faChartPie,
+    faChartLine,
+    faHashtag,
 );
 
 export { FontAwesomeIcon };

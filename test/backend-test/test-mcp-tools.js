@@ -577,12 +577,95 @@ describe("MCP dashboard tools", () => {
         });
 
         assert.strictEqual(res.data.ok, true);
-        assert.match(res.data.message, /2 widget/);
+        assert.match(res.data.message, /2 panel/);
         const call = lastCall(client, "saveDashboard").args[0];
         assert.strictEqual(call.id, 4);
         assert.strictEqual(call.title, "Renamed");
         assert.strictEqual(call.widgets.length, 2);
         assert.strictEqual(call.widgets[0].sectionName, "Firewalls");
+        // NOTE: FakeServer (this test's harness) invokes the tool handler
+        // directly and does not replicate the real MCP SDK's zod validation
+        // pass, so schema defaults (e.g. posX/width) do not apply here --
+        // that's covered at the schema layer, not by this pass-through test.
+    });
+
+    test("create_dashboard forwards an explicit slug/published and returns the server-assigned slug", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        client.responses.createDashboard = { ok: true, dashboardId: 5, slug: "public-fleet" };
+        registerAllTools(server, client, fullConfig);
+
+        const res = await server.call("create_dashboard", {
+            title: "Public Fleet",
+            slug: "public-fleet",
+            published: true,
+        });
+
+        assert.strictEqual(res.data.slug, "public-fleet");
+        assert.match(res.data.message, /public-fleet/);
+        const call = lastCall(client, "createDashboard").args[0];
+        assert.strictEqual(call.slug, "public-fleet");
+        assert.strictEqual(call.published, true);
+    });
+
+    test("save_dashboard forwards ADR-0017 panel geometry/config and dashboard-level fields (slug/published/theme)", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        client.responses.saveDashboard = { ok: true, widgetCount: 1 };
+        registerAllTools(server, client, fullConfig);
+
+        await server.call("save_dashboard", {
+            id: 4,
+            slug: "new-slug",
+            published: true,
+            theme: "dark",
+            refreshInterval: 60,
+            widgets: [
+                {
+                    monitorId: 9,
+                    kind: "speedometer",
+                    title: "WAN",
+                    posX: 4,
+                    posY: 8,
+                    width: 6,
+                    height: 3,
+                    config: { unit: "Mb/s", max: 1000 },
+                },
+            ],
+        });
+
+        const call = lastCall(client, "saveDashboard").args[0];
+        assert.strictEqual(call.slug, "new-slug");
+        assert.strictEqual(call.published, true);
+        assert.strictEqual(call.theme, "dark");
+        assert.strictEqual(call.refreshInterval, 60);
+        const panel = call.widgets[0];
+        assert.strictEqual(panel.kind, "speedometer");
+        assert.strictEqual(panel.posX, 4);
+        assert.strictEqual(panel.posY, 8);
+        assert.strictEqual(panel.width, 6);
+        assert.strictEqual(panel.height, 3);
+        assert.deepStrictEqual(panel.config, { unit: "Mb/s", max: 1000 });
+    });
+
+    test("save_dashboard accepts every ADR-0017 panel kind", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        client.responses.saveDashboard = { ok: true, widgetCount: 7 };
+        registerAllTools(server, client, fullConfig);
+
+        const kinds = ["status_tile", "metric_gauge", "group_summary", "stat", "speedometer", "trend", "pie"];
+        const res = await server.call("save_dashboard", {
+            id: 4,
+            widgets: kinds.map((kind, i) => ({ monitorId: i + 1, kind })),
+        });
+
+        assert.strictEqual(res.data.ok, true);
+        const call = lastCall(client, "saveDashboard").args[0];
+        assert.deepStrictEqual(
+            call.widgets.map((w) => w.kind),
+            kinds
+        );
     });
 
     test("delete_dashboard is a dry-run without confirm and a real call with it", async () => {
