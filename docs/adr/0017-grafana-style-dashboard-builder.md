@@ -1,6 +1,6 @@
 # ADR-0017: Builder de dashboards estilo Grafana (evolui ADR-0016)
 
-- **Status:** Proposed
+- **Status:** Implemented (Phase 1, 2026-07-12) — commits `70595ba5`..`a3f5babb` na branch `claude/superkuma-pfsense-telegraf-c4f669`. Verificado ao vivo (dev server real) + verificação adversarial (5 mutações, 4 pegas de cara, 1 gap real fechado). Fase 2 (fontes de dados/query direta) segue não iniciada.
 - **Data:** 2026-07-12
 - **Tier:** T3 (evolui schema de `dashboard`/`dashboard_widget` + **nova superfície pública** `/panel/:slug` + nova dependência frontend) — exige "Go" humano.
 - **Relacionado:** [ADR-0016](0016-team-dashboards.md) (o conceito de dashboard por time que isto evolui), [ADR-0015](0015-otel-telemetry-receiver.md) / monitor-type `influxdb` (a telemetria que os painéis consomem — o valor da métrica já vai no canal `ping`/heartbeat), [ADR-0010](0010-teams-rbac-multitenancy.md) (autorização por `team_id`), [ADR-0009](0009-master-long-term-metrics-history.md) (séries `stat_*` para janelas longas de trend).
