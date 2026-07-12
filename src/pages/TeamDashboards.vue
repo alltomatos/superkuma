@@ -10,42 +10,30 @@
             </button>
         </div>
 
-        <div class="row">
-            <div class="col-md-4">
-                <div class="list-group">
-                    <button
-                        v-for="dashboard in dashboardList"
-                        :key="dashboard.id"
-                        type="button"
-                        class="list-group-item list-group-item-action"
-                        :class="{ active: dashboard.id === selectedDashboardId }"
-                        @click="selectDashboard(dashboard.id)"
-                    >
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div>{{ dashboard.title }}</div>
-                                <small class="text-muted">
-                                    {{ dashboard.teamName }} &middot; {{ dashboard.widgetCount }} {{ $t("widgets") }}
-                                </small>
-                            </div>
-                            <button class="btn btn-normal btn-sm" type="button" @click.stop="deleteDialog(dashboard)">
-                                <font-awesome-icon icon="trash" />
-                            </button>
+        <div class="list-group">
+            <router-link
+                v-for="dashboard in dashboardList"
+                :key="dashboard.id"
+                :to="`/dashboard-builder/${dashboard.id}`"
+                class="list-group-item list-group-item-action"
+            >
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div>
+                            {{ dashboard.title }}
+                            <span v-if="dashboard.published" class="badge bg-primary ms-1">{{ $t("Published") }}</span>
                         </div>
-                    </button>
-                    <div v-if="dashboardList.length === 0" class="text-center text-muted p-3">
-                        {{ $t("notAvailableShort") }}
+                        <small class="text-muted">
+                            {{ dashboard.teamName }} &middot; {{ dashboard.widgetCount }} {{ $t("widgets") }}
+                        </small>
                     </div>
+                    <button class="btn btn-normal btn-sm" type="button" @click.prevent.stop="deleteDialog(dashboard)">
+                        <font-awesome-icon icon="trash" />
+                    </button>
                 </div>
-            </div>
-
-            <div class="col-md-8">
-                <DashboardDetail
-                    :dashboard="selectedDashboard"
-                    :widgets="selectedWidgets"
-                    @add-widget="addWidget"
-                    @remove-widget="removeWidget"
-                />
+            </router-link>
+            <div v-if="dashboardList.length === 0" class="text-center text-muted p-3">
+                {{ $t("notAvailableShort") }}
             </div>
         </div>
 
@@ -100,12 +88,16 @@
 <script>
 import { Modal } from "bootstrap";
 import Confirm from "../components/Confirm.vue";
-import DashboardDetail from "../components/DashboardDetail.vue";
 
+/**
+ * List of the current team's dashboards (ADR-0016/ADR-0017): create new ones,
+ * delete existing ones, and navigate into the Grafana-style builder
+ * (DashboardBuilder.vue, at /dashboard-builder/:id) to edit a dashboard's
+ * panels.
+ */
 export default {
     components: {
         Confirm,
-        DashboardDetail,
     },
     data() {
         return {
@@ -113,9 +105,6 @@ export default {
             creatingDashboard: false,
             createModal: null,
             pendingDeleteDashboard: null,
-            selectedDashboardId: null,
-            selectedDashboard: null,
-            selectedWidgets: [],
         };
     },
     computed: {
@@ -138,7 +127,8 @@ export default {
         },
 
         /**
-         * Create a dashboard from the dialog's form.
+         * Create a dashboard from the dialog's form, then navigate straight
+         * into its builder (same "create, then edit" flow as add-status-page).
          * @returns {void}
          */
         submitCreate() {
@@ -147,79 +137,17 @@ export default {
                 this.creatingDashboard = false;
                 this.$root.toastRes(res);
                 if (res.ok) {
-                    this.createModal.hide();
-                }
-            });
-        },
-
-        /**
-         * Load a dashboard's full widget list into the detail pane.
-         * @param {number} id Dashboard id
-         * @returns {void}
-         */
-        selectDashboard(id) {
-            this.$root.getDashboard(id, (res) => {
-                if (res.ok) {
-                    this.selectedDashboardId = id;
-                    this.selectedDashboard = res.dashboard;
-                    this.selectedWidgets = res.widgets;
-                } else {
-                    this.$root.toastRes(res);
-                }
-            });
-        },
-
-        /**
-         * Persist the current in-memory widget list (full replace, same
-         * semantics as save_status_page).
-         * @returns {void}
-         */
-        persistWidgets() {
-            this.$root.saveDashboard(
-                {
-                    id: this.selectedDashboardId,
-                    widgets: this.selectedWidgets.map((w) => ({
-                        monitorId: w.monitorId,
-                        kind: w.kind,
-                        sectionName: w.sectionName || undefined,
-                    })),
-                },
-                (res) => {
-                    if (!res.ok) {
-                        this.$root.toastRes(res);
-                        // Reload from the server to undo the optimistic local change.
-                        this.selectDashboard(this.selectedDashboardId);
+                    // Navigate first: the page unmounts right after, so a
+                    // broken modal teardown (e.g. Bootstrap's Modal throwing
+                    // on hide()) can never block leaving this page.
+                    this.$router.push(`/dashboard-builder/${res.dashboardId}`);
+                    try {
+                        this.createModal.hide();
+                    } catch (e) {
+                        void e;
                     }
                 }
-            );
-        },
-
-        /**
-         * Add a widget to the selected dashboard from DashboardDetail's
-         * "Add widget" form.
-         * @param {object} newWidget Fields from the form ({ monitorId, kind, sectionName })
-         * @returns {void}
-         */
-        addWidget(newWidget) {
-            const monitor = this.$root.monitorList[newWidget.monitorId];
-            this.selectedWidgets.push({
-                id: `pending-${Date.now()}`,
-                monitorId: newWidget.monitorId,
-                monitorName: monitor ? monitor.name : null,
-                kind: newWidget.kind,
-                sectionName: newWidget.sectionName || null,
             });
-            this.persistWidgets();
-        },
-
-        /**
-         * Remove a widget from the selected dashboard.
-         * @param {object} widget The widget to remove
-         * @returns {void}
-         */
-        removeWidget(widget) {
-            this.selectedWidgets = this.selectedWidgets.filter((w) => w !== widget);
-            this.persistWidgets();
         },
 
         /**
@@ -240,11 +168,6 @@ export default {
             const id = this.pendingDeleteDashboard.id;
             this.$root.deleteDashboard(id, (res) => {
                 this.$root.toastRes(res);
-                if (res.ok && this.selectedDashboardId === id) {
-                    this.selectedDashboardId = null;
-                    this.selectedDashboard = null;
-                    this.selectedWidgets = [];
-                }
             });
         },
     },
