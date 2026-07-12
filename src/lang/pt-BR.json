@@ -1723,5 +1723,15 @@
     "Section": "Seção",
     "Select a dashboard to view its widgets": "Selecione um painel para ver seus widgets",
     "confirmDeleteDashboardMsg": "Excluir este painel? Os widgets dele também serão excluídos.",
-    "Paused": "Pausado"
+    "Paused": "Pausado",
+    "Published": "Publicado",
+    "Unpublished": "Não Publicado",
+    "View": "Visualizar",
+    "Add Panel": "Adicionar Painel",
+    "Stat": "Stat",
+    "Speedometer": "Velocímetro",
+    "Trend": "Tendência",
+    "Pie": "Pizza",
+    "Dashboard Not Found": "Painel Não Encontrado",
+    "Provided by": "Fornecido por"
 }
