@@ -189,7 +189,6 @@ export default {
     },
     mounted() {
         this.load();
-        this.addPanelModal = new Modal(this.$refs.addPanelModal);
     },
     methods: {
         /**
@@ -207,6 +206,18 @@ export default {
                 this.dashboard = res.dashboard;
                 this.widgets = res.widgets;
                 this.rebuildLayout();
+
+                // The "Add Panel" modal's root element only exists once
+                // dashboard is set (the whole template is behind
+                // v-if="dashboard"), so it can only be initialized here,
+                // after the DOM has actually re-rendered -- not in
+                // mounted(), where $refs.addPanelModal would still be
+                // undefined and crash the Modal constructor.
+                if (!this.addPanelModal) {
+                    this.$nextTick(() => {
+                        this.addPanelModal = new Modal(this.$refs.addPanelModal);
+                    });
+                }
             });
         },
 
