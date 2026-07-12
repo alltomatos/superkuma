@@ -40,6 +40,12 @@
                     </router-link>
                 </li>
                 <li v-if="$root.loggedIn" class="nav-item me-2">
+                    <router-link to="/team-dashboards" class="nav-link">
+                        <font-awesome-icon icon="th" />
+                        {{ $t("Dashboard Pages") }}
+                    </router-link>
+                </li>
+                <li v-if="$root.loggedIn" class="nav-item me-2">
                     <router-link to="/dashboard" class="nav-link">
                         <font-awesome-icon icon="tachometer-alt" />
                         {{ $t("Dashboard") }}
@@ -80,17 +86,6 @@
                                 >
                                     <font-awesome-icon icon="wrench" />
                                     {{ $t("Maintenance") }}
-                                </router-link>
-                            </li>
-
-                            <li>
-                                <router-link
-                                    to="/team-dashboards"
-                                    class="dropdown-item"
-                                    :class="{ active: $route.path.includes('team-dashboards') }"
-                                >
-                                    <font-awesome-icon icon="th" />
-                                    {{ $t("Dashboards") }}
                                 </router-link>
                             </li>
 
