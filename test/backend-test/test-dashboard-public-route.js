@@ -208,6 +208,22 @@ describe("public dashboard route (ADR-0017 /api/panel/:slug)", () => {
         assert.deepStrictEqual(res.body.panels, []);
         assert.strictEqual(res.body.dashboard.teamId, undefined, "public payload must not leak teamId");
         assert.strictEqual(res.body.dashboard.published, undefined, "public payload must not echo the published flag");
+        // Regression test for a mutation-testing gap found during the ADR-0017
+        // adversarial verification (2026-07-12): a raw `{ ...dashboard, ... }`
+        // spread of the redbean-node Bean (instead of the explicit whitelist
+        // object literal) went UNCAUGHT by the two assertions above, because a
+        // Bean's own-enumerable properties are underscore-prefixed internals
+        // (`_teamId`, `_published`, `_id`, `_createdDate`, plus a `beanMeta`
+        // object) -- never the camelCase `teamId`/`published` names those
+        // assertions check for. A spread leaks the real internal team id and
+        // published flag under those different key names instead. Asserting
+        // the exact key set closes that gap regardless of what name a future
+        // leak might use.
+        assert.deepStrictEqual(
+            Object.keys(res.body.dashboard).sort(),
+            ["description", "refreshInterval", "slug", "theme", "title"],
+            "the public dashboard payload must contain exactly the whitelisted fields -- nothing else"
+        );
     });
 
     test("a PUBLISHED dashboard returns its panels + per-monitor public heartbeats", async () => {
