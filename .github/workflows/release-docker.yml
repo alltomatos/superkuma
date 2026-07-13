@@ -1,7 +1,28 @@
 name: Release Docker Image
 
 # Builds the self-contained Dockerfile (repo root) and pushes it to Docker Hub.
-# Runs on a version tag push (e.g. v2.4.0) or a manual dispatch.
+# Runs on a version tag push (e.g. v2.4.0), a manual dispatch, OR any push to
+# main (guarded by the "already published?" check below, since not every
+# push to main bumps the version).
+#
+# The tag-push trigger alone is NOT reliable: tags created by auto-release.yml
+# are pushed using the default GITHUB_TOKEN, and GitHub Actions deliberately
+# doesn't cascade-trigger other workflows from GITHUB_TOKEN-authenticated
+# pushes (anti-recursion protection) -- confirmed broken in practice since
+# 2026-07-06 (every release since then needed a manual workflow_dispatch).
+# The push-to-main trigger sidesteps this entirely by reacting to the same
+# event auto-release.yml itself reacts to, rather than depending on a
+# cascade from its tag push. Both triggers are kept: push-to-main is what
+# actually fires today; tag-push keeps working if the token situation is
+# ever fixed, and workflow_dispatch remains for manual re-runs.
+#
+# Deliberately no `paths: [package.json]` filter on the branch push: GitHub's
+# paths filtering is unreliable for the coexisting tag-push trigger (a tag
+# ref doesn't introduce new commits/diffs the way a branch push does, so
+# combining `tags` and `paths` on the same `push` block risks silently
+# suppressing the tag trigger). Filtering by path would only save a job
+# invocation that the "already published?" check below immediately no-ops
+# anyway, so it isn't worth that risk.
 #
 # Requires two repository secrets:
 #   DOCKERHUB_USERNAME - the Docker Hub account/namespace (e.g. ronaldodavi)
@@ -15,6 +36,7 @@ on:
   push:
     tags:
       - "v*.*.*"
+    branches: [main]
   workflow_dispatch:
     inputs:
       version:
@@ -48,25 +70,48 @@ jobs:
 
       - name: Resolve version
         id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_VERSION: ${{ github.event.inputs.version }}
+          REF: ${{ github.ref }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            VERSION="${DISPATCH_VERSION}"
+          elif [[ "${REF}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
+          else
+            # Plain push to main (not a tag): the version to publish is
+            # whatever's currently in package.json.
+            VERSION=$(jq -r .version package.json)
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "major=${VERSION%%.*}" >> "$GITHUB_OUTPUT"
 
+      - name: Skip if this version is already published
+        id: check
+        run: |
+          if curl -sf "https://hub.docker.com/v2/repositories/${IMAGE}/tags/${VERSION}/" > /dev/null; then
+            echo "${IMAGE}:${VERSION} is already on Docker Hub -- nothing to publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+
       - name: Set up Docker Buildx
+        if: steps.check.outputs.skip != 'true'
         uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
 
       - name: Login to Docker Hub
+        if: steps.check.outputs.skip != 'true'
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push (amd64)
+        if: steps.check.outputs.skip != 'true'
         env:
           VERSION: ${{ steps.version.outputs.version }}
           MAJOR: ${{ steps.version.outputs.major }}

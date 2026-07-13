@@ -1,0 +1,177 @@
+name: Prepare Release PR
+
+# Runs on every push to develop. Computes the semver bump implied by
+# Conventional Commits since the last release tag (fix/perf -> patch,
+# feat -> minor, "!" after type/scope or a "BREAKING CHANGE:" footer -> major)
+# and maintains a single standing "chore: release vX.Y.Z" PR from develop into
+# main with that version bump applied on top -- mirroring what used to be a
+# manual step (npm version + a hand-written "chore: promote develop to main"
+# PR). If develop has no feat/fix/breaking commits since the last release
+# (only chore/docs/test/refactor/etc.), no PR is opened -- there's nothing
+# release-worthy yet.
+#
+# Every new push to develop re-runs this and force-updates the same release
+# branch/PR in place, so the PR always reflects exactly what's currently
+# unreleased on develop, however many pushes land before someone merges it.
+#
+# Merging that PR is still a manual, reviewed step: this workflow never
+# pushes to main directly, matching CLAUDE.md's "never commit direct to
+# master" rule -- it only ever pushes to its own disposable release branch.
+# Once merged, auto-release.yml (unchanged) tags + releases automatically,
+# and release-docker.yml (see its own header comment) picks that up and
+# publishes the Docker Hub image -- so reviewing and merging this one PR is
+# the only manual step left in the whole release pipeline.
+#
+# Runs on a GitHub-hosted runner (needs Node/npm for `npm version` and the gh
+# CLI, neither installed on the omniroute self-hosted runner used by
+# auto-release.yml/release-docker.yml -- see their comments) rather than
+# self-hosted: safe to do so because this only ever fires on push to develop,
+# which -- like push to main -- only happens after a human already reviewed
+# and merged a PR, never from an untrusted fork. auto-test.yml already runs
+# PR-triggered (untrusted-fork-exposed) builds on GitHub-hosted infra, so a
+# push-to-develop trigger is strictly more trusted than what's already there.
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-pr
+  cancel-in-progress: true
+
+env:
+  RELEASE_BRANCH: release-please--branches--main
+
+jobs:
+  release-pr:
+    if: github.repository == 'alltomatos/superkuma'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # persist-credentials must stay true (unlike read-only checkouts
+      # elsewhere in this repo): this job pushes the release branch with the
+      # checked-out token further down. zizmor: ignore[artipacked]
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          ref: develop
+          persist-credentials: true
+
+      - name: Determine bump type from commits since last release
+        id: bump
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 --match 'v*.*.*' origin/main)
+          echo "Last release: ${LAST_TAG}"
+          echo "last_tag=${LAST_TAG}" >> "$GITHUB_OUTPUT"
+
+          BUMP=""
+          for sha in $(git rev-list "${LAST_TAG}..origin/develop"); do
+            SUBJECT=$(git log -1 --format=%s "$sha")
+            BODY=$(git log -1 --format=%b "$sha")
+
+            if [[ "$SUBJECT" =~ ^[a-zA-Z]+(\([^\)]*\))?!: ]] || [[ "$BODY" == *"BREAKING CHANGE:"* ]]; then
+              BUMP="major"
+            elif [[ "$BUMP" != "major" && "$SUBJECT" =~ ^feat(\([^\)]*\))?: ]]; then
+              BUMP="minor"
+            elif [[ -z "$BUMP" && "$SUBJECT" =~ ^(fix|perf)(\([^\)]*\))?: ]]; then
+              BUMP="patch"
+            fi
+          done
+
+          if [ -z "$BUMP" ]; then
+            echo "No feat/fix/breaking commits since ${LAST_TAG} -- nothing to release."
+          else
+            echo "Computed bump: ${BUMP}"
+          fi
+          echo "bump=${BUMP}" >> "$GITHUB_OUTPUT"
+
+      - name: Build changelog preview
+        if: steps.bump.outputs.bump != ''
+        id: changelog
+        env:
+          LAST_TAG: ${{ steps.bump.outputs.last_tag }}
+        run: |
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            git log "${LAST_TAG}..origin/develop" --format='- %s'
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        if: steps.bump.outputs.bump != ''
+        with:
+          node-version: 20
+
+      - name: Bump version on the release branch
+        if: steps.bump.outputs.bump != ''
+        id: version
+        env:
+          BUMP: ${{ steps.bump.outputs.bump }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B "${RELEASE_BRANCH}"
+
+          # Bump relative to what's actually live on main (the last
+          # released version), not develop's current package.json --
+          # keeps this correct even if develop's version field ever
+          # drifts from main's.
+          BASE_VERSION=$(git show origin/main:package.json | jq -r .version)
+          jq --arg v "$BASE_VERSION" '.version = $v' package.json > package.json.tmp
+          mv package.json.tmp package.json
+
+          NEW_VERSION=$(npm version "${BUMP}" --no-git-tag-version | tr -d 'v')
+          git add package.json package-lock.json
+          git commit -m "chore(release): bump version to ${NEW_VERSION}"
+          git push origin "${RELEASE_BRANCH}" --force
+
+          echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the release PR
+        if: steps.bump.outputs.bump != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BUMP: ${{ steps.bump.outputs.bump }}
+          LAST_TAG: ${{ steps.bump.outputs.last_tag }}
+          CHANGELOG: ${{ steps.changelog.outputs.changelog }}
+        run: |
+          TITLE="chore: release v${VERSION}"
+          BODY_FILE=$(mktemp)
+          {
+            echo "# Summary"
+            echo
+            echo "Automated release PR -- promotes develop to main and bumps the version"
+            echo "to v${VERSION} (${BUMP} bump, computed from Conventional Commits since"
+            echo "${LAST_TAG})."
+            echo
+            echo "## Changes since ${LAST_TAG}"
+            echo
+            echo "${CHANGELOG}"
+            echo
+            echo "<details>"
+            echo "<summary>Please follow this checklist to avoid unnecessary back and forth (click to expand)</summary>"
+            echo
+            echo "- [x] Automated release PR -- version bump only, no hand-written code."
+            echo "- [x] CI passes and is green (see checks below before merging)."
+            echo
+            echo "</details>"
+            echo
+            echo "Merging this PR (regular merge -- do **not** delete \`develop\`) tags"
+            echo "+ releases automatically via auto-release.yml, which in turn publishes"
+            echo "the Docker Hub image via release-docker.yml."
+          } > "$BODY_FILE"
+
+          EXISTING=$(gh pr list --base main --head "${RELEASE_BRANCH}" --state open --json number -q '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            gh pr edit "$EXISTING" --title "$TITLE" --body-file "$BODY_FILE"
+            echo "Updated existing release PR #${EXISTING}"
+          else
+            gh pr create --base main --head "${RELEASE_BRANCH}" --title "$TITLE" --body-file "$BODY_FILE"
+          fi
