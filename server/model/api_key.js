@@ -38,9 +38,15 @@ class APIKey extends BeanModel {
     /**
      * Returns an object that ready to parse to JSON with sensitive fields
      * removed
-     * @returns {object} Object ready to parse
+     * @returns {Promise<object>} Object ready to parse
      */
-    toPublicJSON() {
+    async toPublicJSON() {
+        let roleSlug = null;
+        if (this.role_id) {
+            const role = await R.findOne("role", "id = ?", [this.role_id]);
+            roleSlug = role ? role.slug : null;
+        }
+
         return {
             id: this.id,
             name: this.name,
@@ -49,22 +55,27 @@ class APIKey extends BeanModel {
             active: this.active,
             expires: this.expires,
             status: this.getStatus(),
+            roleSlug,
         };
     }
 
     /**
-     * Create a new API Key and store it in the database. The key is always
-     * created with the read-only "viewer" role -- matching how a legacy
-     * (pre-RBAC) key is downgraded on migration -- rather than inheriting the
-     * creator's own role, since there's no UI yet to choose a role and an API
-     * key must never be more privileged than explicitly intended (ADR-0010 R2:
-     * an API key actor never short-circuits is_superadmin, even indirectly).
+     * Create a new API Key and store it in the database. Defaults to the
+     * read-only "viewer" role -- matching how a legacy (pre-RBAC) key is
+     * downgraded on migration -- unless the caller explicitly requests a more
+     * privileged built-in role via `roleSlug`. The caller (the socket handler)
+     * is responsible for verifying the actor may grant that role before
+     * calling this; an API key must never be more privileged than explicitly
+     * intended (ADR-0010 R2: an API key actor never short-circuits
+     * is_superadmin, even indirectly -- "superadmin" is never an accepted
+     * roleSlug here).
      * @param {object} key Object sent by client
      * @param {int} userID ID of socket user
      * @param {import("../security/authz").Actor} actor RBAC actor creating the key
+     * @param {string} roleSlug Built-in, non-superadmin role slug to assign (default "viewer")
      * @returns {Promise<bean>} API key
      */
-    static async save(key, userID, actor) {
+    static async save(key, userID, actor, roleSlug = "viewer") {
         let bean;
         bean = R.dispense("api_key");
 
@@ -75,8 +86,8 @@ class APIKey extends BeanModel {
         bean.expires = key.expires;
         bean.team_id = await resolveTeamIdForCreate(actor);
 
-        const viewerRole = await R.findOne("role", "slug = ? AND team_id IS NULL AND is_system = 1", ["viewer"]);
-        bean.role_id = viewerRole ? viewerRole.id : null;
+        const role = await R.findOne("role", "slug = ? AND team_id IS NULL AND is_system = 1", [roleSlug]);
+        bean.role_id = role ? role.id : null;
 
         await R.store(bean);
 

@@ -972,6 +972,16 @@ export default {
         },
 
         /**
+         * Change the role assigned to an existing API key
+         * @param {object} input { id, roleSlug }
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        editAPIKey(input, callback) {
+            socket.emit("editAPIKey", input, callback);
+        },
+
+        /**
          * Delete specified API key
          * @param {int} keyID ID of key to delete
          * @param {socketCB} callback Callback for socket response
