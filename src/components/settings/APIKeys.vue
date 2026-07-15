@@ -23,7 +23,12 @@
                     <div class="left-part">
                         <div class="circle"></div>
                         <div class="info">
-                            <div class="title">{{ item.name }}</div>
+                            <div class="title">
+                                {{ item.name }}
+                                <span v-if="item.roleSlug" class="badge bg-secondary ms-1">
+                                    {{ $t("teamRole_" + item.roleSlug) }}
+                                </span>
+                            </div>
                             <div class="status">
                                 {{ $t("apiKey-" + item.status) }}
                             </div>
@@ -37,6 +42,11 @@
 
                     <div class="buttons">
                         <div class="btn-group" role="group">
+                            <button class="btn btn-normal" @click="editDialog(item)">
+                                <font-awesome-icon icon="pen" />
+                                {{ $t("Edit") }}
+                            </button>
+
                             <button v-if="item.active" class="btn btn-normal" @click="disableDialog(item.id)">
                                 <font-awesome-icon icon="pause" />
                                 {{ $t("Disable") }}
@@ -71,13 +81,53 @@
             {{ $t("deleteAPIKeyMsg") }}
         </Confirm>
 
+        <div ref="editRoleModal" class="modal fade" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form @submit.prevent="submitEditRole">
+                        <div class="modal-header">
+                            <h5 class="modal-title">{{ $t("Edit API Key") }}</h5>
+                            <button
+                                type="button"
+                                class="btn-close"
+                                :aria-label="$t('Close')"
+                                @click="closeEditRoleModal"
+                            />
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label" for="editRoleSlug">{{ $t("Role") }}</label>
+                                <select id="editRoleSlug" v-model="editRoleSlug" class="form-select">
+                                    <option v-for="slug in assignableRoles" :key="slug" :value="slug">
+                                        {{ $t("teamRole_" + slug) }}
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary" :disabled="editingRole">
+                                <div v-if="editingRole" class="spinner-border spinner-border-sm me-1"></div>
+                                {{ $t("Save") }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <APIKeyDialog ref="apiKeyDialog" />
     </div>
 </template>
 
 <script>
+import { Modal } from "bootstrap";
 import APIKeyDialog from "../../components/APIKeyDialog.vue";
 import Confirm from "../Confirm.vue";
+
+// Roles assignable to an API key, mirroring the backend's
+// ASSIGNABLE_API_KEY_ROLE_SLUGS in api-key-socket-handler.js. "superadmin" is
+// deliberately excluded -- an API key must never carry is_superadmin.
+const ASSIGNABLE_ROLES = ["owner", "admin", "editor", "viewer"];
 
 export default {
     components: {
@@ -87,8 +137,14 @@ export default {
     data() {
         return {
             selectedKeyID: null,
+            editRoleModal: null,
+            editKeyID: null,
+            editRoleSlug: "viewer",
+            editingRole: false,
+            assignableRoles: ASSIGNABLE_ROLES,
         };
     },
+
     computed: {
         keyList() {
             let result = Object.values(this.$root.apiKeyList);
@@ -97,6 +153,10 @@ export default {
         settings() {
             return this.$parent.$parent.$parent.settings;
         },
+    },
+
+    mounted() {
+        this.editRoleModal = new Modal(this.$refs.editRoleModal);
     },
 
     methods: {
@@ -148,6 +208,40 @@ export default {
         enableKey(id) {
             this.$root.getSocket().emit("enableAPIKey", id, (res) => {
                 this.$root.toastRes(res);
+            });
+        },
+
+        /**
+         * Show dialog to change the role assigned to an API key
+         * @param {object} item The API key item ({ id, roleSlug })
+         * @returns {void}
+         */
+        editDialog(item) {
+            this.editKeyID = item.id;
+            this.editRoleSlug = item.roleSlug || "viewer";
+            this.editRoleModal.show();
+        },
+
+        /**
+         * Hide the edit-role dialog
+         * @returns {void}
+         */
+        closeEditRoleModal() {
+            this.editRoleModal.hide();
+        },
+
+        /**
+         * Submit the new role for the selected API key
+         * @returns {void}
+         */
+        submitEditRole() {
+            this.editingRole = true;
+            this.$root.editAPIKey({ id: this.editKeyID, roleSlug: this.editRoleSlug }, (res) => {
+                this.editingRole = false;
+                this.$root.toastRes(res);
+                if (res.ok) {
+                    this.editRoleModal.hide();
+                }
             });
         },
     },
