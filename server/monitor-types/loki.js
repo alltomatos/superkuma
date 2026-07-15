@@ -116,6 +116,10 @@ class LokiMonitorType extends MonitorType {
         };
 
         if (monitor.ignoreTls) {
+            // codeql[js/disabling-certificate-validation]: deliberate, user opt-in
+            // (off by default) for self-signed certs on an internal Loki --
+            // identical, already-accepted pattern to prometheus.js/influxdb.js's
+            // own ignoreTls handling.
             options.httpsAgent = new https.Agent({ rejectUnauthorized: false });
         }
 
