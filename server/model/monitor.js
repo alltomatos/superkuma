@@ -1516,6 +1516,82 @@ class Monitor extends BeanModel {
     }
 
     /**
+     * Record that a `monitor_log_rule` (ADR-0019) has tripped and notify --
+     * entirely decoupled from the Loki monitor's own reachability heartbeat,
+     * mirroring evaluateAnomaly's separation between "is the monitor up" and
+     * "is there something alert-worthy". Called once per rule that evaluates
+     * true; called by server/monitor-types/loki.js, never by beat() directly
+     * (log rules are Loki-monitor-specific, unlike anomaly detection which
+     * applies to every monitor type).
+     *
+     * Deliberately swallows every error internally -- same rationale as
+     * evaluateAnomaly: a bug here (bad rule config, a transient DB error on
+     * the alert_event insert) must never propagate out of loki.js's check()
+     * and take down the monitor's own heartbeat evaluation.
+     * @param {Monitor} monitor The monitor the rule belongs to.
+     * @param {import("./heartbeat")} bean This beat's heartbeat bean. Read
+     * only -- never mutated, so the monitor's UP/DOWN status is untouched.
+     * @param {object} rule The `monitor_log_rule` row that tripped (id, name,
+     * logql, operator, threshold, severity).
+     * @param {number|string} value The value returned by the LogQL query that
+     * satisfied the rule's operator/threshold.
+     * @returns {Promise<void>}
+     */
+    static async evaluateLogRule(monitor, bean, rule, value) {
+        try {
+            // Same anti-noise cooldown window and rationale as evaluateAnomaly,
+            // scoped per-rule (not per-monitor) via log_rule_id so two different
+            // rules on the same monitor don't suppress each other.
+            const cooldownMs = 15 * 60 * 1000;
+            const lastEvent = await R.getRow(
+                "SELECT time FROM alert_event WHERE log_rule_id = ? ORDER BY time DESC LIMIT 1",
+                [rule.id]
+            );
+            if (lastEvent && lastEvent.time && dayjs.utc().diff(dayjs.utc(lastEvent.time)) < cooldownMs) {
+                return;
+            }
+
+            await R.knex("alert_event").insert({
+                monitor_id: monitor.id,
+                type: "log_rule",
+                log_rule_id: rule.id,
+                value: Number(value),
+                expected: rule.threshold,
+                score: 0,
+                severity: rule.severity,
+                time: R.isoDateTimeMillis(dayjs.utc()),
+            });
+
+            const notificationList = await Monitor.getRoutedNotificationList(monitor, rule.severity);
+            if (notificationList.length === 0) {
+                return;
+            }
+
+            const msg = `[${monitor.name}] [Log rule: ${rule.name}] ${value} ${rule.operator} ${rule.threshold}`;
+            const monitorData = [{ id: monitor.id, active: monitor.active, name: monitor.name }];
+            const preloadData = await Monitor.preparePreloadData(monitorData);
+            const heartbeatJSON = await bean.toJSONAsync({ decodeResponse: false });
+
+            for (let notification of notificationList) {
+                try {
+                    await Notification.send(
+                        JSON.parse(notification.config),
+                        msg,
+                        monitor.toJSON(preloadData, false),
+                        heartbeatJSON
+                    );
+                } catch (e) {
+                    log.error("monitor", "Cannot send log rule notification to " + notification.name);
+                    log.error("monitor", e);
+                }
+            }
+        } catch (error) {
+            log.error("monitor", `[${monitor.name}] evaluateLogRule failed: ${error.message}`);
+            log.debug("monitor", error);
+        }
+    }
+
+    /**
      * Send a certificate notification when certificate expires in less
      * than target days
      * @param {string} certCN  Common Name attribute from the certificate subject

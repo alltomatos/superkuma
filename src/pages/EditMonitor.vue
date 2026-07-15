@@ -90,6 +90,7 @@
                                         </option>
                                         <option value="influxdb">InfluxDB (InfluxQL)</option>
                                         <option value="prometheus">Prometheus (PromQL)</option>
+                                        <option value="loki">Loki (LogQL)</option>
                                         <option value="smtp">SMTP</option>
                                         <option value="snmp">SNMP</option>
                                         <option v-if="!$root.info.isContainer" value="tailscale-ping">
@@ -855,6 +856,60 @@
                                 </div>
                             </template>
 
+                            <!-- Loki Monitor Type -->
+                            <template v-if="monitor.type === 'loki'">
+                                <div class="my-3">
+                                    <label for="loki_url" class="form-label">Loki URL</label>
+                                    <input
+                                        id="loki_url"
+                                        v-model="monitor.url"
+                                        type="url"
+                                        class="form-control"
+                                        placeholder="http://loki:3100"
+                                        required
+                                    />
+                                    <div class="form-text">
+                                        Base URL of the Loki server. Reachability is checked on every beat (GET /ready,
+                                        or the query below if set); log rules run separately and never affect this
+                                        monitor's UP/DOWN status.
+                                    </div>
+                                </div>
+
+                                <div class="my-3">
+                                    <label for="loki_reachability_query" class="form-label">
+                                        Reachability Query (optional)
+                                    </label>
+                                    <input
+                                        id="loki_reachability_query"
+                                        v-model="monitor.loki_reachability_query"
+                                        type="text"
+                                        class="form-control"
+                                        placeholder='{job="app"}'
+                                    />
+                                    <div class="form-text">
+                                        Optional LogQL run just to confirm Loki answers queries. Leave empty to use GET
+                                        /ready instead.
+                                    </div>
+                                </div>
+
+                                <div class="my-3 form-check">
+                                    <input
+                                        id="loki_ignore_tls"
+                                        v-model="monitor.ignoreTls"
+                                        class="form-check-input"
+                                        type="checkbox"
+                                    />
+                                    <label class="form-check-label" for="loki_ignore_tls">
+                                        Ignore TLS/SSL error for HTTPS
+                                    </label>
+                                </div>
+
+                                <LogRuleEditor v-if="monitor.id" :monitor-id="monitor.id" />
+                                <div v-else class="alert alert-info" role="alert">
+                                    Save the monitor first to add log rules.
+                                </div>
+                            </template>
+
                             <!-- OTel Monitor Type -->
                             <template v-if="monitor.type === 'otel'">
                                 <div class="alert alert-info" role="alert">
@@ -971,18 +1026,18 @@
                             <div
                                 v-if="
                                     monitor.type === 'json-query' ||
-                                        monitor.type === 'snmp' ||
-                                        monitor.type === 'prometheus' ||
-                                        monitor.type === 'influxdb' ||
-                                        monitor.type === 'otel'
+                                    monitor.type === 'snmp' ||
+                                    monitor.type === 'prometheus' ||
+                                    monitor.type === 'influxdb' ||
+                                    monitor.type === 'otel'
                                 "
                                 class="my-3"
                             >
                                 <div
                                     v-if="
                                         monitor.type !== 'prometheus' &&
-                                            monitor.type !== 'influxdb' &&
-                                            monitor.type !== 'otel'
+                                        monitor.type !== 'influxdb' &&
+                                        monitor.type !== 'otel'
                                     "
                                     class="my-2"
                                 >
@@ -3100,6 +3155,7 @@ import EditMonitorConditions from "../components/EditMonitorConditions.vue";
 import PushUrlField from "../components/monitor-form/PushUrlField.vue";
 import TcpPortFields from "../components/monitor-form/TcpPortFields.vue";
 import HttpOptionsFields from "../components/monitor-form/HttpOptionsFields.vue";
+import LogRuleEditor from "../components/LogRuleEditor.vue";
 
 const toast = useToast();
 
@@ -3156,6 +3212,7 @@ const monitorDefaults = {
     basic_auth_user: "",
     basic_auth_pass: "",
     bearer_token: "",
+    loki_reachability_query: "",
     mqttUsername: "",
     mqttPassword: "",
     mqttTopic: "",
@@ -3203,6 +3260,7 @@ export default {
         PushUrlField,
         TcpPortFields,
         HttpOptionsFields,
+        LogRuleEditor,
     },
 
     data() {

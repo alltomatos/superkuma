@@ -26,6 +26,7 @@ const TABLE_BY_RESOURCE_TYPE = {
     status_page: "status_page",
     notification_route: "notification_route",
     dashboard: "dashboard",
+    monitor_log_rule: "monitor_log_rule",
 };
 
 /**
