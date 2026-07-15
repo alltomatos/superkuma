@@ -142,7 +142,7 @@ async function sendAPIKeyList(socket) {
     const list = await R.find("api_key", filter.clause, filter.params);
 
     for (let bean of list) {
-        result.push(bean.toPublicJSON());
+        result.push(await bean.toPublicJSON());
     }
 
     io.to(roomFor(socket.userID, socket.actor && socket.actor.activeTeamId)).emit("apiKeyList", result);

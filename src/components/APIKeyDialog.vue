@@ -16,6 +16,16 @@
                             <input id="name" v-model="key.name" type="text" class="form-control" required />
                         </div>
 
+                        <!-- Role -->
+                        <div class="mb-3">
+                            <label for="key-role" class="form-label">{{ $t("Role") }}</label>
+                            <select id="key-role" v-model="key.roleSlug" class="form-select">
+                                <option v-for="slug in assignableRoles" :key="slug" :value="slug">
+                                    {{ $t("teamRole_" + slug) }}
+                                </option>
+                            </select>
+                        </div>
+
                         <!-- Expiry -->
                         <div class="my-3">
                             <label class="form-label">{{ $t("Expiry date") }}</label>
@@ -90,6 +100,11 @@ import dayjs from "dayjs";
 import Datepicker from "@vuepic/vue-datepicker";
 import CopyableInput from "./CopyableInput.vue";
 
+// Roles assignable to an API key at creation time, mirroring the backend's
+// ASSIGNABLE_API_KEY_ROLE_SLUGS in api-key-socket-handler.js. "superadmin" is
+// deliberately excluded -- an API key must never carry is_superadmin.
+const ASSIGNABLE_ROLES = ["owner", "admin", "editor", "viewer"];
+
 export default {
     components: {
         CopyableInput,
@@ -107,6 +122,7 @@ export default {
             minDate: this.$root.date(dayjs()) + " 00:00",
             clearKey: null,
             noExpire: false,
+            assignableRoles: ASSIGNABLE_ROLES,
         };
     },
 
@@ -126,6 +142,7 @@ export default {
                 name: "",
                 expires: this.minDate,
                 active: 1,
+                roleSlug: "viewer",
             };
 
             this.keyaddmodal.show();
@@ -164,6 +181,7 @@ export default {
                 name: "",
                 expires: this.minDate,
                 active: 1,
+                roleSlug: "viewer",
             };
             this.noExpire = false;
         },

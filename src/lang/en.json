@@ -1021,6 +1021,7 @@
     "Key Added": "Key Added",
     "apiKeyAddedMsg": "Your API key has been added. Please make a note of it as it will not be shown again.",
     "Add API Key": "Add API Key",
+    "Edit API Key": "Edit API Key",
     "No API Keys": "No API Keys",
     "apiKey-active": "Active",
     "apiKey-expired": "Expired",
