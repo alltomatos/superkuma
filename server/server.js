@@ -209,6 +209,7 @@ const { remoteInstanceSocketHandler } = require("./socket-handlers/remote-instan
 const { userSocketHandler } = require("./socket-handlers/user-socket-handler");
 const { teamSocketHandler } = require("./socket-handlers/team-socket-handler");
 const { notificationRouteSocketHandler } = require("./socket-handlers/notification-route-socket-handler");
+const { monitorLogRuleSocketHandler } = require("./socket-handlers/monitor-log-rule-socket-handler");
 const { dashboardSocketHandler } = require("./socket-handlers/dashboard-socket-handler");
 const { mailSocketHandler } = require("./socket-handlers/mail-socket-handler");
 const { generalSocketHandler } = require("./socket-handlers/general-socket-handler");
@@ -1189,6 +1190,7 @@ let needSetup = false;
         userSocketHandler(socket, server);
         teamSocketHandler(socket);
         notificationRouteSocketHandler(socket);
+        monitorLogRuleSocketHandler(socket);
         dashboardSocketHandler(socket);
         mailSocketHandler(socket);
         generalSocketHandler(socket, server);

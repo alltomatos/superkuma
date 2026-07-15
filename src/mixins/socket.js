@@ -992,6 +992,46 @@ export default {
         },
 
         /**
+         * Get the list of log rules for a Loki monitor
+         * @param {int} monitorID ID of the monitor
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        getLogRuleList(monitorID, callback) {
+            socket.emit("getLogRuleList", monitorID, callback);
+        },
+
+        /**
+         * Add a log rule to a Loki monitor
+         * @param {object} rule { monitorId, name, logql, operator, threshold, severity, enabled }
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        addLogRule(rule, callback) {
+            socket.emit("addLogRule", rule, callback);
+        },
+
+        /**
+         * Update an existing log rule
+         * @param {object} rule { id, name, logql, operator, threshold, severity, enabled }
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        updateLogRule(rule, callback) {
+            socket.emit("updateLogRule", rule, callback);
+        },
+
+        /**
+         * Delete a log rule
+         * @param {int} ruleID ID of the rule to delete
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        deleteLogRule(ruleID, callback) {
+            socket.emit("deleteLogRule", ruleID, callback);
+        },
+
+        /**
          * Register a new remote instance (Master-Agent federation)
          * @param {object} remoteInstance Remote instance to add ({ name, instanceId })
          * @param {socketCB} callback Callback for socket response

@@ -69,3 +69,34 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+
+  # Optional log store for the `loki` monitor type -- NOT SuperKuma's own
+  # database (that's mariadb above), and NOT something SuperKuma itself writes
+  # raw log lines into (see ADR-0019: SuperKuma only ever queries aggregated
+  # LogQL counts, never stores or full-text-searches log content). Point a
+  # log-shipping agent (Promtail, Grafana Alloy, Fluentbit, or an OTel
+  # Collector -- your choice, SuperKuma does not ship one) at this Loki's push
+  # API (http://<host>:3100/loki/api/v1/push), then create a `loki`-type
+  # monitor in SuperKuma with log rules pointing at the same place. See
+  # .claude/skills/superkuma-monitoring/references/loki-log-monitoring.md.
+  # Single-binary mode with local filesystem storage -- fine for a
+  # self-hosted instance's log volume, not meant to scale to S3-backed
+  # production Loki clusters.
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: superkuma-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki-data:/loki
+    ports:
+      # Published (not just internal) because log-shipping agents typically
+      # run on OTHER hosts (e.g. app servers, pfSense), not inside this
+      # Compose network.
+      - "3100:3100"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3100/ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
