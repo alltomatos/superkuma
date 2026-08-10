@@ -158,17 +158,13 @@
                             </div>
 
                             <!-- Friendly Name -->
-                            <div class="my-3">
-                                <label for="name" class="form-label">{{ $t("Friendly Name") }}</label>
-                                <input
-                                    id="name"
-                                    v-model="monitor.name"
-                                    type="text"
-                                    class="form-control"
-                                    data-testid="friendly-name-input"
-                                    :placeholder="defaultFriendlyName"
-                                />
-                            </div>
+                            <MonitorFieldInput
+                                id="name"
+                                v-model="monitor.name"
+                                :label="$t('Friendly Name')"
+                                :placeholder="defaultFriendlyName"
+                                data-testid="friendly-name-input"
+                            />
 
                             <!-- Manual Status switcher -->
                             <div v-if="monitor.type === 'manual'" class="mb-3">
@@ -1562,67 +1558,51 @@
                             />
 
                             <!-- Interval -->
-                            <div class="my-3">
-                                <label for="interval" class="form-label">
-                                    {{ $t("Heartbeat Interval") }} ({{ $t("checkEverySecond", [monitor.interval]) }})
-                                </label>
-                                <input
-                                    id="interval"
-                                    v-model="monitor.interval"
-                                    type="number"
-                                    class="form-control"
-                                    required
-                                    :min="minInterval"
-                                    :max="maxInterval"
-                                    step="1"
-                                    @focus="lowIntervalConfirmation.editedValue = true"
-                                    @blur="finishUpdateInterval"
-                                />
-
-                                <div class="form-text">
-                                    {{ monitor.humanReadableInterval }}
-                                </div>
-
-                                <div v-if="monitor.interval < 20" class="form-text">
+                            <MonitorFieldInput
+                                id="interval"
+                                v-model="monitor.interval"
+                                type="number"
+                                required
+                                :min="minInterval"
+                                :max="maxInterval"
+                                step="1"
+                                :label="`${$t('Heartbeat Interval')} (${$t('checkEverySecond', [monitor.interval])})`"
+                                @focus="lowIntervalConfirmation.editedValue = true"
+                                @blur="finishUpdateInterval"
+                            >
+                                {{ monitor.humanReadableInterval }}
+                                <template v-if="monitor.interval < 20" #warning>
                                     {{ $t("minimumIntervalWarning") }}
-                                </div>
-                            </div>
+                                </template>
+                            </MonitorFieldInput>
 
-                            <div class="my-3">
-                                <label for="maxRetries" class="form-label">{{ $t("Retries") }}</label>
-                                <input
-                                    id="maxRetries"
-                                    v-model="monitor.maxretries"
-                                    type="number"
-                                    class="form-control"
-                                    required
-                                    min="0"
-                                    step="1"
-                                />
-                                <div class="form-text">
-                                    {{ $t("retriesDescription") }}
-                                </div>
-                            </div>
+                            <MonitorFieldInput
+                                id="maxRetries"
+                                v-model="monitor.maxretries"
+                                type="number"
+                                required
+                                min="0"
+                                step="1"
+                                :label="$t('Retries')"
+                            >
+                                {{ $t("retriesDescription") }}
+                            </MonitorFieldInput>
 
-                            <div v-if="monitor.maxretries" class="my-3">
-                                <label for="retry-interval" class="form-label">
-                                    {{ $t("Heartbeat Retry Interval") }}
-                                    <span>({{ $t("retryCheckEverySecond", [monitor.retryInterval]) }})</span>
-                                </label>
-                                <input
-                                    id="retry-interval"
-                                    v-model="monitor.retryInterval"
-                                    type="number"
-                                    class="form-control"
-                                    required
-                                    :min="minInterval"
-                                    step="1"
-                                    @focus="lowIntervalConfirmation.editedValue = true"
-                                />
-                                <div v-if="monitor.retryInterval < 20" class="form-text">
+                            <MonitorFieldInput
+                                v-if="monitor.maxretries"
+                                id="retry-interval"
+                                v-model="monitor.retryInterval"
+                                type="number"
+                                required
+                                :min="minInterval"
+                                step="1"
+                                :label="`${$t('Heartbeat Retry Interval')} (${$t('retryCheckEverySecond', [monitor.retryInterval])})`"
+                                @focus="lowIntervalConfirmation.editedValue = true"
+                            >
+                                <template v-if="monitor.retryInterval < 20" #warning>
                                     {{ $t("minimumIntervalWarning") }}
-                                </div>
-                            </div>
+                                </template>
+                            </MonitorFieldInput>
 
                             <!-- Retry only on status code failure: JSON Query only -->
                             <div v-if="monitor.type === 'json-query' && monitor.maxretries > 0" class="my-3">
@@ -3100,6 +3080,7 @@ import EditMonitorConditions from "../components/EditMonitorConditions.vue";
 import PushUrlField from "../components/monitor-form/PushUrlField.vue";
 import TcpPortFields from "../components/monitor-form/TcpPortFields.vue";
 import HttpOptionsFields from "../components/monitor-form/HttpOptionsFields.vue";
+import MonitorFieldInput from "../components/MonitorFieldInput.vue";
 
 const toast = useToast();
 
@@ -3203,6 +3184,7 @@ export default {
         PushUrlField,
         TcpPortFields,
         HttpOptionsFields,
+        MonitorFieldInput,
     },
 
     data() {
