@@ -1346,7 +1346,7 @@
     "izapiaEnableInteractive": "Send interactive buttons (pause/resume monitor, acknowledge)",
     "izapiaEnableInteractiveHelp": "When enabled, up/down alerts are sent as an interactive WhatsApp message with buttons that can pause or resume the monitor directly from the chat. Requires the webhook secret below, and this SuperKuma instance reachable from the internet at a public URL -- if it sits behind a NAT/firewall, expose it via reverse proxy or port-forward, then point the IZAPIA session webhook (PUT /api/v1/sessions/{sid}/webhook) to that URL + /api/izapia/callback.",
     "izapiaWebhookSecret": "Webhook Secret",
-    "izapiaWebhookSecretHelp": "Must match the secret configured on the IZAPIA session webhook (PUT /api/v1/sessions/{sid}/webhook) -- used to verify button-click callbacks."
+    "izapiaWebhookSecretHelp": "Must match the secret configured on the IZAPIA session webhook (PUT /api/v1/sessions/{sid}/webhook) -- used to verify button-click callbacks.",
     "API URL": "API URL",
     "wayToWriteEvolutionRecipient": "The phone number with the international prefix, but without the plus sign at the start ({0}), the Contact ID ({1}) or the Group ID ({2}).",
     "wayToGetEvolutionUrlAndToken": "You can get the API URL and the token by going into your desired channel from {0}",
