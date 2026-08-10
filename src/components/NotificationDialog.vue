@@ -220,6 +220,7 @@ export default {
                 GoogleChat: "Google Chat (Google Workspace)",
                 gorush: "Gorush",
                 gotify: "Gotify",
+                izapia: "WhatsApp (IZAPIA)",
                 GrafanaOncall: "Grafana Oncall",
                 HaloPSA: "Halo PSA",
                 HeiiOnCall: "Heii On-Call",

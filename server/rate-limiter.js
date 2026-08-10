@@ -68,9 +68,23 @@ const twoFaRateLimiter = new KumaRateLimiter({
     errorMessage: "Too frequently, try again later.",
 });
 
+// Public-but-authenticated webhook (server/routers/izapia-callback-router.js):
+// every request does a full-table notification scan + HMAC compare before
+// its signature is even known to be valid, so an unrate-limited endpoint
+// would let an attacker cheaply drive DB load. 120/min is generous for real
+// WhatsApp traffic (IZAPIA fans out one event per message/ack/etc. on a
+// busy session) while still bounding abuse.
+const izapiaWebhookRateLimiter = new KumaRateLimiter({
+    tokensPerInterval: 120,
+    interval: "minute",
+    fireImmediately: true,
+    errorMessage: "Too frequently, try again later.",
+});
+
 module.exports = {
     KumaRateLimiter,
     loginRateLimiter,
     apiRateLimiter,
     twoFaRateLimiter,
+    izapiaWebhookRateLimiter,
 };

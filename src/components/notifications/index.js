@@ -89,6 +89,7 @@ import SMSPlanet from "./SMSPlanet.vue";
 import SMSIR from "./SMSIR.vue";
 import Webpush from "./Webpush.vue";
 import HaloPSA from "./HaloPSA.vue";
+import Izapia from "./Izapia.vue";
 import Resend from "./Resend.vue";
 import Max from "./Max.vue";
 import VK from "./VK.vue";
@@ -191,6 +192,7 @@ const NotificationFormList = {
     SMSPlanet: SMSPlanet,
     Webpush: Webpush,
     HaloPSA: HaloPSA,
+    izapia: Izapia,
     max: Max,
     VK: VK,
     VKTeams: VKTeams,
