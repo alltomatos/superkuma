@@ -202,7 +202,7 @@ optgroup {
     }
 }
 
-@media (max-width: 550px) {
+@media (max-width: $breakpoint-mobile) {
     .table-shadow-box {
         padding: 10px !important;
 
@@ -412,7 +412,7 @@ optgroup {
         }
     }
 
-    @media (max-width: 550px) {
+    @media (max-width: $breakpoint-mobile) {
         .table-shadow-box {
             tbody {
                 .shadow-box {
@@ -489,7 +489,7 @@ optgroup {
         overflow-y: auto;
     }
 
-    @media (max-width: 770px) {
+    @media (max-width: $breakpoint-tablet) {
         &.scrollbar {
             height: calc(100% - 97px);
         }
@@ -655,13 +655,13 @@ $shadow-box-padding: 20px;
     }
 }
 
-@media (max-width: 770px) {
+@media (max-width: $breakpoint-tablet) {
     .toast-container {
         margin-bottom: 100px !important;
     }
 }
 
-@media (max-width: 550px) {
+@media (max-width: $breakpoint-mobile) {
     .toast-container {
         margin-bottom: 126px !important;
     }

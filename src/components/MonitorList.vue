@@ -776,7 +776,7 @@ export default {
     }
 }
 
-@media (max-width: 770px) {
+@media (max-width: $breakpoint-tablet) {
     .list-header {
         margin-bottom: 10px;
         padding: 20px;
@@ -825,7 +825,7 @@ export default {
     gap: 0;
 }
 
-@media (max-width: 549px), (min-width: 770px) and (max-width: 1149px), (min-width: 1200px) and (max-width: 1499px) {
+@media (max-width: $breakpoint-mobile - 1), (min-width: 770px) and (max-width: 1149px), (min-width: 1200px) and (max-width: 1499px) {
     .selection-controls {
         .selected-count {
             margin-left: 0;

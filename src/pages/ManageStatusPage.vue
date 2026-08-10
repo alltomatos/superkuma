@@ -180,7 +180,7 @@ export default {
     }
 }
 
-@media (max-width: 770px) {
+@media (max-width: $breakpoint-tablet) {
     .item {
         .actions {
             visibility: visible;
