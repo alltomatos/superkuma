@@ -28,7 +28,17 @@
                             <Uptime :monitor="monitor" type="24" :pill="true" />
                         </div>
                         <div class="d-flex align-items-center gap-2 flex-fill" style="min-width: 0">
-                            <span v-if="hasChildren" class="collapse-padding" @click.prevent="changeCollapsed">
+                            <span
+                                v-if="hasChildren"
+                                class="collapse-padding"
+                                role="button"
+                                tabindex="0"
+                                :aria-label="$t('expandCollapseGroupAria')"
+                                :aria-expanded="!isCollapsed"
+                                @click.prevent="changeCollapsed"
+                                @keydown.enter.prevent="changeCollapsed"
+                                @keydown.space.prevent="changeCollapsed"
+                            >
                                 <font-awesome-icon
                                     icon="chevron-down"
                                     class="animated"
