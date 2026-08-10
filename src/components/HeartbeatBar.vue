@@ -86,6 +86,9 @@ export default {
             tooltipTimeoutId: null,
             // Canvas
             hoveredBeatIndex: -1,
+            // Resize handling
+            resizeObserver: null,
+            resizeRAF: null,
         };
     },
     computed: {
@@ -325,7 +328,16 @@ export default {
         },
     },
     unmounted() {
-        window.removeEventListener("resize", this.resize);
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        } else {
+            window.removeEventListener("resize", this.scheduleResize);
+        }
+        if (this.resizeRAF) {
+            cancelAnimationFrame(this.resizeRAF);
+            this.resizeRAF = null;
+        }
         // Clean up tooltip timeout
         if (this.tooltipTimeoutId) {
             clearTimeout(this.tooltipTimeoutId);
@@ -359,7 +371,19 @@ export default {
             this.beatHoverAreaPadding = Math.round(actualHoverAreaPadding) / window.devicePixelRatio;
         }
 
-        window.addEventListener("resize", this.resize);
+        // Observe the wrapper element itself instead of the window, so we only
+        // recompute when this bar's own available width actually changes
+        // (window resize, sidebar/column toggle, container layout changes, etc.),
+        // and never on unrelated resize activity elsewhere on the page.
+        if (this.$refs.wrap && typeof ResizeObserver !== "undefined") {
+            this.resizeObserver = new ResizeObserver(() => {
+                this.scheduleResize();
+            });
+            this.resizeObserver.observe(this.$refs.wrap);
+        } else {
+            // Fallback for environments without ResizeObserver support
+            window.addEventListener("resize", this.scheduleResize);
+        }
         this.resize();
 
         // Initial canvas draw
@@ -368,6 +392,23 @@ export default {
         });
     },
     methods: {
+        /**
+         * Coalesces bursts of resize notifications (ResizeObserver can fire
+         * many times per second while a container is actively being resized)
+         * into a single recompute per animation frame, avoiding repeated
+         * synchronous layout reads/writes that previously caused jank.
+         * @returns {void}
+         */
+        scheduleResize() {
+            if (this.resizeRAF) {
+                cancelAnimationFrame(this.resizeRAF);
+            }
+            this.resizeRAF = requestAnimationFrame(() => {
+                this.resizeRAF = null;
+                this.resize();
+            });
+        },
+
         /**
          * Resize the heartbeat bar
          * @returns {void}

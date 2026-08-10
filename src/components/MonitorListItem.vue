@@ -215,12 +215,6 @@ export default {
             return c;
         },
     },
-    watch: {
-        isSelectMode() {
-            // TODO: Resize the heartbeat bar, but too slow
-            // this.$refs.heartbeatBar.resize();
-        },
-    },
     beforeMount() {
         // Always unfold if monitor is accessed directly
         if (this.monitor.childrenIDs.includes(parseInt(this.$route.params.id))) {
