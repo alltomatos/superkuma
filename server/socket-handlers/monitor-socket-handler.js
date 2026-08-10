@@ -9,6 +9,7 @@ const { validate } = require("../validation");
 const { requireResource, requirePermission, scopeFilter } = require("../security/authz");
 const { teamIdLoader } = require("../security/team-id-loaders");
 const { resolveTeamIdForCreate } = require("../security/actor-repository");
+const { attachTagNotificationsToMonitor } = require("../izapia-tag-auto-attach");
 
 const monitorTagIDSchema = z.number().int().positive();
 const monitorTagValueSchema = z.string().max(500).nullish();
@@ -663,6 +664,8 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
                 monitorID,
                 value,
             ]);
+
+            await attachTagNotificationsToMonitor(tagID, monitorID);
 
             await server.sendUpdateMonitorIntoList(socket, monitorID);
 

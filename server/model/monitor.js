@@ -1307,8 +1307,12 @@ class Monitor extends BeanModel {
 
             for (let notification of notificationList) {
                 try {
+                    // `id` isn't part of the stored config JSON -- injected here so
+                    // providers that need their own DB row id (e.g. izapia.js,
+                    // recording which monitor a sent interactive message belongs
+                    // to) can access it via notification.id.
                     await Notification.send(
-                        JSON.parse(notification.config),
+                        { ...JSON.parse(notification.config), id: notification.id },
                         msg,
                         monitor.toJSON(preloadData, false),
                         heartbeatJSON
@@ -1499,7 +1503,7 @@ class Monitor extends BeanModel {
             for (let notification of notificationList) {
                 try {
                     await Notification.send(
-                        JSON.parse(notification.config),
+                        { ...JSON.parse(notification.config), id: notification.id },
                         msg,
                         monitor.toJSON(preloadData, false),
                         heartbeatJSON
