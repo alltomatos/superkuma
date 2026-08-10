@@ -93,6 +93,7 @@ const SMSPlanet = require("./notification-providers/sms-planet");
 const SpugPush = require("./notification-providers/spugpush");
 const SMSIR = require("./notification-providers/smsir");
 const { commandExists } = require("./util-server");
+const { attachNotificationToTaggedMonitors } = require("./izapia-tag-auto-attach");
 const Whatsapp360messenger = require("./notification-providers/360messenger");
 const Webpush = require("./notification-providers/Webpush");
 const HaloPSA = require("./notification-providers/HaloPSA");
@@ -279,6 +280,8 @@ class Notification {
         if (applyExisting) {
             await applyNotificationEveryMonitor(bean.id, userID);
         }
+
+        await attachNotificationToTaggedMonitors(bean.id, notification);
 
         return bean;
     }

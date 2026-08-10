@@ -3,7 +3,24 @@ const assert = require("node:assert");
 const crypto = require("crypto");
 
 const Izapia = require("../../../server/notification-providers/izapia");
-const { verifySignature, extractButtonReplyId } = require("../../../server/izapia-callback-helpers");
+const { verifySignature, extractButtonReplyId, extractQuotedReply } = require("../../../server/izapia-callback-helpers");
+
+describe("Izapia.extractMessageId()", () => {
+    test("reads message_id from the IZAPIA {ok,data} envelope", () => {
+        const id = Izapia.extractMessageId({ data: { ok: true, data: { message_id: "3EB0F355A97E22C6A02792" } } });
+        assert.strictEqual(id, "3EB0F355A97E22C6A02792");
+    });
+
+    test("returns null for a bare (non-enveloped) message_id -- the exact bug from PR #91", () => {
+        const id = Izapia.extractMessageId({ data: { message_id: "3EB0F355A97E22C6A02792" } });
+        assert.strictEqual(id, null);
+    });
+
+    test("returns null for a falsy response", () => {
+        assert.strictEqual(Izapia.extractMessageId(null), null);
+        assert.strictEqual(Izapia.extractMessageId(undefined), null);
+    });
+});
 
 describe("Izapia.resolveJid()", () => {
     const provider = new Izapia();
@@ -51,17 +68,64 @@ describe("izapia-callback-helpers.verifySignature()", () => {
 });
 
 describe("izapia-callback-helpers.extractButtonReplyId()", () => {
-    test("reads message.buttonReply.id", () => {
-        const id = extractButtonReplyId({ message: { buttonReply: { id: "pause:12" } } });
+    test("reads data.selected.id from a message.interactiveReply event", () => {
+        const id = extractButtonReplyId({
+            type: "message.interactiveReply",
+            data: { selected: { id: "pause:12" } },
+        });
         assert.strictEqual(id, "pause:12");
     });
 
-    test("reads data.interactive.button_reply.id", () => {
-        const id = extractButtonReplyId({ data: { interactive: { button_reply: { id: "resume:3" } } } });
-        assert.strictEqual(id, "resume:3");
+    test("ignores other event types even if data.selected.id is present", () => {
+        const id = extractButtonReplyId({
+            type: "message.received",
+            data: { selected: { id: "pause:12" } },
+        });
+        assert.strictEqual(id, null);
     });
 
-    test("returns null when no known shape matches", () => {
-        assert.strictEqual(extractButtonReplyId({ text: "hello" }), null);
+    test("returns null when data.selected.id is missing", () => {
+        assert.strictEqual(extractButtonReplyId({ type: "message.interactiveReply", data: {} }), null);
+    });
+
+    test("returns null for a falsy payload", () => {
+        assert.strictEqual(extractButtonReplyId(null), null);
+    });
+});
+
+describe("izapia-callback-helpers.extractQuotedReply()", () => {
+    test("reads stanzaID and text from a quoted message.received event", () => {
+        const result = extractQuotedReply({
+            type: "message.received",
+            data: {
+                raw: {
+                    extendedTextMessage: {
+                        text: "Pausar monitor",
+                        contextInfo: { stanzaID: "3EB0162C84262A012C2670" },
+                    },
+                },
+            },
+        });
+        assert.deepStrictEqual(result, { quotedMessageId: "3EB0162C84262A012C2670", text: "Pausar monitor" });
+    });
+
+    test("returns null for a non-quoted message.received event", () => {
+        const result = extractQuotedReply({
+            type: "message.received",
+            data: { raw: { conversation: "just a normal message" } },
+        });
+        assert.strictEqual(result, null);
+    });
+
+    test("ignores other event types", () => {
+        const result = extractQuotedReply({
+            type: "message.ack",
+            data: { raw: { extendedTextMessage: { contextInfo: { stanzaID: "x" } } } },
+        });
+        assert.strictEqual(result, null);
+    });
+
+    test("returns null for a falsy payload", () => {
+        assert.strictEqual(extractQuotedReply(null), null);
     });
 });

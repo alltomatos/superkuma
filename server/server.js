@@ -135,6 +135,7 @@ const {
 
 log.debug("server", "Importing Notification");
 const { Notification } = require("./notification");
+const Izapia = require("./notification-providers/izapia");
 Notification.init();
 
 const { requireResource, ForbiddenError } = require("./security/authz");
@@ -1055,6 +1056,19 @@ let needSetup = false;
             } catch (e) {
                 log.error("server", e);
 
+                callback({
+                    ok: false,
+                    msg: e.message,
+                });
+            }
+        });
+
+        socket.on("izapiaListGroups", async (config, callback) => {
+            try {
+                checkLogin(socket);
+                const groups = await Izapia.listGroups(config);
+                callback({ ok: true, groups });
+            } catch (e) {
                 callback({
                     ok: false,
                     msg: e.message,

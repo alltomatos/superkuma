@@ -3,7 +3,7 @@ const axios = require("axios");
 const { R } = require("redbean-node");
 const { log } = require("../../src/util");
 const { SuperKumaServer } = require("../superkuma-server");
-const { verifySignature, extractButtonReplyId } = require("../izapia-callback-helpers");
+const { verifySignature, extractButtonReplyId, extractQuotedReply } = require("../izapia-callback-helpers");
 
 /**
  * Receives interactive-message webhook deliveries from IZAPIA (button clicks
@@ -17,12 +17,45 @@ const { verifySignature, extractButtonReplyId } = require("../izapia-callback-he
  * configured on the SuperKuma side and mirrored into the IZAPIA session's
  * webhook config (PUT /api/v1/sessions/{sid}/webhook).
  *
- * The button `id` we send is `<action>:<monitorID>` (action = pause | resume
- * | ack). A clicked button can only ever affect a monitor that is actually
- * attached to the notification config whose secret verified the request --
- * this is the authorization boundary (not a logged-in user), so it is
- * enforced via a `monitor_notification` join, not `checkOwner`.
+ * Two ways to recover which button was tapped, tried in order (see PR #91
+ * for how this was worked out against a real IZAPIA session):
+ *  1. `extractQuotedReply` -- the real path for a QR-paired (personal
+ *     WhatsApp) session. A tap comes back as an ordinary text reply quoting
+ *     the original message; `izapia_pending_action` (written by
+ *     server/notification-providers/izapia.js at send time) maps that
+ *     quoted message id back to a monitor/notification, and the reply TEXT
+ *     (matched against the known button labels) supplies the action.
+ *  2. `extractButtonReplyId` -- unverified fallback for a WhatsApp Business
+ *     Cloud API session, where IZAPIA's docs say a tap is normalized into a
+ *     `message.interactiveReply` event carrying the button's own `id`
+ *     (`<action>:<monitorID>`, as sent).
+ *
+ * Either way, a clicked button can only ever affect a monitor that is
+ * actually attached to the notification config whose secret verified the
+ * request -- this is the authorization boundary (not a logged-in user), so
+ * it is enforced via a `monitor_notification` join, not `checkOwner`.
  */
+
+/**
+ * Maps a button's label text to its action, tolerant of the exact strings
+ * server/notification-providers/izapia.js sends ("Pausar monitor", "Retomar
+ * monitor", "OK, ciente").
+ * @param {string} text Reply text (the tapped button's label).
+ * @returns {?string} "pause" | "resume" | "ack", or null if unrecognized.
+ */
+function actionFromLabel(text) {
+    const normalized = (text || "").trim().toLowerCase();
+    if (normalized.includes("pausar")) {
+        return "pause";
+    }
+    if (normalized.includes("retomar")) {
+        return "resume";
+    }
+    if (normalized.includes("ciente")) {
+        return "ack";
+    }
+    return null;
+}
 
 const router = express.Router();
 const server = SuperKumaServer.getInstance();
@@ -42,7 +75,10 @@ router.post("/api/izapia/callback", rawBodyParser, async (request, response) => 
         const sid = payload.sid || payload.session_id || payload.data?.sid;
         const signatureHeader = request.get("X-izapia-Signature");
 
-        const candidates = await R.getAll("SELECT id, config FROM notification WHERE type = 'izapia'");
+        // The `notification` table has no `type` column -- it only lives inside
+        // the `config` JSON blob (see server/notification.js Notification.save()),
+        // so filtering has to happen in JS after parsing each row.
+        const candidates = await R.getAll("SELECT id, config FROM notification");
         let matchedNotification = null;
         for (const row of candidates) {
             let config;
@@ -51,7 +87,7 @@ router.post("/api/izapia/callback", rawBodyParser, async (request, response) => 
             } catch (e) {
                 continue;
             }
-            if (config.izapiaSessionId !== sid) {
+            if (config.type !== "izapia" || config.izapiaSessionId !== sid) {
                 continue;
             }
             if (verifySignature(config.izapiaWebhookSecret, rawBody, signatureHeader)) {
@@ -65,15 +101,35 @@ router.post("/api/izapia/callback", rawBodyParser, async (request, response) => 
             return response.status(401).json({ ok: false, error: "Invalid signature" });
         }
 
-        const replyId = extractButtonReplyId(payload);
-        const match = replyId && replyId.match(/^(pause|resume|ack):(\d+)$/);
-        if (!match) {
-            // Not a button click we recognize (e.g. a plain text reply); ack and ignore.
-            return response.json({ ok: true });
+        let action = null;
+        let monitorID = null;
+        let pendingActionRow = null;
+
+        const quoted = extractQuotedReply(payload);
+        if (quoted) {
+            pendingActionRow = await R.getRow(
+                "SELECT id, monitor_id FROM izapia_pending_action WHERE message_id = ? AND notification_id = ?",
+                [quoted.quotedMessageId, matchedNotification.id]
+            );
+            if (pendingActionRow) {
+                action = actionFromLabel(quoted.text);
+                monitorID = pendingActionRow.monitor_id;
+            }
         }
 
-        const [, action, monitorIDRaw] = match;
-        const monitorID = parseInt(monitorIDRaw, 10);
+        if (!action) {
+            const replyId = extractButtonReplyId(payload);
+            const match = replyId && replyId.match(/^(pause|resume|ack):(\d+)$/);
+            if (match) {
+                action = match[1];
+                monitorID = parseInt(match[2], 10);
+            }
+        }
+
+        if (!action || !monitorID) {
+            // Not a button click we recognize (e.g. an unrelated message); ack and ignore.
+            return response.json({ ok: true });
+        }
 
         const link = await R.getRow("SELECT 1 FROM monitor_notification WHERE monitor_id = ? AND notification_id = ?", [
             monitorID,
@@ -85,6 +141,11 @@ router.post("/api/izapia/callback", rawBodyParser, async (request, response) => 
                 `Rejected callback: monitor ${monitorID} not attached to notification ${matchedNotification.id}`
             );
             return response.status(403).json({ ok: false, error: "Monitor not attached to this notification" });
+        }
+
+        if (pendingActionRow) {
+            // One-shot: this specific button press has now been consumed.
+            await R.exec("DELETE FROM izapia_pending_action WHERE id = ?", [pendingActionRow.id]);
         }
 
         let replyText = null;
@@ -112,7 +173,11 @@ router.post("/api/izapia/callback", rawBodyParser, async (request, response) => 
             replyText = "Recebido, obrigado.";
         }
 
-        if (replyText && payload.from) {
+        // Reply into the chat the tap came from (`data.chat`), not `data.from`
+        // -- in a group, `from` is the tapping participant, not the chat itself.
+        const replyTo = payload.data?.chat || payload.data?.from;
+
+        if (replyText && replyTo) {
             try {
                 const baseUrl = (matchedNotification.config.izapiaApiUrl || "https://api.izapia.com").replace(
                     /\/+$/,
@@ -120,7 +185,7 @@ router.post("/api/izapia/callback", rawBodyParser, async (request, response) => 
                 );
                 await axios.post(
                     `${baseUrl}/api/v1/sessions/${matchedNotification.config.izapiaSessionId}/messages/text`,
-                    { to: payload.from, text: replyText },
+                    { to: replyTo, text: replyText },
                     {
                         headers: {
                             Accept: "application/json",

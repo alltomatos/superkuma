@@ -40,6 +40,33 @@
         </select>
     </div>
 
+    <div v-if="$parent.notification.izapiaRecipientType === 'group'" class="mb-3">
+        <label for="izapia-group-picker" class="form-label">{{ $t("izapiaGroupPicker") }}</label>
+        <div class="d-flex gap-2">
+            <select
+                id="izapia-group-picker"
+                v-model="$parent.notification.izapiaRecipient"
+                class="form-select"
+                :disabled="groups.length === 0"
+            >
+                <option v-if="groups.length === 0" value="" disabled>{{ $t("izapiaNoGroupsLoaded") }}</option>
+                <option v-for="group in groups" :key="group.id" :value="group.id">
+                    {{ group.name }}
+                </option>
+            </select>
+            <button
+                type="button"
+                class="btn btn-outline-primary text-nowrap"
+                :disabled="loadingGroups"
+                @click="loadGroups"
+            >
+                {{ loadingGroups ? $t("Loading...") : $t("izapiaLoadGroups") }}
+            </button>
+        </div>
+        <div v-if="groupsError" class="form-text text-danger">{{ groupsError }}</div>
+        <div class="form-text">{{ $t("izapiaGroupPickerHelp") }}</div>
+    </div>
+
     <div class="mb-3">
         <label for="izapia-recipient" class="form-label">{{ $t("izapiaRecipient") }}</label>
         <input
@@ -56,6 +83,17 @@
                     : $t("izapiaRecipientHelpContact", ["5511987654321"])
             }}
         </div>
+    </div>
+
+    <div class="mb-3">
+        <label for="izapia-auto-attach-tag" class="form-label">{{ $t("izapiaAutoAttachTag") }}</label>
+        <select id="izapia-auto-attach-tag" v-model="$parent.notification.izapiaAutoAttachTagId" class="form-select">
+            <option :value="null">{{ $t("izapiaNoAutoAttachTag") }}</option>
+            <option v-for="tag in tags" :key="tag.id" :value="tag.id">
+                {{ tag.name }}
+            </option>
+        </select>
+        <div class="form-text">{{ $t("izapiaAutoAttachTagHelp") }}</div>
     </div>
 
     <div class="form-check form-switch mb-3">
@@ -90,6 +128,60 @@ import HiddenInput from "../HiddenInput.vue";
 export default {
     components: {
         HiddenInput,
+    },
+
+    data() {
+        return {
+            groups: [],
+            loadingGroups: false,
+            groupsError: null,
+            tags: [],
+        };
+    },
+
+    mounted() {
+        this.loadTags();
+    },
+
+    methods: {
+        /**
+         * Fetch the tenant's tag list for the "auto-attach" dropdown.
+         * @returns {void}
+         */
+        loadTags() {
+            this.$root.getSocket().emit("getTags", (res) => {
+                if (res.ok) {
+                    this.tags = res.tags;
+                }
+            });
+        },
+
+        /**
+         * Fetch the real WhatsApp groups visible to the session entered in
+         * this (possibly unsaved) form, so the user can pick one instead of
+         * pasting a raw group JID.
+         * @returns {void}
+         */
+        loadGroups() {
+            this.groupsError = null;
+            this.loadingGroups = true;
+            this.$root.getSocket().emit(
+                "izapiaListGroups",
+                {
+                    izapiaApiUrl: this.$parent.notification.izapiaApiUrl,
+                    izapiaApiKey: this.$parent.notification.izapiaApiKey,
+                    izapiaSessionId: this.$parent.notification.izapiaSessionId,
+                },
+                (res) => {
+                    this.loadingGroups = false;
+                    if (res.ok) {
+                        this.groups = res.groups;
+                    } else {
+                        this.groupsError = res.msg;
+                    }
+                }
+            );
+        },
     },
 };
 </script>
