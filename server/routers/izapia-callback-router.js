@@ -4,6 +4,7 @@ const { R } = require("redbean-node");
 const { log } = require("../../src/util");
 const { SuperKumaServer } = require("../superkuma-server");
 const { verifySignature, extractButtonReplyId, extractQuotedReply } = require("../izapia-callback-helpers");
+const { izapiaWebhookRateLimiter } = require("../rate-limiter");
 
 /**
  * Receives interactive-message webhook deliveries from IZAPIA (button clicks
@@ -64,6 +65,16 @@ const rawBodyParser = express.raw({ type: "*/*", limit: "256kb" });
 
 router.post("/api/izapia/callback", rawBodyParser, async (request, response) => {
     try {
+        // Rate-limited BEFORE the notification-table scan + HMAC compare below
+        // (CodeQL: js/missing-rate-limiting) -- this is a public, unauthenticated-
+        // until-verified endpoint, so an unbounded request rate would let an
+        // attacker cheaply drive DB load regardless of whether their signature
+        // ever verifies.
+        const rateLimitOk = await izapiaWebhookRateLimiter.pass(null);
+        if (!rateLimitOk) {
+            return response.status(429).json({ ok: false, error: "Too many requests" });
+        }
+
         const rawBody = Buffer.isBuffer(request.body) ? request.body : Buffer.from("");
         let payload;
         try {
