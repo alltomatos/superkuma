@@ -315,7 +315,7 @@ export default {
         gap: 8px;
         flex-direction: row-reverse;
 
-        @media (max-width: 550px) {
+        @media (max-width: $breakpoint-mobile) {
             & {
                 width: 100%;
             }

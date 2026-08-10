@@ -326,7 +326,7 @@ table {
         transition: all ease-in-out 0.2ms;
     }
 
-    @media (max-width: 550px) {
+    @media (max-width: $breakpoint-mobile) {
         table-layout: fixed;
         overflow-wrap: break-word;
     }
