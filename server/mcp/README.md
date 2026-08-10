@@ -2,8 +2,9 @@
 
 An [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server that lets an
 AI agent inspect and configure a running SuperKuma instance — **monitors, notifications,
-tags, status pages, maintenance windows and team dashboards** — through a safe, gated set
-of **39 tools**.
+tags, status pages, maintenance windows and team dashboards** — through **39 tools**. All
+39 are always registered; what an agent can actually do with them is decided entirely by
+the API key's RBAC role (Owner/Admin/Editor/Viewer), the same as a dashboard user.
 
 It runs in two ways: as a local **stdio** process, or as a **remote HTTP endpoint** hosted
 by the instance itself. Design rationale: [ADR-0011](../../docs/adr/0011-mcp-server-for-agent-configuration.md).
@@ -32,10 +33,16 @@ There are two ways to run it:
 
 ## Setup
 
-1. **Create an API key** in SuperKuma: _Settings → API Keys → Add API Key_. Copy the
-   generated key (format `uk<id>_<secret>` — it is shown only once).
-   - The key is tied to the user that created it; the MCP acts as that user.
-   - Prefer a dedicated, least-privilege user for automation.
+1. **Create an API key** in SuperKuma: _Settings → API Keys → Add API Key_, picking a
+   **role** (Owner/Admin/Editor/Viewer) for it. Copy the generated key (format
+   `uk<id>_<secret>` — it is shown only once).
+   - The role you pick **is** the write/delete gate — a Viewer-role key can only read no
+     matter what; an Editor-role key can create/update/delete monitors, notifications,
+     tags, status pages and maintenance windows but not manage team members/API keys/
+     settings (that needs Admin); Owner adds team deactivation.
+   - Prefer a dedicated, least-privilege key scoped to only what the agent actually needs
+     to do — Viewer for a read-only reporting agent, Editor for one that manages
+     monitoring day to day.
 
 2. **Configure the MCP server** in your agent host (e.g. Claude Desktop
    `claude_desktop_config.json`):
@@ -48,9 +55,7 @@ There are two ways to run it:
          "args": ["D:/dev/uptime-kuma/server/mcp/index.js"],
          "env": {
            "SUPERKUMA_URL": "http://localhost:3001",
-           "SUPERKUMA_API_KEY": "uk1_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-           "SUPERKUMA_ALLOW_MUTATIONS": "true",
-           "SUPERKUMA_ALLOW_DELETE": "false"
+           "SUPERKUMA_API_KEY": "uk1_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
          }
        }
      }
@@ -72,9 +77,9 @@ tools directly at `https://<instance>/mcp`, so any MCP client connects **remotel
 the API key in the `Authorization` header.
 
 1. **Enable it** on the SuperKuma server by setting the environment variable
-   `SUPERKUMA_MCP_HTTP_ENABLED=true` (it is **off by default**). The same
-   `SUPERKUMA_ALLOW_MUTATIONS` / `SUPERKUMA_ALLOW_DELETE` gates apply, read from the
-   server's environment.
+   `SUPERKUMA_MCP_HTTP_ENABLED=true` (it is **off by default**). What each connecting key
+   can do is decided by its own RBAC role, same as the stdio server — there is no separate
+   server-side write/delete toggle to also configure.
 
 2. **Connect** with the [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) bridge,
    passing the API key as a Bearer header:
@@ -112,32 +117,36 @@ the API key in the `Authorization` header.
 > **Note on native connectors.** Claude's _custom connector_ dialog authenticates via OAuth
 > and does not support a static Bearer header, so use the `mcp-remote` bridge above for
 > API-key auth. Put the endpoint behind TLS and a trusted reverse proxy — it is a
-> mutation-capable surface gated only by the API key.
+> mutation-capable surface protected only by whatever role the presented key holds; treat
+> a leaked Editor/Owner/Admin key as a full write/delete credential.
 
 ## Environment variables
 
 | Variable                     | Required | Default                 | Description                                                                                     |
 | ---------------------------- | -------- | ----------------------- | ----------------------------------------------------------------------------------------------- |
 | `SUPERKUMA_URL`              | no       | `http://localhost:3001` | URL of the running SuperKuma server (`http(s)://` or `ws(s)://`).                               |
-| `SUPERKUMA_API_KEY`          | **yes**  | —                       | API key (`uk<id>_<secret>`) used to authenticate.                                               |
-| `SUPERKUMA_ALLOW_MUTATIONS`  | no       | `false`                 | Set `true` to enable all write tools (create/update/pause/resume/post/test across every area).  |
-| `SUPERKUMA_ALLOW_DELETE`     | no       | `false`                 | Set `true` to enable the destructive `delete_*` tools.                                          |
+| `SUPERKUMA_API_KEY`          | **yes**  | —                       | API key (`uk<id>_<secret>`) used to authenticate. Its **role** decides what it can do.          |
 | `SUPERKUMA_INSECURE_TLS`     | no       | `false`                 | Set `true` to skip TLS verification (self-signed certs; best effort).                           |
 | `SUPERKUMA_REQUEST_TIMEOUT`  | no       | `10000`                 | Per-request timeout in milliseconds.                                                            |
 | `SUPERKUMA_MCP_HTTP_ENABLED` | no       | `false`                 | **Server-side.** Set `true` on the SuperKuma instance to serve the remote `/mcp` HTTP endpoint. |
 
 > `SUPERKUMA_API_KEY` / `SUPERKUMA_URL` apply to the **stdio** server. For the remote HTTP
-> endpoint the key comes from each request's `Authorization` header, and `SUPERKUMA_MCP_HTTP_ENABLED`
-> plus the `ALLOW_*` gates are read from the **SuperKuma server's** environment.
+> endpoint the key comes from each request's `Authorization` header, and
+> `SUPERKUMA_MCP_HTTP_ENABLED` is read from the **SuperKuma server's** environment.
 
 ## Safety model
 
-- **Read-only by default.** Without `SUPERKUMA_ALLOW_MUTATIONS=true`, only the read tools
-  (every `list_*` / `get_*` plus `get_info`) are registered; write and delete tools are not
-  even exposed.
-- **Deletes are double-gated.** The `delete_*` tools require both `SUPERKUMA_ALLOW_DELETE=true`
-  _and_ a per-call `confirm: true`; without `confirm` they return a dry-run description instead
-  of deleting.
+- **No separate authorization surface.** All 39 tools are always registered; every call
+  is still gated by SuperKuma's own `checkLogin` + RBAC checks (ADR-0011), scoped to the
+  API key's role — the same authorization a dashboard user goes through. There is no
+  MCP-level write/delete toggle to also configure or forget.
+- **The key's role is the only control.** Viewer reads only; Editor can create/update/
+  delete monitors, notifications, tags, status pages and maintenance windows; Admin adds
+  team/key/settings management; Owner adds deactivating the team itself. Pick the
+  narrowest role that lets the agent do its job.
+- **Deletes still require a per-call `confirm: true`** regardless of role — a mechanical
+  safety net against a single mistaken invocation, independent of who's authorized to make
+  it. Without `confirm` they return a dry-run description instead of deleting.
 - **Secrets stay hidden.** `list_notifications` returns only id/name/type — never the provider
   credentials stored in the notification config.
 - **Least privilege.** The MCP inherits exactly what the API key's user/role/team can do; the
@@ -157,7 +166,7 @@ the API key in the `Authorization` header.
 | `update_monitor`    | write       | Update a monitor (fetch-merge-save).              |
 | `pause_monitor`     | write       | Pause a monitor.                                  |
 | `resume_monitor`    | write       | Resume a monitor.                                 |
-| `delete_monitor`    | destructive | Delete a monitor (needs delete gate + `confirm`). |
+| `delete_monitor`    | destructive | Delete a monitor (needs Editor+ role + `confirm`). |
 
 **Notifications**
 
@@ -167,7 +176,7 @@ the API key in the `Authorization` header.
 | `create_notification` | write       | Create a notification (`type` + provider `config`).    |
 | `update_notification` | write       | Update a notification (fetch-merge-save).              |
 | `test_notification`   | write       | Send a test message without saving (validates creds).  |
-| `delete_notification` | destructive | Delete a notification (needs delete gate + `confirm`). |
+| `delete_notification` | destructive | Delete a notification (needs Editor+ role + `confirm`). |
 
 **Tags**
 
@@ -178,7 +187,7 @@ the API key in the `Authorization` header.
 | `update_tag`         | write       | Rename a tag / change color.                  |
 | `add_monitor_tag`    | write       | Attach a tag to a monitor (optional value).   |
 | `remove_monitor_tag` | write       | Detach a tag from a monitor.                  |
-| `delete_tag`         | destructive | Delete a tag (needs delete gate + `confirm`). |
+| `delete_tag`         | destructive | Delete a tag (needs Editor+ role + `confirm`). |
 
 **Status pages**
 
@@ -190,7 +199,7 @@ the API key in the `Authorization` header.
 | `save_status_page`   | write       | Set title/description and organize monitors into groups (sections). |
 | `post_incident`      | write       | Post/pin an incident on a status page.                              |
 | `resolve_incident`   | write       | Unpin/resolve the pinned incident.                                  |
-| `delete_status_page` | destructive | Delete a status page (needs delete gate + `confirm`).               |
+| `delete_status_page` | destructive | Delete a status page (needs Editor+ role + `confirm`).               |
 
 **Maintenance**
 
@@ -202,7 +211,7 @@ the API key in the `Authorization` header.
 | `update_maintenance` | write       | Update a maintenance (fetch-merge-save).                  |
 | `pause_maintenance`  | write       | Pause a maintenance window.                               |
 | `resume_maintenance` | write       | Resume a maintenance window.                              |
-| `delete_maintenance` | destructive | Delete a maintenance (needs delete gate + `confirm`).     |
+| `delete_maintenance` | destructive | Delete a maintenance (needs Editor+ role + `confirm`).     |
 
 **Team dashboards**
 
@@ -212,7 +221,7 @@ the API key in the `Authorization` header.
 | `get_dashboard`    | read        | A dashboard's full, ordered panel list by id, with each panel's grid geometry.                                                                          |
 | `create_dashboard` | write       | Create an empty dashboard in the API key's own team (slug auto-generated if omitted).                                                                   |
 | `save_dashboard`   | write       | Replace a dashboard's panel grid (status_tile / metric_gauge / stat / speedometer / trend / pie / group_summary) and/or its title/slug/published/theme. |
-| `delete_dashboard` | destructive | Delete a dashboard (needs delete gate + `confirm`).                                                                                                     |
+| `delete_dashboard` | destructive | Delete a dashboard (needs Editor+ role + `confirm`).                                                                                                     |
 
 Dashboards (ADR-0016/ADR-0017) are the RMM-style operational view SuperKuma is building
 toward: a Grafana-style, drag-and-drop-editable grid of panels over existing monitors,
@@ -225,6 +234,6 @@ grid (`posX`/`posY`/`width`/`height`, 12 columns wide). Set `published: true` (v
 `create_dashboard` or `save_dashboard`) to make it readable, unauthenticated, at
 `/panel/<slug>` — otherwise it stays internal to the team.
 
-All read/write/destructive tools honour the same gating: read-only by default,
-writes need `SUPERKUMA_ALLOW_MUTATIONS=true`, deletes need `SUPERKUMA_ALLOW_DELETE=true`
-plus a per-call `confirm: true`.
+All read/write/destructive tools honour the same authorization: whatever the API key's
+RBAC role permits, no more, no less. Destructive tools additionally require a per-call
+`confirm: true`.

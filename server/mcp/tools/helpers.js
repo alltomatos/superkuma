@@ -1,11 +1,15 @@
 /**
  * Shared helpers for registering MCP tools.
  *
- * Tools are gated by the configuration: read-only tools are always registered;
- * mutating tools require `config.allowMutations`; destructive (delete) tools
- * additionally require `config.allowDelete`. This makes the MCP server safe by
- * default -- an agent can inspect but not change anything until writes are
- * explicitly opted into.
+ * Every tool is always registered -- the MCP server adds no authorization
+ * surface of its own (ADR-0011). What an agent can actually do is decided
+ * entirely by the API key's role: a call that exceeds the key's RBAC
+ * permissions (Settings -> API Keys -> role) is rejected by the same
+ * `checkLogin` + `requireResource` checks the dashboard itself goes through,
+ * the same way a Viewer-role dashboard user can't click a delete button that
+ * isn't there. Destructive tools still require `confirm: true` per call as a
+ * mechanical safety net against a single mistaken invocation, independent of
+ * who is authorized to make it.
  */
 
 /**
@@ -33,8 +37,9 @@ function errorResult(message) {
 }
 
 /**
- * Register a tool while honouring the mutation/delete gates and wrapping the
- * handler so any thrown error becomes a clean MCP error result.
+ * Register a tool, wrapping the handler so any thrown error (including an
+ * RBAC permission denial from the underlying SuperKuma call) becomes a clean
+ * MCP error result instead of an uncaught exception.
  * @param {object} server The McpServer instance.
  * @param {object} config Resolved MCP configuration.
  * @param {object} spec Tool specification.
@@ -42,19 +47,14 @@ function errorResult(message) {
  * @param {string} spec.title Human-readable title.
  * @param {string} spec.description Tool description.
  * @param {object} spec.inputSchema Zod raw shape for the tool input (optional).
- * @param {boolean} spec.mutation Whether the tool changes server state (optional).
- * @param {boolean} spec.destructive Whether the tool deletes server state (optional).
+ * @param {boolean} spec.mutation Whether the tool changes server state (optional; used for the
+ *   `readOnlyHint` annotation shown to the MCP client, not for gating).
+ * @param {boolean} spec.destructive Whether the tool deletes server state (optional; used for the
+ *   `destructiveHint` annotation, not for gating).
  * @param {Function} spec.handler Async handler `(args) => data`.
- * @returns {boolean} True if the tool was registered, false if gated out.
+ * @returns {boolean} Always true; kept for backward compatibility with callers checking the result.
  */
 function registerTool(server, config, spec) {
-    if (spec.mutation && !config.allowMutations) {
-        return false;
-    }
-    if (spec.destructive && !config.allowDelete) {
-        return false;
-    }
-
     server.registerTool(
         spec.name,
         {

@@ -33,16 +33,16 @@ function parseIntEnv(value, fallback) {
 }
 
 /**
- * Load the capability gates and connection tunables shared by every transport.
- * These do NOT require an API key: the stdio server gets the key from the
- * environment, while the embedded HTTP endpoint takes it per-request from the
- * Authorization header.
- * @returns {object} The resolved gates ({ allowMutations, allowDelete, insecureTls, requestTimeout }).
+ * Load the connection tunables shared by every transport. These do NOT
+ * require an API key: the stdio server gets the key from the environment,
+ * while the embedded HTTP endpoint takes it per-request from the
+ * Authorization header. What an API key can actually do (create/update/
+ * delete) is decided entirely by its RBAC role, not by any env var here --
+ * see server/mcp/tools/helpers.js.
+ * @returns {object} The resolved gates ({ insecureTls, requestTimeout }).
  */
 function loadGates() {
     return {
-        allowMutations: parseBool(process.env.SUPERKUMA_ALLOW_MUTATIONS),
-        allowDelete: parseBool(process.env.SUPERKUMA_ALLOW_DELETE),
         insecureTls: parseBool(process.env.SUPERKUMA_INSECURE_TLS),
         requestTimeout: parseIntEnv(process.env.SUPERKUMA_REQUEST_TIMEOUT, 10000),
     };

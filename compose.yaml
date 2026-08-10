@@ -18,6 +18,11 @@ services:
       SUPERKUMA_DB_NAME: superkuma
       SUPERKUMA_DB_USERNAME: superkuma
       SUPERKUMA_DB_PASSWORD: ${SUPERKUMA_DB_PASSWORD:?set SUPERKUMA_DB_PASSWORD in a .env file next to this compose.yaml}
+      # Built-in MCP server (see server/mcp/README.md) -- serving the endpoint is safe on its
+      # own, every request still needs a valid API key from Settings > API Keys. What that key
+      # can do (read/create/update/delete) is decided entirely by its role, chosen when the key
+      # is created (Settings > API Keys > Add API Key) -- there is no separate env var gate.
+      SUPERKUMA_MCP_HTTP_ENABLED: ${SUPERKUMA_MCP_HTTP_ENABLED:-true}
     volumes:
       - ./data:/app/data
     ports:

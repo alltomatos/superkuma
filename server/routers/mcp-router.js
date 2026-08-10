@@ -88,8 +88,6 @@ async function createSession(req, res) {
         // Loopback connection to this same server; skip TLS verification for it.
         insecureTls: true,
         requestTimeout: gates.requestTimeout,
-        allowMutations: gates.allowMutations,
-        allowDelete: gates.allowDelete,
     };
 
     const client = new SuperKumaClient(mcpConfig);

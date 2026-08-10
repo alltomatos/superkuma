@@ -62,6 +62,13 @@ docker compose up -d
 
 SuperKuma is now running on all network interfaces (e.g. http://localhost:3001 or http://your-ip:3001) — go straight to creating your admin account, the database is already configured.
 
+> [!NOTE]
+> The built-in [MCP server](#-ai-agents-mcp) is served (`/mcp`) — every call needs a valid API
+> key from Settings > API Keys, and what it can actually do is decided entirely by that key's
+> **role** (Owner/Admin/Editor can write, Viewer is read-only), the exact same RBAC a dashboard
+> user goes through. There's no separate server-side toggle to also flip: pick the role when
+> generating the key (Settings > API Keys > Add API Key) and that's the whole gate.
+
 > [!WARNING]
 > File Systems like **NFS** (Network File System) are **NOT** supported. Please map to a local directory or volume.
 
