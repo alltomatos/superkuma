@@ -227,7 +227,7 @@ const { chartSocketHandler } = require("./socket-handlers/chart-socket-handler")
 // necessary and for this exact mechanism's own unit tests). Every OTHER
 // route's behavior is byte-for-byte identical to plain `express.json()`.
 const { pathExcludedJsonParser } = require("./middleware/path-excluded-json-parser");
-app.use(pathExcludedJsonParser(["/v1/metrics"]));
+app.use(pathExcludedJsonParser(["/v1/metrics", "/api/izapia/callback"]));
 
 // Global Middleware
 app.use(function (req, res, next) {
@@ -405,6 +405,10 @@ let needSetup = false;
     // Federation Router
     const federationRouter = require("./routers/federation-router");
     app.use(federationRouter);
+
+    // IZAPIA interactive-notification callback router
+    const izapiaCallbackRouter = require("./routers/izapia-callback-router");
+    app.use(izapiaCallbackRouter);
 
     // Telemetry Router (OTLP/JSON metrics receiver, ADR-0015)
     const telemetryRouter = require("./routers/telemetry-router");
