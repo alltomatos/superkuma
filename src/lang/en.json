@@ -389,6 +389,8 @@
     "selectAllMonitorsAria": "Select all monitors",
     "deselectAllMonitorsAria": "Deselect all monitors",
     "Check/Uncheck": "Check/Uncheck",
+    "expandCollapseGroupAria": "Expand/collapse group",
+    "removeMonitorFromTagAria": "Remove monitor from tag",
     "Powered by": "Powered by",
     "Customize": "Customize",
     "Custom Footer": "Custom Footer",
