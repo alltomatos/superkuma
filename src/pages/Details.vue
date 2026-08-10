@@ -1073,7 +1073,7 @@ export default {
     }
 }
 
-@media (max-width: 550px) {
+@media (max-width: $breakpoint-mobile) {
     .ping-chart-wrapper {
         padding: 10px !important;
     }
@@ -1154,7 +1154,7 @@ table {
     }
 }
 
-@media (max-width: 550px) {
+@media (max-width: $breakpoint-mobile) {
     .stats {
         .col {
             margin: 10px 0 !important;
