@@ -22,14 +22,10 @@ name: Prepare Release PR
 # publishes the Docker Hub image -- so reviewing and merging this one PR is
 # the only manual step left in the whole release pipeline.
 #
-# Runs on a GitHub-hosted runner (needs Node/npm for `npm version` and the gh
-# CLI, neither installed on the omniroute self-hosted runner used by
-# auto-release.yml/release-docker.yml -- see their comments) rather than
-# self-hosted: safe to do so because this only ever fires on push to develop,
-# which -- like push to main -- only happens after a human already reviewed
-# and merged a PR, never from an untrusted fork. auto-test.yml already runs
-# PR-triggered (untrusted-fork-exposed) builds on GitHub-hosted infra, so a
-# push-to-develop trigger is strictly more trusted than what's already there.
+# Runs on a GitHub-hosted runner (all workflows in this repo do -- see
+# ADR-0012 addendum, the omniroute self-hosted runner was retired). Safe to
+# fire on push to develop: that, like push to main, only happens after a
+# human already reviewed and merged a PR, never from an untrusted fork.
 
 on:
   push:

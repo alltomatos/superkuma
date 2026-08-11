@@ -891,3 +891,16 @@ CI da PR: mesmas 2 falhas de ambiente já confirmadas (`validate`→libatomic1, 
 7 de 8 issues fechadas via merge em `develop` (fecham de verdade quando `develop`→`main` for promovido). Só #97 resta aberta, aguardando decisão humana sobre a migração de schema.
 
 Efeito colateral desta sessão: **runners GHA do omniroute consertados** (estavam mortos há 2 semanas) — ver seção "Incidente de infra" acima para detalhes e achados correlatos não corrigidos (PAT do stack org expirado; bug de redirect no entrypoint.sh para watink-dev).
+
+### Issue #97 (B3, T3) concluída — TODAS as pendências de infra + epics fechadas (2026-08-11)
+
+PR #112 mergeada com "Go" humano explícito reconfirmado em dois pontos: antes da implementação e antes do merge final (T3 = confirmação dupla, não reaproveitou autorização genérica das PRs T1/T2 anteriores). Todos os 12 checks de CI verdes, incluindo `auto-test` rodando de verdade os testes de RADIUS/SNMP/migration.
+
+**Achados/consertos adicionais nesta rodada**:
+- `package.json` tinha `vue-virtual-scroller` com `^` em vez de `~` (erro da PR #106, passou despercebido por causa do caos de infra na época) — corrigido via PR #113, estava quebrando o `validate` de toda PR subsequente.
+- **Runner image (`gha-runner-official`) reconstruída** no omniroute: adicionado `iputils-ping` (resolve a flake determinística de `test-util-server.js`) e `libatomic1` (resolve o `validate` quebrado documentado no ADR-0012). Rebuild + `docker compose up -d --force-recreate` nos dois stacks (`repos` e `org`).
+- **PAT do stack `org` renovado**: token antigo expirado (401), usuário gerou um novo fine-grained token (organization permission "Self-hosted runners: Read and write") em `alltomatosbr`, escrito em `/opt/gha-runner/org/gh_pat.txt` via SSH. Os 4 runners `omniroute-org-*` voltaram.
+- **Bug real achado no `entrypoint.sh`** (compartilhado por todos os stacks): `curl` sem `-L` não seguia redirect 301 do endpoint de registration-token — corrigido (`curl -sLX POST`). Ainda não resolve o `watink-dev` (que precisa de outro fix: `REPO_FULL_NAME` no compose aponta pro nome antigo do repo — usuário informou que o nome novo é `alltomatos/watink`, mas o compose não foi atualizado ainda, fora do escopo desta sessão).
+- **Achado de processo real**: GitHub raramente dessincroniza o registro de uma PR do estado real da branch (`git push` funciona, `gh api .../pulls/N` fica preso no SHA antigo, CI para de re-disparar) — corrigido fechando e reabrindo a PR à força. Também confirmado de novo: `gh pr merge` pode fechar uma PR sem mergear quando a base mudou sob ela em vez de só falhar (reabrir + tentar de novo resolve).
+
+**Todas as 8 issues de epics de frontend (#95-#102) e a fila de pendências pedida pelo usuário estão concluídas.** Restam só os itens explicitamente fora de escopo, documentados e não tocados: `watink-dev` REPO_FULL_NAME desatualizado (outro projeto).
