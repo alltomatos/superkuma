@@ -9,8 +9,9 @@
  * no new authorization surface of its own.
  *
  * Configure via environment variables (see server/mcp/README.md):
- *   SUPERKUMA_URL, SUPERKUMA_API_KEY, SUPERKUMA_ALLOW_MUTATIONS,
- *   SUPERKUMA_ALLOW_DELETE, SUPERKUMA_INSECURE_TLS, SUPERKUMA_REQUEST_TIMEOUT
+ *   SUPERKUMA_URL, SUPERKUMA_API_KEY, SUPERKUMA_INSECURE_TLS, SUPERKUMA_REQUEST_TIMEOUT
+ * What the key can actually do (read/create/update/delete) is decided by its RBAC role
+ * (Settings -> API Keys), not by any environment variable here.
  */
 
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
@@ -44,7 +45,7 @@ async function main() {
 
     logStderr(`connecting to ${config.url} ...`);
     await client.connect();
-    logStderr(`authenticated (mutations=${config.allowMutations}, delete=${config.allowDelete})`);
+    logStderr("authenticated");
 
     const server = new McpServer({
         name: MCP_SERVER_NAME,

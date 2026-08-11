@@ -1,6 +1,6 @@
 # ADR-0011: Servidor MCP para configuração por agentes de IA
 
-- **Status:** Accepted
+- **Status:** Accepted (o item "segurança por padrão" via `SUPERKUMA_ALLOW_MUTATIONS`/`SUPERKUMA_ALLOW_DELETE` foi **superado por [ADR-0018](0018-mcp-rbac-only-no-env-var-gates.md)** — o papel da API key passou a ser o único controle; o restante desta ADR permanece válido)
 - **Data:** 2026-07-05
 
 ## Contexto

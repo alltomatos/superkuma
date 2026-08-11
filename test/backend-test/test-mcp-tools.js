@@ -140,16 +140,12 @@ describe("MCP config", () => {
         }
     });
 
-    test("loadConfig applies defaults and gates", () => {
+    test("loadConfig applies defaults", () => {
         const saved = { ...process.env };
         process.env.SUPERKUMA_API_KEY = "uk1_secret";
         delete process.env.SUPERKUMA_URL;
-        delete process.env.SUPERKUMA_ALLOW_MUTATIONS;
-        delete process.env.SUPERKUMA_ALLOW_DELETE;
         const cfg = loadConfig();
         assert.strictEqual(cfg.url, "http://localhost:3001");
-        assert.strictEqual(cfg.allowMutations, false);
-        assert.strictEqual(cfg.allowDelete, false);
         assert.strictEqual(cfg.requestTimeout, 10000);
         process.env = saved;
     });
@@ -261,33 +257,16 @@ describe("MCP maintenance payload", () => {
     });
 });
 
-describe("MCP tool gating", () => {
-    test("read-only config registers only read tools", () => {
+describe("MCP tool registration", () => {
+    // The MCP server adds no authorization surface of its own (ADR-0011): every tool is always
+    // registered regardless of what's in the config object, and an unauthorized call is rejected
+    // by the underlying SuperKuma RBAC (checkLogin + requireResource), not by tool availability.
+    test("every tool -- read, mutating and destructive -- is registered regardless of config", () => {
         const server = new FakeServer();
-        registerAllTools(server, new FakeClient(), { allowMutations: false, allowDelete: false });
+        registerAllTools(server, new FakeClient(), {});
         const names = server.names();
-        const mutating = names.filter((n) =>
-            /^(create|update|delete|pause|resume|add_monitor_tag|remove_monitor_tag|test_|post_|resolve_)/.test(n)
-        );
-        assert.deepStrictEqual(mutating, [], "no mutating tools should be registered read-only");
         assert.ok(names.includes("list_monitors"));
         assert.ok(names.includes("get_info"));
-    });
-
-    test("mutations without delete hides only destructive tools", () => {
-        const server = new FakeServer();
-        registerAllTools(server, new FakeClient(), { allowMutations: true, allowDelete: false });
-        const names = server.names();
-        assert.ok(names.includes("create_monitor"));
-        assert.ok(!names.includes("delete_monitor"));
-        assert.ok(!names.includes("delete_notification"));
-        assert.ok(!names.includes("delete_status_page"));
-    });
-
-    test("full config registers the complete tool set", () => {
-        const server = new FakeServer();
-        registerAllTools(server, new FakeClient(), { allowMutations: true, allowDelete: true });
-        const names = server.names();
         for (const expected of [
             "create_monitor",
             "delete_monitor",
@@ -310,7 +289,7 @@ describe("MCP tool gating", () => {
 });
 
 describe("MCP tool behaviour", () => {
-    const fullConfig = { allowMutations: true, allowDelete: true };
+    const fullConfig = {}; // tools no longer gated by config; kept as a name for readability
 
     test("list_monitors filters by teamId when given, returns all otherwise", async () => {
         const server = new FakeServer();
@@ -521,7 +500,7 @@ describe("MCP tool behaviour", () => {
 });
 
 describe("MCP dashboard tools", () => {
-    const fullConfig = { allowMutations: true, allowDelete: true };
+    const fullConfig = {}; // tools no longer gated by config; kept as a name for readability
 
     test("list_dashboards forwards to getDashboardList", async () => {
         const server = new FakeServer();
@@ -684,16 +663,15 @@ describe("MCP dashboard tools", () => {
 });
 
 describe("MCP config gates", () => {
-    test("loadGates reads the mutation/delete gates without an API key", () => {
+    test("loadGates reads the connection tunables without an API key", () => {
         const saved = { ...process.env };
-        process.env.SUPERKUMA_ALLOW_MUTATIONS = "true";
-        process.env.SUPERKUMA_ALLOW_DELETE = "1";
         delete process.env.SUPERKUMA_API_KEY;
         const gates = loadGates();
-        assert.strictEqual(gates.allowMutations, true);
-        assert.strictEqual(gates.allowDelete, true);
         assert.strictEqual(typeof gates.requestTimeout, "number");
+        assert.strictEqual(typeof gates.insecureTls, "boolean");
         assert.ok(!("apiKey" in gates), "gates must not require/return an API key");
+        assert.ok(!("allowMutations" in gates), "mutations are no longer gated by config");
+        assert.ok(!("allowDelete" in gates), "deletes are no longer gated by config");
         process.env = saved;
     });
 });

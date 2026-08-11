@@ -12,18 +12,26 @@ function registerInfoTools(server, client, config) {
         name: "get_info",
         title: "Get server info",
         description:
-            "Return the MCP connection status, which capabilities are enabled (mutations/deletes), the number of " +
-            "visible monitors, the SuperKuma server info (version, base URL), and the team this connection is " +
-            "scoped to (Teams/RBAC). Monitors created via create_monitor land in that team; every list tool " +
-            "(list_monitors, etc.) only returns that team's resources -- a superadmin connection sees every team.",
+            "Return the MCP connection status, what this API key's role actually permits (read/create/update/" +
+            "delete, derived from its RBAC permissions -- there is no separate mutations/deletes toggle), the " +
+            "number of visible monitors, the SuperKuma server info (version, base URL), and the team this " +
+            "connection is scoped to (Teams/RBAC). Monitors created via create_monitor land in that team; every " +
+            "list tool (list_monitors, etc.) only returns that team's resources -- a superadmin connection sees " +
+            "every team.",
         handler: async () => {
             const info = client.info || {};
+            const activeTeam = (info.teams || []).find((t) => t.id === info.activeTeamId) || null;
+            const permissions = new Set((activeTeam && activeTeam.permissions) || []);
             return {
                 connected: Boolean(client.socket && client.socket.connected),
                 authenticated: client.loggedIn,
                 url: config.url,
-                mutationsEnabled: config.allowMutations,
-                deleteEnabled: config.allowDelete,
+                permissions: {
+                    isSuperadmin: Boolean(info.currentUser && info.currentUser.isSuperadmin),
+                    canCreateMonitors: permissions.has("monitor:create"),
+                    canUpdateMonitors: permissions.has("monitor:update"),
+                    canDeleteMonitors: permissions.has("monitor:delete"),
+                },
                 monitorCount: Object.keys(client.monitors).length,
                 notificationCount: (client.notifications || []).length,
                 statusPageCount: Object.keys(client.statusPages || {}).length,
@@ -31,7 +39,7 @@ function registerInfoTools(server, client, config) {
                     ? client.maintenances
                     : Object.keys(client.maintenances || {})
                 ).length,
-                team: (info.teams || []).find((t) => t.id === info.activeTeamId) || null,
+                team: activeTeam,
                 teams: info.teams || [],
                 server: client.info,
             };
