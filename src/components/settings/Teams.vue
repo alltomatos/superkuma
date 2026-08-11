@@ -251,6 +251,13 @@ export default {
     },
 
     mounted() {
+        // Team creation/membership changes are superadmin-only server-side;
+        // this tab is hidden from the settings menu for anyone else (see
+        // Settings.vue), but guard direct URL navigation too.
+        if (!this.$root.isSuperadminUser) {
+            this.$router.replace("/settings/general");
+            return;
+        }
         this.$root.getTeamList();
         this.$root.getUserList();
         this.createTeamModal = new Modal(this.$refs.createTeamModal);
