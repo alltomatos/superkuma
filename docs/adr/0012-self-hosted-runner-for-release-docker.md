@@ -1,7 +1,37 @@
 # ADR-0012: Runner self-hosted para o release Docker
 
-- **Status:** Accepted (escopo ampliado em 2026-07-07, ver nota abaixo)
+- **Status:** Superseded (revertido em 2026-08-11, ver nota abaixo) — escopo tinha sido ampliado em 2026-07-07
 - **Data:** 2026-07-06
+
+> **Atualização 2026-08-11 — reversão completa: todos os workflows voltaram para runners GitHub-hosted.**
+> O `omniroute` (self-hosted) parou de compensar o ganho de velocidade original. Numa única sessão de
+> orquestração (fila de melhorias de frontend, issues #95-#102 + #97 T3), o runner precisou de
+> intervenção manual repetida:
+> - Os 7 containers `gha-repo-superkuma-*` estavam **mortos há 2 semanas** (crash-loop silencioso: o
+>   `entrypoint.sh` tenta `config.sh` sem tratar o caso "já configurado" quando a camada de escrita do
+>   container persiste um registro anterior, e a policy de restart não recria a camada) — só descoberto
+>   porque bloqueou pushes ativamente, sem qualquer alerta.
+> - Depois de consertado, um `docker compose up -d --force-recreate` matou containers **no meio de jobs
+>   em andamento**, deixando jobs órfãos presos em `in_progress` no GitHub por vários minutos sem
+>   nenhum runner de fato processando (GitHub não detecta o runner sumindo rápido o suficiente).
+> - A imagem do runner (`gha-runner-official`) nunca instalou `iputils-ping` nem `libatomic1`,
+>   causando falha determinística em `test-util-server.js` (`ping`) e no job `validate` (Node.js 25)
+>   em toda PR, por meses, sem ninguém perceber que era infra e não código.
+> - Builds Docker concorrentes (vários PRs + um release real ao mesmo tempo) sobrecarregaram o daemon
+>   Docker compartilhado do host, deixando `docker-build-smoke` levar 15+ minutos em vez dos ~6-10
+>   normais.
+> - GitHub ocasionalmente dessincroniza o registro de uma PR do estado real da branch quando o runner
+>   monitorando aquele push desaparece no meio do caminho — o head da PR fica preso num commit antigo e
+>   o CI para de re-disparar, exigindo fechar/reabrir a PR à força pra resincronizar.
+>
+> Nenhum desses problemas é inerente à ideia de self-hosted em si — todos têm causa raiz identificada e
+> conserto conhecido — mas o custo operacional acumulado (uma pessoa precisando entrar via SSH pra
+> depurar o host de CI no meio de um fluxo de trabalho normal) superou o ganho de velocidade que
+> motivou a decisão original. `auto-test.yml`, `validate.yml`, `auto-release.yml` e
+> `release-docker.yml` voltaram todos pra runners GitHub-hosted (`ubuntu-latest`/`ubuntu-22.04`),
+> incluindo o próprio build+push da imagem Docker de release (antes exclusivo do `omniroute` por causa
+> do `docker.sock` do host). O host `omniroute` continua existindo pra outras cargas (Chatwoot, Typebot,
+> outros repos), só não é mais usado pelo CI do superkuma.
 
 > **Atualização 2026-07-07:** a rejeição de mover `Auto Test`/`validate` para o `omniroute` (ver
 > "Decisão" e "Alternativas consideradas" abaixo) foi revisitada, não revertida. A fila
