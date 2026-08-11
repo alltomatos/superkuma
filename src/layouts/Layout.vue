@@ -430,7 +430,7 @@ main {
     }
 }
 
-@media (max-width: 770px) {
+@media (max-width: $breakpoint-tablet) {
     .clear-all-toast-btn {
         bottom: 72px;
     }

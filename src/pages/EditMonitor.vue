@@ -158,17 +158,13 @@
                             </div>
 
                             <!-- Friendly Name -->
-                            <div class="my-3">
-                                <label for="name" class="form-label">{{ $t("Friendly Name") }}</label>
-                                <input
-                                    id="name"
-                                    v-model="monitor.name"
-                                    type="text"
-                                    class="form-control"
-                                    data-testid="friendly-name-input"
-                                    :placeholder="defaultFriendlyName"
-                                />
-                            </div>
+                            <MonitorFieldInput
+                                id="name"
+                                v-model="monitor.name"
+                                :label="$t('Friendly Name')"
+                                :placeholder="defaultFriendlyName"
+                                data-testid="friendly-name-input"
+                            />
 
                             <!-- Manual Status switcher -->
                             <div v-if="monitor.type === 'manual'" class="mb-3">
@@ -1562,67 +1558,68 @@
                             />
 
                             <!-- Interval -->
-                            <div class="my-3">
-                                <label for="interval" class="form-label">
-                                    {{ $t("Heartbeat Interval") }} ({{ $t("checkEverySecond", [monitor.interval]) }})
-                                </label>
-                                <input
-                                    id="interval"
-                                    v-model="monitor.interval"
-                                    type="number"
-                                    class="form-control"
-                                    required
-                                    :min="minInterval"
-                                    :max="maxInterval"
-                                    step="1"
-                                    @focus="lowIntervalConfirmation.editedValue = true"
-                                    @blur="finishUpdateInterval"
-                                />
-
-                                <div class="form-text">
-                                    {{ monitor.humanReadableInterval }}
-                                </div>
-
-                                <div v-if="monitor.interval < 20" class="form-text">
+                            <MonitorFieldInput
+                                id="interval"
+                                v-model="monitor.interval"
+                                type="number"
+                                required
+                                :min="minInterval"
+                                :max="maxInterval"
+                                step="1"
+                                :invalid="Boolean(fieldErrors.interval)"
+                                :label="`${$t('Heartbeat Interval')} (${$t('checkEverySecond', [monitor.interval])})`"
+                                @focus="lowIntervalConfirmation.editedValue = true"
+                                @blur="
+                                    finishUpdateInterval();
+                                    validateField('interval');
+                                "
+                            >
+                                {{ monitor.humanReadableInterval }}
+                                <template v-if="monitor.interval < 20" #warning>
                                     {{ $t("minimumIntervalWarning") }}
-                                </div>
-                            </div>
+                                </template>
+                                <template #error>
+                                    {{ fieldErrors.interval }}
+                                </template>
+                            </MonitorFieldInput>
 
-                            <div class="my-3">
-                                <label for="maxRetries" class="form-label">{{ $t("Retries") }}</label>
-                                <input
-                                    id="maxRetries"
-                                    v-model="monitor.maxretries"
-                                    type="number"
-                                    class="form-control"
-                                    required
-                                    min="0"
-                                    step="1"
-                                />
-                                <div class="form-text">
-                                    {{ $t("retriesDescription") }}
-                                </div>
-                            </div>
+                            <MonitorFieldInput
+                                id="maxRetries"
+                                v-model="monitor.maxretries"
+                                type="number"
+                                required
+                                min="0"
+                                step="1"
+                                :invalid="Boolean(fieldErrors.maxretries)"
+                                :label="$t('Retries')"
+                                @blur="validateField('maxretries')"
+                            >
+                                {{ $t("retriesDescription") }}
+                                <template #error>
+                                    {{ fieldErrors.maxretries }}
+                                </template>
+                            </MonitorFieldInput>
 
-                            <div v-if="monitor.maxretries" class="my-3">
-                                <label for="retry-interval" class="form-label">
-                                    {{ $t("Heartbeat Retry Interval") }}
-                                    <span>({{ $t("retryCheckEverySecond", [monitor.retryInterval]) }})</span>
-                                </label>
-                                <input
-                                    id="retry-interval"
-                                    v-model="monitor.retryInterval"
-                                    type="number"
-                                    class="form-control"
-                                    required
-                                    :min="minInterval"
-                                    step="1"
-                                    @focus="lowIntervalConfirmation.editedValue = true"
-                                />
-                                <div v-if="monitor.retryInterval < 20" class="form-text">
+                            <MonitorFieldInput
+                                v-if="monitor.maxretries"
+                                id="retry-interval"
+                                v-model="monitor.retryInterval"
+                                type="number"
+                                required
+                                :min="minInterval"
+                                step="1"
+                                :invalid="Boolean(fieldErrors.retryInterval)"
+                                :label="`${$t('Heartbeat Retry Interval')} (${$t('retryCheckEverySecond', [monitor.retryInterval])})`"
+                                @focus="lowIntervalConfirmation.editedValue = true"
+                                @blur="validateField('retryInterval')"
+                            >
+                                <template v-if="monitor.retryInterval < 20" #warning>
                                     {{ $t("minimumIntervalWarning") }}
-                                </div>
-                            </div>
+                                </template>
+                                <template #error>
+                                    {{ fieldErrors.retryInterval }}
+                                </template>
+                            </MonitorFieldInput>
 
                             <!-- Retry only on status code failure: JSON Query only -->
                             <div v-if="monitor.type === 'json-query' && monitor.maxretries > 0" class="my-3">
@@ -3100,6 +3097,7 @@ import EditMonitorConditions from "../components/EditMonitorConditions.vue";
 import PushUrlField from "../components/monitor-form/PushUrlField.vue";
 import TcpPortFields from "../components/monitor-form/TcpPortFields.vue";
 import HttpOptionsFields from "../components/monitor-form/HttpOptionsFields.vue";
+import MonitorFieldInput from "../components/MonitorFieldInput.vue";
 
 const toast = useToast();
 
@@ -3203,6 +3201,7 @@ export default {
         PushUrlField,
         TcpPortFields,
         HttpOptionsFields,
+        MonitorFieldInput,
     },
 
     data() {
@@ -3236,6 +3235,14 @@ export default {
             lowIntervalConfirmation: {
                 confirmed: false,
                 editedValue: false,
+            },
+            // Client-side validation error messages for the pilot MonitorFieldInput
+            // fields (Heartbeat Interval, Retries, Heartbeat Retry Interval). Keyed by
+            // field name; a null/empty value means the field is currently valid.
+            fieldErrors: {
+                interval: null,
+                maxretries: null,
+                retryInterval: null,
             },
         };
     },
@@ -3929,10 +3936,83 @@ message HealthCheckResponse {
         },
 
         /**
+         * Validate a single pilot field (Heartbeat Interval, Retries or Heartbeat
+         * Retry Interval) against the min/max constraints already enforced natively
+         * by MonitorFieldInput, storing a translated error message (or null when
+         * valid) in `fieldErrors`. This is UI-only feedback: it does not replace
+         * the backend (zod) validation, it just mirrors the constraints the form
+         * already declares (`required`, `min`, `max`).
+         * @param {string} field The `fieldErrors`/`monitor` property to validate
+         * (one of "interval", "maxretries", "retryInterval").
+         * @returns {boolean} Whether the field is currently valid.
+         * @throws {Error} If called with an unsupported field name.
+         */
+        validateField(field) {
+            const fieldToConfig = {
+                interval: { min: this.minInterval, max: this.maxInterval, required: true },
+                maxretries: { min: 0, max: undefined, required: true },
+                retryInterval: {
+                    min: this.minInterval,
+                    max: undefined,
+                    // Only required while retries are enabled (field is hidden otherwise).
+                    required: Boolean(this.monitor.maxretries),
+                },
+            };
+
+            const config = fieldToConfig[field];
+            if (!config) {
+                throw new Error(`Unsupported field for validateField(): ${field}`);
+            }
+
+            const value = this.monitor[field];
+
+            if (!config.required && (value === "" || value === null || value === undefined)) {
+                this.fieldErrors[field] = null;
+                return true;
+            }
+
+            if (value === "" || value === null || value === undefined) {
+                this.fieldErrors[field] = this.$t("fieldValueRequired");
+                return false;
+            }
+
+            const numericValue = Number(value);
+
+            if (config.min !== undefined && numericValue < config.min) {
+                this.fieldErrors[field] = this.$t("fieldValueTooLow", { min: config.min });
+                return false;
+            }
+
+            if (config.max !== undefined && numericValue > config.max) {
+                this.fieldErrors[field] = this.$t("fieldValueTooHigh", { max: config.max });
+                return false;
+            }
+
+            this.fieldErrors[field] = null;
+            return true;
+        },
+
+        /**
+         * Validate every pilot MonitorFieldInput field ahead of submission.
+         * @returns {boolean} Whether all pilot fields are currently valid.
+         */
+        validatePilotFields() {
+            const intervalValid = this.validateField("interval");
+            const maxRetriesValid = this.validateField("maxretries");
+            const retryIntervalValid = this.validateField("retryInterval");
+
+            return intervalValid && maxRetriesValid && retryIntervalValid;
+        },
+
+        /**
          * Validate form input
          * @returns {boolean} Is the form input valid?
          */
         isInputValid() {
+            if (!this.validatePilotFields()) {
+                toast.error(this.$t("formHasFieldErrors"));
+                return false;
+            }
             if (this.monitor.body && (!this.monitor.httpBodyEncoding || this.monitor.httpBodyEncoding === "json")) {
                 try {
                     JSON.parse(this.monitor.body);

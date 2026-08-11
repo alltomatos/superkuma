@@ -376,6 +376,7 @@
                             :src="screenshotURL"
                             style="width: 100%"
                             alt="screenshot of the website"
+                            loading="lazy"
                             @click="showScreenshotDialog"
                         />
                     </div>
@@ -1073,7 +1074,7 @@ export default {
     }
 }
 
-@media (max-width: 550px) {
+@media (max-width: $breakpoint-mobile) {
     .ping-chart-wrapper {
         padding: 10px !important;
     }
@@ -1154,7 +1155,7 @@ table {
     }
 }
 
-@media (max-width: 550px) {
+@media (max-width: $breakpoint-mobile) {
     .stats {
         .col {
             margin: 10px 0 !important;

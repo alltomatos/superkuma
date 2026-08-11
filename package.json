@@ -1,6 +1,6 @@
 {
   "name": "superkuma",
-  "version": "2.11.0",
+  "version": "2.12.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -155,6 +155,7 @@
     "tldts": "~7.0.23",
     "tough-cookie": "~4.1.4",
     "validator": "~13.15.26",
+    "vue-virtual-scroller": "^3.0.4",
     "web-push": "~3.6.7",
     "ws": "~8.19.0",
     "zod": "~4.4.3"

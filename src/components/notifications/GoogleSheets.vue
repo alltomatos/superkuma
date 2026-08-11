@@ -44,6 +44,9 @@
 <script>
 import HiddenInput from "../HiddenInput.vue";
 import ToggleSection from "../ToggleSection.vue";
+import { useToast } from "vue-toastification";
+
+const toast = useToast();
 
 // Google Apps Script code for logging to spreadsheet
 const GOOGLE_APPS_SCRIPT_CODE = `function doPost(e) {
@@ -81,12 +84,16 @@ export default {
         },
     },
     methods: {
+        /**
+         * Copy the Google Apps Script code to the clipboard.
+         * @returns {void}
+         */
         copyScript() {
             try {
                 navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
-                alert(this.$t("Copied to clipboard!"));
+                toast.success(this.$t("Copied to clipboard!"));
             } catch (error) {
-                alert(this.$t("Failed to copy to clipboard"));
+                toast.error(this.$t("Failed to copy to clipboard"));
             }
         },
     },

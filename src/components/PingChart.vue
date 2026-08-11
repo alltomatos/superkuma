@@ -22,8 +22,9 @@
                 </li>
             </ul>
         </div>
-        <div class="chart-wrapper" :class="{ loading: loading }">
-            <Line :data="chartData" :options="chartOptions" />
+        <div class="chart-wrapper">
+            <ChartSkeleton v-if="showSkeleton" />
+            <Line v-else :data="chartData" :options="chartOptions" />
         </div>
     </div>
 </template>
@@ -44,6 +45,7 @@ import {
 } from "chart.js";
 import "chartjs-adapter-dayjs-4";
 import { Line } from "vue-chartjs";
+import ChartSkeleton from "./ChartSkeleton.vue";
 import { UP, DOWN, PENDING, MAINTENANCE } from "../util.ts";
 
 Chart.register(
@@ -60,7 +62,7 @@ Chart.register(
 );
 
 export default {
-    components: { Line },
+    components: { Line, ChartSkeleton },
     props: {
         /** ID of monitor */
         monitorId: {
@@ -220,6 +222,30 @@ export default {
             } else {
                 return this.getChartDatapointsFromStats();
             }
+        },
+
+        /**
+         * Whether no heartbeat data has arrived yet for the "recent" period.
+         * Used to keep the skeleton visible on initial load, before the
+         * socket has pushed the first heartbeatList payload for this monitor.
+         * @returns {boolean} True if the recent period has no data yet
+         */
+        isInitialLoading() {
+            if (this.chartPeriodHrs !== "0") {
+                return false;
+            }
+            const heartbeatList = this.$root.heartbeatList[this.monitorId];
+            return !heartbeatList || heartbeatList.length === 0;
+        },
+
+        /**
+         * Whether the skeleton placeholder should replace the chart:
+         * either fetching a non-"recent" period, or waiting for the first
+         * heartbeat data of the "recent" period.
+         * @returns {boolean} True if the skeleton should be shown
+         */
+        showSkeleton() {
+            return this.loading || this.isInitialLoading;
         },
     },
     watch: {
@@ -657,9 +683,5 @@ export default {
 
 .chart-wrapper {
     margin-bottom: 0.5em;
-
-    &.loading {
-        filter: blur(10px);
-    }
 }
 </style>

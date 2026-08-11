@@ -100,22 +100,54 @@
             :style="monitorListStyle"
             data-testid="monitor-list"
         >
-            <div v-if="Object.keys($root.monitorList).length === 0" class="text-center mt-3">
+            <MonitorListSkeleton v-if="!$root.monitorListLoaded" />
+
+            <div v-else-if="Object.keys($root.monitorList).length === 0" class="text-center mt-3">
                 {{ $t("No Monitors, please") }}
                 <router-link to="/add">{{ $t("add one") }}</router-link>
             </div>
 
-            <MonitorListItem
-                v-for="item in sortedMonitorList"
-                :key="`${item.id}-${collapseKey}`"
-                :monitor="item"
-                :isSelectMode="selectMode"
-                :isSelected="isSelected"
-                :select="select"
-                :deselect="deselect"
-                :filter-func="filterFunc"
-                :sort-func="sortFunc"
-            />
+            <DynamicScroller
+                v-if="$root.monitorListLoaded && shouldVirtualize"
+                :items="sortedMonitorList"
+                :min-item-size="58"
+                key-field="id"
+                class="monitor-list-scroller"
+            >
+                <template #default="{ item, index, active }">
+                    <DynamicScrollerItem
+                        :item="item"
+                        :active="active"
+                        :data-index="index"
+                        :size-dependencies="[item.tags.length, item.childrenIDs?.length]"
+                    >
+                        <MonitorListItem
+                            :key="`${item.id}-${collapseKey}`"
+                            :monitor="item"
+                            :isSelectMode="selectMode"
+                            :isSelected="isSelected"
+                            :select="select"
+                            :deselect="deselect"
+                            :filter-func="filterFunc"
+                            :sort-func="sortFunc"
+                        />
+                    </DynamicScrollerItem>
+                </template>
+            </DynamicScroller>
+
+            <template v-else>
+                <MonitorListItem
+                    v-for="item in sortedMonitorList"
+                    :key="`${item.id}-${collapseKey}`"
+                    :monitor="item"
+                    :isSelectMode="selectMode"
+                    :isSelected="isSelected"
+                    :select="select"
+                    :deselect="deselect"
+                    :filter-func="filterFunc"
+                    :sort-func="sortFunc"
+                />
+            </template>
         </div>
     </div>
 
@@ -129,16 +161,32 @@
 </template>
 
 <script>
+import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller";
+import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import Confirm from "../components/Confirm.vue";
 import MonitorListItem from "../components/MonitorListItem.vue";
 import MonitorListFilter from "./MonitorListFilter.vue";
+import MonitorListSkeleton from "./MonitorListSkeleton.vue";
 import { getMonitorRelativeURL } from "../util.ts";
+
+/**
+ * Above this many root-level monitors, the list switches from a plain
+ * v-for to a virtualized scroller (vue-virtual-scroller) so the DOM
+ * only ever holds the visible rows instead of one node per monitor.
+ * Most installs have far fewer monitors than this, so UX is unchanged
+ * for them.
+ * @type {number}
+ */
+const VIRTUALIZATION_THRESHOLD = 150;
 
 export default {
     components: {
         Confirm,
         MonitorListItem,
         MonitorListFilter,
+        MonitorListSkeleton,
+        DynamicScroller,
+        DynamicScrollerItem,
     },
     props: {
         /** Should the scrollbar be shown */
@@ -206,6 +254,17 @@ export default {
 
         isDarkTheme() {
             return document.body.classList.contains("dark");
+        },
+
+        /**
+         * Whether the monitor list should render through the virtualized
+         * scroller instead of a plain v-for. Only kicks in once the
+         * root-level list grows past VIRTUALIZATION_THRESHOLD, so small
+         * installs keep the original DOM-based rendering untouched.
+         * @returns {boolean} True if virtualization should be active.
+         */
+        shouldVirtualize() {
+            return this.sortedMonitorList.length > VIRTUALIZATION_THRESHOLD;
         },
 
         monitorListStyle() {
@@ -776,7 +835,7 @@ export default {
     }
 }
 
-@media (max-width: 770px) {
+@media (max-width: $breakpoint-tablet) {
     .list-header {
         margin-bottom: 10px;
         padding: 20px;
@@ -825,7 +884,11 @@ export default {
     gap: 0;
 }
 
-@media (max-width: 549px), (min-width: 770px) and (max-width: 1149px), (min-width: 1200px) and (max-width: 1499px) {
+.monitor-list-scroller {
+    height: 100%;
+}
+
+@media (max-width: $breakpoint-mobile - 1), (min-width: 770px) and (max-width: 1149px), (min-width: 1200px) and (max-width: 1499px) {
     .selection-controls {
         .selected-count {
             margin-left: 0;
