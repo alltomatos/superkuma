@@ -38,6 +38,11 @@ export default {
                 initedSocketIO: false,
             },
             username: null,
+            // Whether the CURRENTLY logged in user is a global superadmin --
+            // UI-only convenience flag (see getMyAccessInfo) used to hide
+            // superadmin-only screens like Teams; every actual mutation stays
+            // enforced server-side regardless of this value.
+            isSuperadminUser: false,
             remember: localStorage.remember !== "0",
             allowLoginDialog: false, // Allowed to show login dialog, but "loggedIn" have to be true too. This exists because prevent the login dialog show 0.1s in first before the socket server auth-ed.
             loggedIn: false,
@@ -142,6 +147,7 @@ export default {
                 this.storage().token = "autoLogin";
                 this.socket.token = "autoLogin";
                 this.allowLoginDialog = false;
+                this.getMyAccessInfo();
             });
 
             socket.on("loginRequired", () => {
@@ -438,6 +444,7 @@ export default {
                         this.socket.token = res.token;
                         this.loggedIn = true;
                         this.username = this.getJWTPayload()?.username;
+                        this.getMyAccessInfo();
 
                         // Trigger Chrome Save Password
                         history.pushState({}, "");
@@ -462,6 +469,7 @@ export default {
                 } else {
                     this.loggedIn = true;
                     this.username = this.getJWTPayload()?.username;
+                    this.getMyAccessInfo();
                 }
             });
         },
@@ -476,7 +484,22 @@ export default {
             this.socket.token = null;
             this.loggedIn = false;
             this.username = null;
+            this.isSuperadminUser = false;
             this.clearData();
+        },
+
+        /**
+         * Fetch whether the currently logged in user is a global superadmin,
+         * used only to hide superadmin-only UI (e.g. the Teams settings
+         * tab) -- every real mutation stays enforced server-side regardless.
+         * @returns {void}
+         */
+        getMyAccessInfo() {
+            socket.emit("getMyAccessInfo", (res) => {
+                if (res.ok) {
+                    this.isSuperadminUser = res.isSuperadmin;
+                }
+            });
         },
 
         /**
@@ -612,6 +635,36 @@ export default {
          */
         addUser(user, callback) {
             socket.emit("addUser", user, (res) => {
+                if (res.ok) {
+                    this.getUserList();
+                }
+                callback(res);
+            });
+        },
+
+        /**
+         * Rename a user and/or change their email address.
+         * @param {object} user Fields ({ id, username, email })
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        editUser(user, callback) {
+            socket.emit("editUser", user, (res) => {
+                if (res.ok) {
+                    this.getUserList();
+                }
+                callback(res);
+            });
+        },
+
+        /**
+         * Permanently delete a user.
+         * @param {number} id ID of the user to delete
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        deleteUser(id, callback) {
+            socket.emit("deleteUser", { id }, (res) => {
                 if (res.ok) {
                     this.getUserList();
                 }
