@@ -37,7 +37,7 @@
                     </a>
                 </div>
                 <div class="settings-content col-lg-9 col-md-7">
-                    <div v-if="currentPage" class="settings-content-header">
+                    <div v-if="currentPage && subMenus[currentPage]" class="settings-content-header">
                         {{ subMenus[currentPage].title }}
                     </div>
                     <div class="mx-3">
@@ -84,7 +84,7 @@ export default {
         },
 
         subMenus() {
-            return {
+            const menus = {
                 general: {
                     title: this.$t("General"),
                 },
@@ -137,6 +137,17 @@ export default {
                     title: this.$t("About"),
                 },
             };
+
+            // Team creation/membership changes are superadmin-only server-side
+            // (see team-socket-handler.js's assertCallerIsSuperadmin) -- a
+            // non-superadmin (e.g. a per-team Editor) can at best view their
+            // own team's roster read-only and hit a 403 on everything else, so
+            // don't offer the tab at all rather than show a dead-end screen.
+            if (!this.$root.isSuperadminUser) {
+                delete menus.teams;
+            }
+
+            return menus;
         },
     },
 

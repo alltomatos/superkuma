@@ -48,6 +48,14 @@
                                 <font-awesome-icon icon="user-shield" />
                                 {{ item.is_superadmin ? $t("Remove Admin") : $t("Make Admin") }}
                             </button>
+                            <button class="btn btn-normal btn-sm" type="button" @click="$refs.userDialog.showEdit(item)">
+                                <font-awesome-icon icon="pen" />
+                                {{ $t("Edit") }}
+                            </button>
+                            <button class="btn btn-danger btn-sm" type="button" @click="deleteDialog(item.id)">
+                                <font-awesome-icon icon="trash" />
+                                {{ $t("Delete") }}
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -62,6 +70,10 @@
 
         <Confirm ref="confirmSuperadmin" :yes-text="$t('Yes')" :no-text="$t('No')" @yes="toggleSuperadmin">
             {{ confirmSuperadminMsg }}
+        </Confirm>
+
+        <Confirm ref="confirmDelete" :yes-text="$t('Yes')" :no-text="$t('No')" @yes="deleteUser">
+            {{ $t("deleteUserMsg") }}
         </Confirm>
 
         <!-- Manual password entry for an existing user -->
@@ -228,6 +240,26 @@ export default {
                 if (res.ok) {
                     this.$root.getUserList();
                 }
+            });
+        },
+
+        /**
+         * Show dialog to confirm permanently deleting a user.
+         * @param {number} id ID of the user to delete
+         * @returns {void}
+         */
+        deleteDialog(id) {
+            this.selectedUserID = id;
+            this.$refs.confirmDelete.show();
+        },
+
+        /**
+         * Permanently delete the selected user.
+         * @returns {void}
+         */
+        deleteUser() {
+            this.$root.deleteUser(this.selectedUserID, (res) => {
+                this.$root.toastRes(res);
             });
         },
     },

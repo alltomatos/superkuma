@@ -904,3 +904,15 @@ PR #112 mergeada com "Go" humano explícito reconfirmado em dois pontos: antes d
 - **Achado de processo real**: GitHub raramente dessincroniza o registro de uma PR do estado real da branch (`git push` funciona, `gh api .../pulls/N` fica preso no SHA antigo, CI para de re-disparar) — corrigido fechando e reabrindo a PR à força. Também confirmado de novo: `gh pr merge` pode fechar uma PR sem mergear quando a base mudou sob ela em vez de só falhar (reabrir + tentar de novo resolve).
 
 **Todas as 8 issues de epics de frontend (#95-#102) e a fila de pendências pedida pelo usuário estão concluídas.** Restam só os itens explicitamente fora de escopo, documentados e não tocados: `watink-dev` REPO_FULL_NAME desatualizado (outro projeto).
+
+### Promoção develop→main + migração completa de CI pra GitHub-hosted (2026-08-11)
+
+Usuário pediu "promova develop a main". Achado no processo: PR de release automática (#114, release-please-style bot) já existia mas estava com conflito real (`package.json`/`package-lock.json` `version`) porque `develop` nunca recebe de volta os commits de bump que só existem em `main` — PR #115 trouxe esses 2 commits de volta pra `develop`, resolvendo o conflito de raiz (não é bug pontual, vai se repetir em toda release futura a menos que isso vire prática regular).
+
+**Durante a correção, o usuário pediu pra tirar tudo do runner self-hosted `omniroute`** (`auto-test.yml`, `validate.yml`, `auto-release.yml`, `release-docker.yml` — os 4 workflows que ainda dependiam dele, incluindo o build+push real da imagem Docker de release). Motivo: o custo operacional acumulado numa única sessão (runners mortos 2 semanas, jobs órfãos após force-recreate, imagem sem `iputils-ping`/`libatomic1`, daemon sobrecarregado por builds concorrentes, GitHub dessincronizando o head de PRs quando o runner monitorando o push desaparece) superou o ganho de velocidade. **ADR-0012 atualizado com "Status: Superseded" e a reversão completa documentada.**
+
+**Achado real e sério só descoberto por causa dessa investigação**: `ronaldodavi/superkuma:latest` no Docker Hub estava **travado em v2.11.0 desde 2026-07-15** — quase um mês de releases (2.12.0 e 2.12.1 antes desta sessão) nunca publicaram, porque o `release-docker.yml` no `omniroute` vinha falhando silenciosamente (run de 13min terminando em failure, sem ninguém notar). v2.12.0 nunca existiu no Docker Hub (confirmado via API, 404). **Corrigido**: PR #114 mergeada, `release-docker.yml` agora roda em `ubuntu-latest`, `v2.12.1` e `latest` publicados com sucesso (confirmado via API do Docker Hub, `last_updated` de agora).
+
+**Estado final**: `main` e `develop` sincronizados em `28243808`/`d73063b9` respectivamente (main 1 commit à frente, o bump de versão de sempre — normal). Todos os workflows de CI/release rodando em runners GitHub-hosted, zero dependência do `omniroute` pro superkuma.
+
+**Pendência real que ficou pra trás, fora do escopo do superkuma**: `watink-dev` (`docker-compose.yml` do stack de runners que já não é mais usado pelo superkuma) tem `REPO_FULL_NAME` apontando pro nome antigo do repo — usuário confirmou que agora é `alltomatos/watink`. Não corrigido nesta sessão.

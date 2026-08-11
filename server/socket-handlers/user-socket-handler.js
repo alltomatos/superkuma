@@ -24,13 +24,38 @@ const passwordField = z
         message: "Password is too long for bcrypt (max 72 bytes once UTF-8 encoded).",
     });
 
+// Usernames are the literal value users type into the login field (as
+// opposed to their separate, optional email) -- spaces invite copy/paste and
+// autocomplete mistakes, and mixed case invites "is it Foo or foo" login
+// confusion, so both are rejected/normalized here rather than left to admins
+// to get right by convention.
+const usernameField = z
+    .string()
+    .trim()
+    .min(1)
+    .max(255)
+    .refine((v) => !/\s/.test(v), {
+        message: "Username must not contain spaces.",
+    })
+    .transform((v) => v.toLowerCase());
+
 const addUserSchema = z.object({
-    username: z.string().trim().min(1).max(255),
+    username: usernameField,
     email: z.string().trim().email().max(255),
     // An empty string (the form's "leave blank to auto-generate" state) must
     // stay valid here -- only .optional() would reject it, since it only
     // allows `undefined`, not "".
     password: z.union([passwordField, z.literal("")]).optional(),
+});
+
+const editUserSchema = z.object({
+    id: z.number().int().positive(),
+    username: usernameField,
+    email: z.string().trim().email().max(255),
+});
+
+const deleteUserSchema = z.object({
+    id: z.number().int().positive(),
 });
 
 const resendWelcomeSchema = z.object({
@@ -155,6 +180,120 @@ module.exports.userSocketHandler = (socket, server) => {
                 ok: false,
                 msg: e.message,
                 msgi18n: !!e.msgi18n,
+            });
+        }
+    });
+
+    // Rename a user and/or change their email address. Credentials
+    // (password, superadmin status) are handled by their own dedicated
+    // handlers above/below -- this only ever touches identity fields.
+    socket.on("editUser", async (input, callback) => {
+        try {
+            checkLogin(socket);
+            requirePermission(socket.actor, "user:manage", {});
+
+            const data = validate(editUserSchema, input);
+
+            const user = await R.findOne("user", "id = ?", [data.id]);
+            if (!user) {
+                throw new Error("User not found.");
+            }
+            assertCanModifyCredentials(socket.actor, user);
+
+            user.username = data.username;
+            user.email = data.email;
+
+            try {
+                await R.store(user);
+            } catch (e) {
+                throw new Error("A user with this username already exists.");
+            }
+
+            log.debug("user", `Edited User: ${user.id}`);
+
+            callback({
+                ok: true,
+                msg: "userSaved",
+                msgi18n: true,
+            });
+        } catch (e) {
+            callback({
+                ok: false,
+                msg: e.message,
+                msgi18n: !!e.msgi18n,
+            });
+        }
+    });
+
+    // Permanently delete a user. Refuses to delete the caller's own account
+    // (an admin locking themselves out) and refuses to delete the last
+    // remaining active superadmin (leaving the instance unmanageable).
+    socket.on("deleteUser", async (input, callback) => {
+        try {
+            checkLogin(socket);
+            requirePermission(socket.actor, "user:manage", {});
+
+            const { id } = validate(deleteUserSchema, input);
+
+            if (id === socket.userID) {
+                throw new TranslatableError("cannotDeleteYourself");
+            }
+
+            const user = await R.findOne("user", "id = ?", [id]);
+            if (!user) {
+                throw new Error("User not found.");
+            }
+            assertCanModifyCredentials(socket.actor, user);
+
+            if (user.is_superadmin && user.active) {
+                const otherActiveSuperadmins = await R.getCell(
+                    "SELECT COUNT(*) FROM user WHERE is_superadmin = 1 AND active = 1 AND id != ?",
+                    [id]
+                );
+                if (!otherActiveSuperadmins) {
+                    throw new TranslatableError("cannotRemoveLastSuperadmin");
+                }
+            }
+
+            await R.trash(user);
+
+            log.debug("user", `Deleted User: ${id}`);
+
+            server.disconnectAllSocketClients(id);
+
+            callback({
+                ok: true,
+                msg: "userDeleted",
+                msgi18n: true,
+            });
+        } catch (e) {
+            callback({
+                ok: false,
+                msg: e.message,
+                msgi18n: !!e.msgi18n,
+            });
+        }
+    });
+
+    // Let the frontend know whether the CURRENT caller is a global
+    // superadmin, so purely-informational UI (e.g. the Teams settings tab)
+    // can hide itself for roles that can only ever hit a 403 there -- team
+    // creation and membership changes are gated to superadmins only (see
+    // team-socket-handler.js's assertCallerIsSuperadmin). This is a UX
+    // convenience only; every actual mutation stays server-enforced
+    // regardless of what this reports.
+    socket.on("getMyAccessInfo", async (callback) => {
+        try {
+            checkLogin(socket);
+            const user = await R.findOne("user", "id = ?", [socket.userID]);
+            callback({
+                ok: true,
+                isSuperadmin: !!(user && user.is_superadmin),
+            });
+        } catch (e) {
+            callback({
+                ok: false,
+                msg: e.message,
             });
         }
     });
