@@ -28,9 +28,10 @@ name: Release Docker Image
 #   DOCKERHUB_USERNAME - the Docker Hub account/namespace (e.g. ronaldodavi)
 #   DOCKERHUB_TOKEN    - a Docker Hub access token with write scope
 #
-# amd64-only for now (see ADR-0012): arm64/QEMU support on the self-hosted
-# runner hasn't been tried yet. Re-add multi-arch once that's verified (or by
-# building arm64 on a real arm64 runner instead of QEMU emulation).
+# amd64-only for now (see ADR-0012 addendum, self-hosted runner retired):
+# still runs on a GitHub-hosted amd64 runner via QEMU/buildx for the single
+# platform. Re-add multi-arch once cross-arch build time on GitHub-hosted
+# infra has been verified acceptable (or by using a real arm64 runner).
 
 on:
   push:
@@ -51,20 +52,15 @@ env:
 jobs:
   release-docker:
     if: github.repository == 'alltomatos/superkuma'
-    # Self-hosted runner on omniroute, the org's dedicated CI host (see
-    # ADR-0012) -- registered specifically against this repo, so it only ever
-    # runs superkuma jobs. Only THIS maintainer/tag-triggered workflow is
-    # routed here -- PR-triggered workflows (Auto Test, etc.) stay on
-    # GitHub-hosted runners so untrusted contributor code never executes on
-    # our infrastructure.
-    runs-on: [self-hosted, omniroute]
+    # GitHub-hosted (see ADR-0012 addendum) -- the omniroute self-hosted
+    # runner was retired after repeated operational failures (dead/crash-
+    # looping containers, orphaned in-progress jobs, GitHub PR-sync desyncs).
+    runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
       contents: read
 
     steps:
-      # Pinned to v4 (node20) rather than v6 (node24): the omniroute self-hosted
-      # runner's agent (2.321.0) predates node24 action support.
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with: { persist-credentials: false }
 

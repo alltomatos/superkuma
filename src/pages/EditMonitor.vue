@@ -663,10 +663,9 @@
                                 <label for="snmp_community_string" class="form-label">
                                     {{ $t("Community String") }}
                                 </label>
-                                <!-- TODO: Rename monitor.radiusPassword to monitor.password for general use -->
                                 <HiddenInput
                                     id="snmp_community_string"
-                                    v-model="monitor.radiusPassword"
+                                    v-model="monitor.password"
                                     autocomplete="false"
                                     required="true"
                                     placeholder="public"
@@ -1294,7 +1293,7 @@
                                     <label for="radius_password" class="form-label">Radius {{ $t("Password") }}</label>
                                     <HiddenInput
                                         id="radius_password"
-                                        v-model="monitor.radiusPassword"
+                                        v-model="monitor.password"
                                         autocomplete="new-password"
                                         :required="true"
                                     />
@@ -1470,10 +1469,9 @@
                             <template v-if="monitor.type === 'mysql'">
                                 <div class="my-3">
                                     <label for="mysql-password" class="form-label">{{ $t("Password") }}</label>
-                                    <!-- TODO: Rename monitor.radiusPassword to monitor.password for general use -->
                                     <HiddenInput
                                         id="mysql-password"
-                                        v-model="monitor.radiusPassword"
+                                        v-model="monitor.password"
                                         autocomplete="false"
                                     ></HiddenInput>
                                 </div>

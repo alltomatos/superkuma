@@ -22,9 +22,7 @@ class MysqlMonitorType extends MonitorType {
             query = "SELECT 1";
         }
 
-        // Use `radius_password` as `password` field for backwards compatibility
-        // TODO: rename `radius_password` to `password` later for general use
-        const password = monitor.radiusPassword;
+        const password = monitor.password;
 
         const conditions = monitor.conditions ? ConditionExpressionGroup.fromMonitor(monitor) : null;
         const hasConditions = conditions && conditions.children && conditions.children.length > 0;

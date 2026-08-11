@@ -259,7 +259,7 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
             bean.grpcMetadata = monitor.grpcMetadata;
             bean.grpcEnableTls = monitor.grpcEnableTls;
             bean.radiusUsername = monitor.radiusUsername;
-            bean.radiusPassword = monitor.radiusPassword;
+            bean.password = monitor.password;
             bean.radiusCalledStationId = monitor.radiusCalledStationId;
             bean.radiusCallingStationId = monitor.radiusCallingStationId;
             bean.radiusSecret = monitor.radiusSecret;

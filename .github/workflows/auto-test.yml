@@ -12,15 +12,11 @@ permissions: {}
 
 jobs:
   auto-test:
-    # Runs on the omniroute self-hosted runner (ADR-0012) for PRs from a branch
-    # of this same repo; fork PRs fall back to a GitHub-hosted amd64 runner so
-    # untrusted code never executes on our infra.
-    runs-on: >-
-      ${{
-        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
-        fromJSON('["self-hosted","omniroute"]') ||
-        'ubuntu-22.04'
-      }}
+    # GitHub-hosted (see ADR-0012 addendum): the omniroute self-hosted runner
+    # was retired from CI after repeated operational failures (dead/crash-
+    # looping containers, orphaned in-progress jobs, GitHub PR-sync desyncs
+    # caused by the runner going away mid-job) outweighed its speed benefit.
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
 
@@ -75,13 +71,9 @@ jobs:
   # on a 302, which a fresh (unconfigured) container may not return, whereas any
   # HTTP response proves the server booted and bound the port.
   docker-build-smoke:
-    # Needs the host Docker daemon (omniroute mounts docker.sock, ADR-0012).
-    runs-on: >-
-      ${{
-        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
-        fromJSON('["self-hosted","omniroute"]') ||
-        'ubuntu-22.04'
-      }}
+    # GitHub-hosted runners ship a Docker daemon out of the box; the
+    # omniroute self-hosted runner is no longer used (see ADR-0012 addendum).
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
     steps:
@@ -118,13 +110,8 @@ jobs:
         run: docker rm -f "${cid:-}" 2>/dev/null || true
 
   check-linters:
-    # Same same-repo-only gate as auto-test above -- see ADR-0012.
-    runs-on: >-
-      ${{
-        (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
-        fromJSON('["self-hosted","omniroute"]') ||
-        'ubuntu-latest'
-      }}
+    # GitHub-hosted (see ADR-0012 addendum) -- no longer routed to omniroute.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
 
