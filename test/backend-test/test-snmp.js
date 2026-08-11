@@ -10,7 +10,7 @@ describe("SNMPMonitorType", () => {
             hostname: "127.0.0.1",
             port: 65530, // Assuming no SNMP agent is running here
             snmpVersion: "2c",
-            radiusPassword: "public",
+            password: "public",
             snmpOid: "1.3.6.1.2.1.1.1.0",
             timeout: 1,
             maxretries: 1,

@@ -31,7 +31,7 @@ class SNMPMonitorType extends MonitorType {
                 sessionOptions.username = monitor.snmp_v3_username;
                 session = snmp.createV3Session(monitor.hostname, monitor.snmp_v3_username, sessionOptions);
             } else {
-                session = snmp.createSession(monitor.hostname, monitor.radiusPassword, sessionOptions);
+                session = snmp.createSession(monitor.hostname, monitor.password, sessionOptions);
             }
 
             // Handle errors during session creation
