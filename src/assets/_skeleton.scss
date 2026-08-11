@@ -1,0 +1,28 @@
+// Shared shimmer building block for skeleton-screen loading placeholders.
+// Import this partial from any component-scoped <style> block that needs
+// the `.skeleton-block` shimmer effect.
+
+@mixin skeleton-block($bg: rgba(0, 0, 0, 0.08), $shine: rgba(255, 255, 255, 0.35)) {
+    background-color: $bg;
+    background-image: linear-gradient(90deg, transparent, $shine, transparent);
+    background-size: 200% 100%;
+    background-repeat: no-repeat;
+    background-position: -150% 0;
+    border-radius: 6px;
+    animation: skeleton-shimmer 1.5s ease-in-out infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+        background-position: 0 0;
+    }
+}
+
+@keyframes skeleton-shimmer {
+    0% {
+        background-position: -150% 0;
+    }
+
+    100% {
+        background-position: 150% 0;
+    }
+}

@@ -100,13 +100,15 @@
             :style="monitorListStyle"
             data-testid="monitor-list"
         >
-            <div v-if="Object.keys($root.monitorList).length === 0" class="text-center mt-3">
+            <MonitorListSkeleton v-if="!$root.monitorListLoaded" />
+
+            <div v-else-if="Object.keys($root.monitorList).length === 0" class="text-center mt-3">
                 {{ $t("No Monitors, please") }}
                 <router-link to="/add">{{ $t("add one") }}</router-link>
             </div>
 
             <DynamicScroller
-                v-if="shouldVirtualize"
+                v-if="$root.monitorListLoaded && shouldVirtualize"
                 :items="sortedMonitorList"
                 :min-item-size="58"
                 key-field="id"
@@ -164,6 +166,7 @@ import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import Confirm from "../components/Confirm.vue";
 import MonitorListItem from "../components/MonitorListItem.vue";
 import MonitorListFilter from "./MonitorListFilter.vue";
+import MonitorListSkeleton from "./MonitorListSkeleton.vue";
 import { getMonitorRelativeURL } from "../util.ts";
 
 /**
@@ -181,6 +184,7 @@ export default {
         Confirm,
         MonitorListItem,
         MonitorListFilter,
+        MonitorListSkeleton,
         DynamicScroller,
         DynamicScrollerItem,
     },
