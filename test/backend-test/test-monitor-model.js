@@ -158,7 +158,7 @@ describe("Monitor model - characterization", () => {
             assert.strictEqual(json.dns_last_result, "93.184.216.34");
 
             // radius/mqtt secret fields are part of the sensitive block regardless of monitor type.
-            assert.strictEqual("radiusPassword" in json, true);
+            assert.strictEqual("password" in json, true);
             assert.strictEqual("radiusSecret" in json, true);
             assert.strictEqual("mqttPassword" in json, true);
         });
@@ -180,14 +180,14 @@ describe("Monitor model - characterization", () => {
             assert.strictEqual("pushToken" in jsonWithoutSensitive, false);
         });
 
-        test("radius monitor: radius_password / radius_secret exposed in plaintext when includeSensitiveData=true", async () => {
+        test("radius monitor: password / radius_secret exposed in plaintext when includeSensitiveData=true", async () => {
             const monitor = await createMonitor({
                 type: "radius",
                 name: "radius monitor",
                 hostname: "radius.example.com",
                 port: 1812,
                 radius_username: "raduser",
-                radius_password: "rad-user-pass",
+                password: "rad-user-pass",
                 radius_secret: "rad-shared-secret",
                 radius_calling_station_id: "00-00-00-00-00-00",
                 radius_called_station_id: "11-11-11-11-11-11",
@@ -197,13 +197,13 @@ describe("Monitor model - characterization", () => {
             const json = monitor.toJSON(preloadData, true);
 
             assert.strictEqual(json.radiusUsername, "raduser");
-            assert.strictEqual(json.radiusPassword, "rad-user-pass");
+            assert.strictEqual(json.password, "rad-user-pass");
             assert.strictEqual(json.radiusSecret, "rad-shared-secret");
             assert.strictEqual(json.radiusCallingStationId, "00-00-00-00-00-00");
             assert.strictEqual(json.radiusCalledStationId, "11-11-11-11-11-11");
 
             const jsonNoSensitive = monitor.toJSON(preloadData, false);
-            assert.strictEqual("radiusPassword" in jsonNoSensitive, false);
+            assert.strictEqual("password" in jsonNoSensitive, false);
             assert.strictEqual("radiusSecret" in jsonNoSensitive, false);
             // Non-sensitive radius fields remain present without the sensitive flag.
             assert.strictEqual(jsonNoSensitive.radiusCallingStationId, "00-00-00-00-00-00");

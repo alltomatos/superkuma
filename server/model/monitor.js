@@ -261,7 +261,7 @@ class Monitor extends BeanModel {
                 pushToken: this.pushToken,
                 databaseConnectionString: this.databaseConnectionString,
                 radiusUsername: this.radiusUsername,
-                radiusPassword: this.radiusPassword,
+                password: this.password,
                 radiusSecret: this.radiusSecret,
                 mqttUsername: this.mqttUsername,
                 mqttPassword: this.mqttPassword,
@@ -628,7 +628,7 @@ class Monitor extends BeanModel {
                     const resp = await radius(
                         this.hostname,
                         this.radiusUsername,
-                        this.radiusPassword,
+                        this.password,
                         this.radiusCalledStationId,
                         this.radiusCallingStationId,
                         this.radiusSecret,
