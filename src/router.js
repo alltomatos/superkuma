@@ -39,6 +39,7 @@ import Users from "./components/settings/Users.vue";
 import Teams from "./components/settings/Teams.vue";
 const NotificationRouting = () => import("./components/settings/NotificationRouting.vue");
 import Mail from "./components/settings/Mail.vue";
+const IzapiaSettings = () => import("./pages/IzapiaSettings.vue");
 
 const routes = [
     {
@@ -106,6 +107,14 @@ const routes = [
                             {
                                 path: "notifications",
                                 component: Notifications,
+                            },
+                            {
+                                path: "notifications/izapia",
+                                component: IzapiaSettings,
+                            },
+                            {
+                                path: "notifications/izapia/:id",
+                                component: IzapiaSettings,
                             },
                             {
                                 path: "reverse-proxy",

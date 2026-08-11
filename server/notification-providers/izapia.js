@@ -100,6 +100,185 @@ class Izapia extends NotificationProvider {
     }
 
     /**
+     * Creates a new WhatsApp session on IZAPIA, ready to be paired via QR
+     * code (see requestPairingQr). Used by the dedicated iZapia settings
+     * page's "create new connection" flow.
+     * @param {object} config {izapiaApiKey} -- API key, not yet tied to a saved notification.
+     * @param {string} name Optional human-readable session name (falsy to omit).
+     * @returns {Promise<object>} The created session, e.g. {sid, name, ...}.
+     * @throws {Error} If the API key is missing or the request fails.
+     */
+    static async createSession(config, name) {
+        if (!config || !config.izapiaApiKey) {
+            throw new Error("API Key is required to create a session.");
+        }
+        try {
+            const response = await axios.post(
+                `${Izapia.baseUrl(config)}/api/v1/sessions/`,
+                name ? { name } : {},
+                Izapia.authHeaders(config)
+            );
+            return response?.data?.data;
+        } catch (error) {
+            const provider = new Izapia();
+            provider.throwGeneralAxiosError(error);
+        }
+    }
+
+    /**
+     * Lists the WhatsApp sessions available on the tenant's IZAPIA account,
+     * for the "connect with existing connection" flow.
+     * @param {object} config {izapiaApiKey} -- API key, not yet tied to a saved notification.
+     * @returns {Promise<object[]>} Sessions as {sid, name, jid, status, ...}.
+     * @throws {Error} If the API key is missing or the request fails.
+     */
+    static async listSessions(config) {
+        if (!config || !config.izapiaApiKey) {
+            throw new Error("API Key is required to list sessions.");
+        }
+        try {
+            const response = await axios.get(`${Izapia.baseUrl(config)}/api/v1/sessions/`, Izapia.authHeaders(config));
+            const sessions = response?.data?.data;
+            return Array.isArray(sessions) ? sessions : [];
+        } catch (error) {
+            const provider = new Izapia();
+            provider.throwGeneralAxiosError(error);
+        }
+    }
+
+    /**
+     * Fetches a single session's current status, used both right after
+     * picking an existing connection and while polling for QR pairing to
+     * complete.
+     * @param {object} config {izapiaApiKey} -- API key, not yet tied to a saved notification.
+     * @param {string} sid Session id.
+     * @returns {Promise<object>} Session details, e.g. {sid, name, jid, status, ...}.
+     * @throws {Error} If the API key/sid is missing or the request fails.
+     */
+    static async getSessionDetails(config, sid) {
+        if (!config || !config.izapiaApiKey || !sid) {
+            throw new Error("API Key and session id are required.");
+        }
+        try {
+            const response = await axios.get(
+                `${Izapia.baseUrl(config)}/api/v1/sessions/${sid}`,
+                Izapia.authHeaders(config)
+            );
+            return response?.data?.data;
+        } catch (error) {
+            const provider = new Izapia();
+            provider.throwGeneralAxiosError(error);
+        }
+    }
+
+    /**
+     * Requests a fresh pairing QR code for a session, to be scanned from the
+     * WhatsApp app that should own this connection.
+     * @param {object} config {izapiaApiKey} -- API key, not yet tied to a saved notification.
+     * @param {string} sid Session id.
+     * @returns {Promise<object>} {code, qr_png_base64}.
+     * @throws {Error} If the API key/sid is missing or the request fails.
+     */
+    static async requestPairingQr(config, sid) {
+        if (!config || !config.izapiaApiKey || !sid) {
+            throw new Error("API Key and session id are required.");
+        }
+        try {
+            const response = await axios.post(
+                `${Izapia.baseUrl(config)}/api/v1/sessions/${sid}/pair`,
+                {},
+                Izapia.authHeaders(config)
+            );
+            return response?.data?.data;
+        } catch (error) {
+            const provider = new Izapia();
+            provider.throwGeneralAxiosError(error);
+        }
+    }
+
+    /**
+     * Soft-disconnects a session (WhatsApp app unlinked, session row kept).
+     * @param {object} config {izapiaApiKey} -- API key, not yet tied to a saved notification.
+     * @param {string} sid Session id.
+     * @returns {Promise<void>}
+     * @throws {Error} If the API key/sid is missing or the request fails.
+     */
+    static async logoutSession(config, sid) {
+        if (!config || !config.izapiaApiKey || !sid) {
+            throw new Error("API Key and session id are required.");
+        }
+        try {
+            await axios.post(`${Izapia.baseUrl(config)}/api/v1/sessions/${sid}/logout`, {}, Izapia.authHeaders(config));
+        } catch (error) {
+            const provider = new Izapia();
+            provider.throwGeneralAxiosError(error);
+        }
+    }
+
+    /**
+     * Permanently deletes a session from the tenant's IZAPIA account.
+     * @param {object} config {izapiaApiKey} -- API key, not yet tied to a saved notification.
+     * @param {string} sid Session id.
+     * @returns {Promise<void>}
+     * @throws {Error} If the API key/sid is missing or the request fails.
+     */
+    static async deleteSession(config, sid) {
+        if (!config || !config.izapiaApiKey || !sid) {
+            throw new Error("API Key and session id are required.");
+        }
+        try {
+            await axios.delete(`${Izapia.baseUrl(config)}/api/v1/sessions/${sid}`, Izapia.authHeaders(config));
+        } catch (error) {
+            const provider = new Izapia();
+            provider.throwGeneralAxiosError(error);
+        }
+    }
+
+    /**
+     * Renames a session.
+     * @param {object} config {izapiaApiKey} -- API key, not yet tied to a saved notification.
+     * @param {string} sid Session id.
+     * @param {string} name New session name.
+     * @returns {Promise<void>}
+     * @throws {Error} If the API key/sid/name is missing or the request fails.
+     */
+    static async renameSession(config, sid, name) {
+        if (!config || !config.izapiaApiKey || !sid || !name) {
+            throw new Error("API Key, session id and name are required.");
+        }
+        try {
+            await axios.patch(`${Izapia.baseUrl(config)}/api/v1/sessions/${sid}`, { name }, Izapia.authHeaders(config));
+        } catch (error) {
+            const provider = new Izapia();
+            provider.throwGeneralAxiosError(error);
+        }
+    }
+
+    /**
+     * The IZAPIA API always lives at api.izapia.com -- unlike other
+     * providers, there is no per-tenant/self-hosted URL to configure.
+     * @param {object} config Optionally {izapiaApiUrl} for legacy configs saved via the generic modal.
+     * @returns {string} Base URL with no trailing slash.
+     */
+    static baseUrl(config) {
+        return ((config && config.izapiaApiUrl) || "https://api.izapia.com").replace(/\/+$/, "");
+    }
+
+    /**
+     * Shared axios config for authenticated session-management calls.
+     * @param {object} config {izapiaApiKey}.
+     * @returns {object} Axios request config with Authorization/Accept headers.
+     */
+    static authHeaders(config) {
+        return {
+            headers: {
+                Accept: "application/json",
+                Authorization: "Bearer " + config.izapiaApiKey,
+            },
+        };
+    }
+
+    /**
      * @inheritdoc
      */
     async send(notification, msg, monitorJSON = null, heartbeatJSON = null) {
