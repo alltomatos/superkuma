@@ -42,6 +42,11 @@ export default {
             allowLoginDialog: false, // Allowed to show login dialog, but "loggedIn" have to be true too. This exists because prevent the login dialog show 0.1s in first before the socket server auth-ed.
             loggedIn: false,
             monitorList: {},
+            // Becomes true once the first "monitorList" socket payload has
+            // been received. Used by MonitorList.vue to tell "still loading"
+            // apart from "genuinely no monitors yet" so it can show a
+            // skeleton screen instead of the empty-state message.
+            monitorListLoaded: false,
             monitorTypeList: {},
             maintenanceList: {},
             apiKeyList: {},
@@ -152,6 +157,7 @@ export default {
             socket.on("monitorList", (data) => {
                 this.assignMonitorUrlParser(data);
                 this.monitorList = data;
+                this.monitorListLoaded = true;
             });
 
             socket.on("updateMonitorIntoList", (data) => {
