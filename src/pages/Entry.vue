@@ -7,6 +7,9 @@
 <script>
 import axios from "axios";
 import StatusPage from "./StatusPage.vue";
+import { useToast } from "vue-toastification";
+
+const toast = useToast();
 
 export default {
     components: {
@@ -44,7 +47,10 @@ export default {
                 this.$router.push("/dashboard");
             }
         } catch (e) {
-            alert("Cannot connect to the backend server. Did you start the backend server? (npm run start-server-dev)");
+            toast.error(
+                "Cannot connect to the backend server. Did you start the backend server? (npm run start-server-dev)",
+                { timeout: false }
+            );
         }
     },
 };
