@@ -257,7 +257,7 @@
                     >
                         <font-awesome-icon icon="times" class="text-danger" />
                     </button>
-                    <img :src="logoURL" alt class="logo me-2" :class="logoClass" />
+                    <img :src="logoURL" :alt="config.title || $t('Logo')" class="logo me-2" :class="logoClass" />
                     <font-awesome-icon v-if="enableEditMode" class="icon-upload" icon="upload" />
                 </span>
 
@@ -602,6 +602,16 @@
             {{ $t("deleteStatusPageMsg") }}
         </Confirm>
 
+        <Confirm
+            ref="confirmLeave"
+            :yes-text="$t('Yes')"
+            :no-text="$t('No')"
+            @yes="confirmLeaveYes"
+            @no="confirmLeaveNo"
+        >
+            {{ leavePageMsg }}
+        </Confirm>
+
         <component is="style" v-if="config.customCSS" type="text/css">
             {{ config.customCSS }}
         </component>
@@ -673,12 +683,9 @@ export default {
     // Leave Page for vue route change
     beforeRouteLeave(to, from, next) {
         if (this.editMode) {
-            const answer = window.confirm(leavePageMsg);
-            if (answer) {
-                next();
-            } else {
-                next(false);
-            }
+            this.pendingLeaveNext = next;
+            this.$refs.confirmLeave.show();
+            return;
         }
         next();
     },
@@ -717,6 +724,8 @@ export default {
             loading: true,
             incidentHistory: [],
             incidentHistoryLoading: false,
+            pendingLeaveNext: null,
+            leavePageMsg,
             incidentHistoryNextCursor: null,
             incidentHistoryHasMore: false,
         };
@@ -1207,6 +1216,28 @@ export default {
                     this.$root.toastError(res.msg);
                 }
             });
+        },
+
+        /**
+         * Confirm leaving the page with unsaved changes
+         * @returns {void}
+         */
+        confirmLeaveYes() {
+            if (this.pendingLeaveNext) {
+                this.pendingLeaveNext();
+                this.pendingLeaveNext = null;
+            }
+        },
+
+        /**
+         * Cancel leaving the page with unsaved changes
+         * @returns {void}
+         */
+        confirmLeaveNo() {
+            if (this.pendingLeaveNext) {
+                this.pendingLeaveNext(false);
+                this.pendingLeaveNext = null;
+            }
         },
 
         /**

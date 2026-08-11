@@ -376,6 +376,7 @@
                             :src="screenshotURL"
                             style="width: 100%"
                             alt="screenshot of the website"
+                            loading="lazy"
                             @click="showScreenshotDialog"
                         />
                     </div>

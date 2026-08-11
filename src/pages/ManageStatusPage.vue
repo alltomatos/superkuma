@@ -28,7 +28,7 @@
                         :href="'/status/' + statusPage.slug"
                         class="item"
                     >
-                        <img :src="icon(statusPage.icon)" alt class="logo me-2" />
+                        <img :src="icon(statusPage.icon)" :alt="statusPage.title" class="logo me-2" loading="lazy" />
                         <div class="info">
                             <div class="title">{{ statusPage.title }}</div>
                             <div class="slug">/status/{{ statusPage.slug }}</div>
