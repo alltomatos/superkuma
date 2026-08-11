@@ -337,6 +337,16 @@ export default {
                     this.loadingSessions = false;
                     if (res.ok) {
                         this.sessions = res.sessions;
+                        // A native <select> visually shows the first option by
+                        // default even though v-model's underlying value is
+                        // still "" until the user manually changes it -- so
+                        // without this, the dropdown LOOKS like a session is
+                        // picked (misleading) while notification.izapiaSessionId
+                        // stays empty and "Load groups" stays disabled.
+                        if (!this.notification.izapiaSessionId && this.sessions.length > 0) {
+                            this.notification.izapiaSessionId = this.sessions[0].sid;
+                            this.onSessionPicked();
+                        }
                     } else {
                         this.sessionsError = res.msg;
                     }
