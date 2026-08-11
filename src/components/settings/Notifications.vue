@@ -12,13 +12,23 @@
                 <li v-for="(notification, index) in $root.notificationList" :key="index" class="list-group-item">
                     {{ notification.name }}
                     <br />
-                    <a href="#" @click="$refs.notificationDialog.show(notification.id)">{{ $t("Edit") }}</a>
+                    <router-link
+                        v-if="isIzapia(notification)"
+                        :to="`/settings/notifications/izapia/${notification.id}`"
+                    >
+                        {{ $t("Edit") }}
+                    </router-link>
+                    <a v-else href="#" @click="$refs.notificationDialog.show(notification.id)">{{ $t("Edit") }}</a>
                 </li>
             </ul>
 
             <button class="btn btn-primary me-2" type="button" @click="$refs.notificationDialog.show()">
                 {{ $t("Setup Notification") }}
             </button>
+
+            <router-link to="/settings/notifications/izapia" class="btn btn-outline-success izapia-highlight-btn">
+                {{ $t("izapiaPageTitle") }}
+            </router-link>
         </div>
 
         <div class="my-4 pt-4">
@@ -189,6 +199,20 @@ export default {
     },
 
     methods: {
+        /**
+         * Whether a notification list entry is an iZapia notification, which
+         * is edited on its own dedicated page instead of the generic modal.
+         * @param {object} notification Entry from $root.notificationList (config is a JSON string).
+         * @returns {boolean} True if this notification's type is "izapia".
+         */
+        isIzapia(notification) {
+            try {
+                return JSON.parse(notification.config)?.type === "izapia";
+            } catch (e) {
+                return false;
+            }
+        },
+
         /**
          * Remove a day from tls expiry notification days.
          * @param {number} day The day to remove.
