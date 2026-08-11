@@ -1076,6 +1076,97 @@ let needSetup = false;
             }
         });
 
+        socket.on("izapiaCreateSession", async (config, name, callback) => {
+            try {
+                checkLogin(socket);
+                const session = await Izapia.createSession(config, name);
+                callback({ ok: true, session });
+            } catch (e) {
+                callback({
+                    ok: false,
+                    msg: e.message,
+                });
+            }
+        });
+
+        socket.on("izapiaListSessions", async (config, callback) => {
+            try {
+                checkLogin(socket);
+                const sessions = await Izapia.listSessions(config);
+                callback({ ok: true, sessions });
+            } catch (e) {
+                callback({
+                    ok: false,
+                    msg: e.message,
+                });
+            }
+        });
+
+        socket.on("izapiaGetSessionDetails", async (config, sid, callback) => {
+            try {
+                checkLogin(socket);
+                const session = await Izapia.getSessionDetails(config, sid);
+                callback({ ok: true, session });
+            } catch (e) {
+                callback({
+                    ok: false,
+                    msg: e.message,
+                });
+            }
+        });
+
+        socket.on("izapiaRequestPairingQr", async (config, sid, callback) => {
+            try {
+                checkLogin(socket);
+                const pairing = await Izapia.requestPairingQr(config, sid);
+                callback({ ok: true, pairing });
+            } catch (e) {
+                callback({
+                    ok: false,
+                    msg: e.message,
+                });
+            }
+        });
+
+        socket.on("izapiaLogoutSession", async (config, sid, callback) => {
+            try {
+                checkLogin(socket);
+                await Izapia.logoutSession(config, sid);
+                callback({ ok: true });
+            } catch (e) {
+                callback({
+                    ok: false,
+                    msg: e.message,
+                });
+            }
+        });
+
+        socket.on("izapiaDeleteSession", async (config, sid, callback) => {
+            try {
+                checkLogin(socket);
+                await Izapia.deleteSession(config, sid);
+                callback({ ok: true });
+            } catch (e) {
+                callback({
+                    ok: false,
+                    msg: e.message,
+                });
+            }
+        });
+
+        socket.on("izapiaRenameSession", async (config, sid, name, callback) => {
+            try {
+                checkLogin(socket);
+                await Izapia.renameSession(config, sid, name);
+                callback({ ok: true });
+            } catch (e) {
+                callback({
+                    ok: false,
+                    msg: e.message,
+                });
+            }
+        });
+
         socket.on("checkApprise", async (callback) => {
             try {
                 checkLogin(socket);
