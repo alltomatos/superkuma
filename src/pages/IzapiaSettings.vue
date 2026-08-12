@@ -3,7 +3,7 @@
         <h1 class="mb-1">{{ $t("izapiaPageTitle") }}</h1>
         <p class="text-muted">{{ $t("izapiaPageSubtitle") }}</p>
 
-        <ol v-if="!id" class="izapia-wizard-steps">
+        <ol class="izapia-wizard-steps">
             <li v-for="step in 4" :key="step" :class="{ active: wizardStep === step, done: wizardStep > step }">
                 {{ $t(wizardStepLabelKey(step)) }}
             </li>
@@ -38,15 +38,6 @@
                             {{ $t("izapiaSignupCta") }}
                         </a>
                     </div>
-                    <button
-                        type="button"
-                        class="btn btn-primary"
-                        :disabled="!notification.izapiaApiKey || loadingSessions"
-                        @click="connectExisting"
-                    >
-                        {{ loadingSessions ? $t("Loading...") : $t("izapiaConnectButton") }}
-                    </button>
-                    <div v-if="sessionsError" class="form-text text-danger">{{ sessionsError }}</div>
                 </div>
 
                 <div v-if="showStep(2)" class="izapia-section">
@@ -65,26 +56,71 @@
                         </button>
                     </div>
 
-                    <div v-if="showSessionPicker" class="mb-3">
-                        <label class="form-label">{{ $t("izapiaSelectConnection") }}</label>
-                        <select v-model="notification.izapiaSessionId" class="form-select" @change="onSessionPicked">
-                            <option v-if="sessions.length === 0" value="" disabled>
-                                {{ $t("izapiaNoSessionsLoaded") }}
-                            </option>
-                            <option v-for="s in sessions" :key="s.sid" :value="s.sid">
-                                {{ s.name || s.sid }} ({{ s.status }})
-                            </option>
-                        </select>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label mb-0">{{ $t("izapiaExistingConnections") }}</label>
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-outline-primary text-nowrap"
+                                :disabled="loadingSessions || !notification.izapiaApiKey"
+                                @click="loadSessions"
+                            >
+                                {{ loadingSessions ? $t("Loading...") : $t("izapiaRefreshConnections") }}
+                            </button>
+                        </div>
+                        <div v-if="sessionsError" class="form-text text-danger">{{ sessionsError }}</div>
+                        <div v-if="!loadingSessions && sessions.length === 0" class="form-text">
+                            {{ $t("izapiaNoSessionsLoaded") }}
+                        </div>
+                        <div v-for="s in sessions" :key="s.id" class="izapia-session-row mb-2">
+                            <div>
+                                <strong>{{ s.name || s.id }}</strong>
+                                <span class="text-muted">({{ s.status }})</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button
+                                    type="button"
+                                    class="btn btn-sm text-nowrap"
+                                    :class="
+                                        notification.izapiaSessionId === s.id ? 'btn-success' : 'btn-outline-secondary'
+                                    "
+                                    @click="pickSession(s)"
+                                >
+                                    {{
+                                        notification.izapiaSessionId === s.id
+                                            ? $t("izapiaSelected")
+                                            : $t("izapiaSelectConnection")
+                                    }}
+                                </button>
+                                <button
+                                    v-if="s.status !== 'connected'"
+                                    type="button"
+                                    class="btn btn-sm btn-outline-primary text-nowrap"
+                                    :disabled="creatingSession"
+                                    @click="generateQr(s)"
+                                >
+                                    {{ $t("izapiaGenerateQr") }}
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
-                    <button
-                        type="button"
-                        class="btn btn-outline-primary"
-                        :disabled="!notification.izapiaApiKey || creatingSession"
-                        @click="createNewConnection"
-                    >
-                        {{ $t("izapiaCreateNewConnection") }}
-                    </button>
+                    <div class="d-flex gap-2 align-items-start">
+                        <input
+                            v-model="newConnectionName"
+                            type="text"
+                            class="form-control"
+                            :placeholder="$t('izapiaNewConnectionNamePlaceholder')"
+                        />
+                        <button
+                            type="button"
+                            class="btn btn-outline-primary text-nowrap"
+                            :disabled="!notification.izapiaApiKey || !newConnectionName.trim() || creatingSession"
+                            @click="createNewConnection"
+                        >
+                            {{ $t("izapiaCreateNewConnection") }}
+                        </button>
+                    </div>
 
                     <div v-if="qrError" class="form-text text-danger">
                         {{ qrError }}
@@ -133,7 +169,11 @@
                     <div class="mb-3">
                         <label class="form-label">{{ $t("izapiaContacts") }}</label>
                         <div class="izapia-contact-chips mb-2">
-                            <span v-for="(contact, index) in notification.izapiaContacts" :key="contact" class="izapia-chip">
+                            <span
+                                v-for="(contact, index) in notification.izapiaContacts"
+                                :key="contact"
+                                class="izapia-chip"
+                            >
                                 {{ contact }}
                                 <a href="#" class="izapia-chip-remove" @click.prevent="removeContact(index)">&times;</a>
                             </span>
@@ -196,7 +236,7 @@
                     </div>
                 </div>
 
-                <div v-if="!id" class="izapia-section d-flex gap-2">
+                <div class="izapia-section d-flex gap-2">
                     <button v-if="wizardStep > 1" type="button" class="btn btn-outline-secondary" @click="wizardStep--">
                         {{ $t("izapiaWizardBack") }}
                     </button>
@@ -211,7 +251,7 @@
                     </button>
                 </div>
 
-                <div v-if="id || wizardStep === 4" class="izapia-section d-flex gap-2">
+                <div v-if="wizardStep === 4" class="izapia-section d-flex gap-2">
                     <button type="button" class="btn btn-primary" :disabled="saving" @click="save">
                         {{ $t("Save") }}
                     </button>
@@ -242,7 +282,13 @@
             </div>
         </div>
 
-        <Confirm ref="confirmDelete" btn-style="btn-danger" :yes-text="$t('Yes')" :no-text="$t('No')" @yes="deleteNotification">
+        <Confirm
+            ref="confirmDelete"
+            btn-style="btn-danger"
+            :yes-text="$t('Yes')"
+            :no-text="$t('No')"
+            @yes="deleteNotification"
+        >
             {{ $t("deleteNotificationMsg") }}
         </Confirm>
     </div>
@@ -254,7 +300,12 @@ import IzapiaPhonePreview from "../components/notifications/IzapiaPhonePreview.v
 import Confirm from "../components/Confirm.vue";
 
 const DEFAULT_TEMPLATE = "[{status}] {monitorName}\n{msg}";
-const WIZARD_STEP_LABEL_KEYS = ["izapiaApiKeyStep", "izapiaConnectionStep", "izapiaRecipientStep", "izapiaTemplateStep"];
+const WIZARD_STEP_LABEL_KEYS = [
+    "izapiaApiKeyStep",
+    "izapiaConnectionStep",
+    "izapiaRecipientStep",
+    "izapiaTemplateStep",
+];
 
 export default {
     components: {
@@ -268,6 +319,7 @@ export default {
             id: null,
             wizardStep: 1,
             newContact: "",
+            newConnectionName: "",
             notification: {
                 name: "IZapia",
                 type: "izapia",
@@ -292,7 +344,6 @@ export default {
             sessions: [],
             loadingSessions: false,
             sessionsError: null,
-            showSessionPicker: false,
 
             creatingSession: false,
             qrImage: null,
@@ -300,6 +351,7 @@ export default {
             polling: false,
             pairedJustNow: false,
             pollTimer: null,
+            sessionsPollTimer: null,
 
             currentSession: null,
 
@@ -357,6 +409,23 @@ export default {
         },
     },
 
+    watch: {
+        /**
+         * Keeps the existing-connections list live while the user is on the
+         * connection step -- statuses (e.g. a pairing session finishing, or
+         * one dropping) can change on IZAPIA's side without any action here.
+         * @param {number} step The wizard step just entered.
+         * @returns {void}
+         */
+        wizardStep(step) {
+            if (step === 2) {
+                this.startSessionsPolling();
+            } else {
+                this.stopSessionsPolling();
+            }
+        },
+    },
+
     mounted() {
         this.id = this.$route.params.id ? parseInt(this.$route.params.id, 10) : null;
         this.loadTags();
@@ -387,18 +456,22 @@ export default {
 
     beforeUnmount() {
         this.stopPolling();
+        this.stopSessionsPolling();
     },
 
     methods: {
         /**
-         * Whether wizard step `n`'s section should render -- always true
-         * when editing an existing notification (everything shown at
-         * once), or only for the current step while creating a new one.
+         * Whether wizard step `n`'s section should render. The wizard is
+         * the only view -- editing an existing notification uses the same
+         * step-by-step flow as creating one (deliberately: showing
+         * everything at once as soon as the first per-step auto-save gave
+         * this notification an id caused Next/Connect to visually "jump to
+         * the edit page" mid-wizard).
          * @param {number} n Step number (1-4).
          * @returns {boolean} True if the section for step n should render.
          */
         showStep(n) {
-            return !!this.id || this.wizardStep === n;
+            return this.wizardStep === n;
         },
 
         /**
@@ -422,6 +495,9 @@ export default {
         advanceToStep(step) {
             this.wizardStep = step;
             this.save();
+            if (step === 2 && this.notification.izapiaApiKey && this.sessions.length === 0 && !this.loadingSessions) {
+                this.loadSessions();
+            }
             if (step === 3 && this.notification.izapiaSessionId && this.groups.length === 0) {
                 this.loadGroups();
             }
@@ -518,31 +594,19 @@ export default {
         },
 
         /**
-         * Loads the tenant's existing sessions so the user can pick one
-         * instead of creating a brand new connection.
+         * Loads the tenant's existing sessions from the IZAPIA API so the
+         * user can pick one, or see which ones still need pairing.
          * @returns {void}
          */
-        connectExisting() {
+        loadSessions() {
             this.sessionsError = null;
             this.loadingSessions = true;
-            this.showSessionPicker = true;
-            this.qrImage = null;
             this.$root
                 .getSocket()
                 .emit("izapiaListSessions", { izapiaApiKey: this.notification.izapiaApiKey }, (res) => {
                     this.loadingSessions = false;
                     if (res.ok) {
                         this.sessions = res.sessions;
-                        // A native <select> visually shows the first option by
-                        // default even though v-model's underlying value is
-                        // still "" until the user manually changes it -- so
-                        // without this, the dropdown LOOKS like a session is
-                        // picked (misleading) while notification.izapiaSessionId
-                        // stays empty and "Load groups" stays disabled.
-                        if (!this.notification.izapiaSessionId && this.sessions.length > 0) {
-                            this.notification.izapiaSessionId = this.sessions[0].sid;
-                            this.onSessionPicked();
-                        }
                     } else {
                         this.sessionsError = res.msg;
                     }
@@ -550,39 +614,85 @@ export default {
         },
 
         /**
-         * Reacts to picking a session from the "connect existing" dropdown.
-         * Persists the choice immediately -- otherwise navigating away
-         * without pressing "Save" silently discards the connection.
+         * Starts refreshing the existing-connections list every 5s while the
+         * user sits on the connection step, so statuses that change on
+         * IZAPIA's side (e.g. a session reconnecting) show up without a
+         * manual "Refresh" click.
          * @returns {void}
          */
-        onSessionPicked() {
-            this.refreshCurrentSession();
-            if (this.notification.izapiaSessionId) {
-                this.save();
+        startSessionsPolling() {
+            this.stopSessionsPolling();
+            if (!this.notification.izapiaApiKey) {
+                return;
+            }
+            this.sessionsPollTimer = setInterval(() => {
+                if (!this.loadingSessions) {
+                    this.loadSessions();
+                }
+            }, 5000);
+        },
+
+        /**
+         * Stops the existing-connections auto-refresh, if running.
+         * @returns {void}
+         */
+        stopSessionsPolling() {
+            if (this.sessionsPollTimer) {
+                clearInterval(this.sessionsPollTimer);
+                this.sessionsPollTimer = null;
             }
         },
 
         /**
-         * Creates a brand new WhatsApp session and immediately requests its
-         * pairing QR code, then starts polling until it connects.
+         * Marks an already-listed session as the one this notification uses,
+         * persisting the choice immediately -- otherwise navigating away
+         * without pressing "Save" silently discards the connection.
+         * @param {object} session Entry from `sessions`, as returned by the IZAPIA API.
+         * @returns {void}
+         */
+        pickSession(session) {
+            this.notification.izapiaSessionId = session.id;
+            this.refreshCurrentSession();
+            this.save();
+        },
+
+        /**
+         * Creates a brand new WhatsApp session (named per newConnectionName,
+         * required by the IZAPIA API to tell sessions apart) and immediately
+         * requests its pairing QR code, then starts polling until it connects.
          * @returns {void}
          */
         createNewConnection() {
+            const name = this.newConnectionName.trim();
+            if (!name) {
+                return;
+            }
             this.qrError = null;
             this.creatingSession = true;
-            this.showSessionPicker = false;
             this.pairedJustNow = false;
             this.$root
                 .getSocket()
-                .emit("izapiaCreateSession", { izapiaApiKey: this.notification.izapiaApiKey }, undefined, (res) => {
+                .emit("izapiaCreateSession", { izapiaApiKey: this.notification.izapiaApiKey }, name, (res) => {
                     this.creatingSession = false;
                     if (!res.ok) {
                         this.qrError = res.msg;
                         return;
                     }
-                    this.notification.izapiaSessionId = res.session.sid;
-                    this.requestQr();
+                    this.newConnectionName = "";
+                    this.sessions.push(res.session);
+                    this.generateQr(res.session);
                 });
+        },
+
+        /**
+         * Marks the given session as selected and requests a fresh pairing
+         * QR code for it, then starts polling until it connects.
+         * @param {object} session Entry from `sessions`, as returned by the IZAPIA API.
+         * @returns {void}
+         */
+        generateQr(session) {
+            this.notification.izapiaSessionId = session.id;
+            this.requestQr();
         },
 
         /**
@@ -745,6 +855,20 @@ export default {
 
 .izapia-section {
     margin-bottom: 2rem;
+}
+
+.izapia-session-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.5rem;
+    background: rgba(0, 0, 0, 0.03);
+
+    .dark & {
+        background: rgba(255, 255, 255, 0.06);
+    }
 }
 
 .izapia-session-status {
