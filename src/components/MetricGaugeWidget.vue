@@ -78,8 +78,33 @@ export default {
         clampedValue() {
             return Math.max(0, Math.min(this.value, this.gaugeMax));
         },
+        /**
+         * Color the arc/value by how close the value actually is to the
+         * alert threshold, not just the monitor's current discrete status --
+         * a disk at 16GB free out of 183GB is technically still "up" but
+         * should read as a warning well before it crosses into pending/down.
+         * Falls back to the flat per-status color when there's no threshold
+         * direction to reason about (down/maintenance always keep their
+         * status color; up/pending grade from green to red as headroom shrinks).
+         * @returns {string} A hex color.
+         */
         statusColor() {
-            return STATUS_COLORS[this.status] ?? STATUS_COLORS[2];
+            if (this.status === 0 || this.status === 3 || !this.thresholdOperator || this.gaugeMax <= 0) {
+                return STATUS_COLORS[this.status] ?? STATUS_COLORS[2];
+            }
+            // ">"/">=" == headroom-style (up while value stays high, e.g. free
+            // space/RAM); "<"/"<=" == usage-style (up while value stays low,
+            // e.g. CPU%) -- safetyRatio is 1 when maximally safe, 0 at the edge.
+            const ratio = this.clampedValue / this.gaugeMax;
+            const headroomStyle = this.thresholdOperator.startsWith(">");
+            const safetyRatio = headroomStyle ? ratio : 1 - ratio;
+            if (safetyRatio >= 0.5) {
+                return STATUS_COLORS[1];
+            }
+            if (safetyRatio >= 0.2) {
+                return STATUS_COLORS[2];
+            }
+            return STATUS_COLORS[0];
         },
         displayValue() {
             // Trim to a sane number of decimals for display without implying false precision.
