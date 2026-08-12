@@ -19,6 +19,15 @@
                         {{ $t("Edit") }}
                     </router-link>
                     <a v-else href="#" @click="$refs.notificationDialog.show(notification.id)">{{ $t("Edit") }}</a>
+
+                    <a
+                        v-if="isIzapia(notification)"
+                        href="#"
+                        class="text-danger ms-2"
+                        @click.prevent="confirmDeleteIzapia(notification.id)"
+                    >
+                        {{ $t("Delete") }}
+                    </a>
                 </li>
             </ul>
 
@@ -141,17 +150,29 @@
         </div>
 
         <NotificationDialog ref="notificationDialog" />
+
+        <Confirm
+            ref="confirmDeleteIzapia"
+            btn-style="btn-danger"
+            :yes-text="$t('Yes')"
+            :no-text="$t('No')"
+            @yes="deleteIzapia"
+        >
+            {{ $t("deleteNotificationMsg") }}
+        </Confirm>
     </div>
 </template>
 
 <script>
 import NotificationDialog from "../../components/NotificationDialog.vue";
 import ActionInput from "../ActionInput.vue";
+import Confirm from "../Confirm.vue";
 
 export default {
     components: {
         NotificationDialog,
         ActionInput,
+        Confirm,
     },
 
     data() {
@@ -163,6 +184,10 @@ export default {
              */
             tlsExpiryNotifInput: null,
             domainExpiryNotifInput: null,
+            /**
+             * id of the iZapia notification pending confirmation in confirmDeleteIzapia.
+             */
+            pendingDeleteId: null,
         };
     },
 
@@ -211,6 +236,29 @@ export default {
             } catch (e) {
                 return false;
             }
+        },
+
+        /**
+         * Opens the delete-confirmation dialog for an iZapia notification,
+         * reachable straight from the list instead of forcing a trip through
+         * the whole edit wizard just to delete it.
+         * @param {number} id Notification id.
+         * @returns {void}
+         */
+        confirmDeleteIzapia(id) {
+            this.pendingDeleteId = id;
+            this.$refs.confirmDeleteIzapia.show();
+        },
+
+        /**
+         * Deletes the iZapia notification confirmed via confirmDeleteIzapia.
+         * @returns {void}
+         */
+        deleteIzapia() {
+            const id = this.pendingDeleteId;
+            this.$root.getSocket().emit("deleteNotification", id, (res) => {
+                this.$root.toastRes(res);
+            });
         },
 
         /**
