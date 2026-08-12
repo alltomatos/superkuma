@@ -279,56 +279,85 @@ class Izapia extends NotificationProvider {
     }
 
     /**
+     * Builds the list of JIDs to send to, from either the current
+     * multi-recipient fields (izapiaGroupIds/izapiaContacts) or -- for
+     * notifications saved before that migration -- the legacy single
+     * izapiaRecipient/izapiaRecipientType pair.
+     * @param {object} notification Notification config.
+     * @returns {string[]} JIDs to send to (may be empty).
+     */
+    resolveRecipients(notification) {
+        const groupIds = Array.isArray(notification.izapiaGroupIds) ? notification.izapiaGroupIds : [];
+        const contacts = Array.isArray(notification.izapiaContacts) ? notification.izapiaContacts : [];
+
+        if (groupIds.length === 0 && contacts.length === 0 && notification.izapiaRecipient) {
+            return [this.resolveJid(notification.izapiaRecipient, notification.izapiaRecipientType)];
+        }
+
+        return [
+            ...groupIds.map((id) => this.resolveJid(id, "group")),
+            ...contacts.map((contact) => this.resolveJid(contact, "contact")),
+        ];
+    }
+
+    /**
      * @inheritdoc
      */
     async send(notification, msg, monitorJSON = null, heartbeatJSON = null) {
-        const okMsg = "Sent Successfully.";
-
-        try {
-            let config = {
-                headers: {
-                    Accept: "application/json",
-                    "Content-Type": "application/json",
-                    Authorization: "Bearer " + notification.izapiaApiKey,
-                },
-            };
-            config = this.getAxiosConfigWithProxy(config);
-
-            const baseUrl = (notification.izapiaApiUrl || "https://api.izapia.com").replace(/\/+$/, "");
-            const sid = notification.izapiaSessionId;
-            const to = this.resolveJid(notification.izapiaRecipient, notification.izapiaRecipientType);
-
-            if (notification.izapiaEnableInteractive && monitorJSON && monitorJSON.id) {
-                const buttons = [
-                    monitorJSON.active
-                        ? { id: `pause:${monitorJSON.id}`, kind: "quick_reply", label: "Pausar monitor" }
-                        : { id: `resume:${monitorJSON.id}`, kind: "quick_reply", label: "Retomar monitor" },
-                    { id: `ack:${monitorJSON.id}`, kind: "quick_reply", label: "OK, ciente" },
-                ];
-
-                let url = `${baseUrl}/api/v1/sessions/${sid}/messages/interactive`;
-                let data = {
-                    to,
-                    body: msg,
-                    buttons,
-                };
-
-                const response = await axios.post(url, data, config);
-                await this.recordPendingAction(response, notification, monitorJSON);
-                return okMsg;
-            }
-
-            let url = `${baseUrl}/api/v1/sessions/${sid}/messages/text`;
-            let data = {
-                to,
-                text: msg,
-            };
-
-            await axios.post(url, data, config);
-            return okMsg;
-        } catch (error) {
-            this.throwGeneralAxiosError(error);
+        const recipients = this.resolveRecipients(notification);
+        if (recipients.length === 0) {
+            throw new Error("No recipients configured for this IZAPIA notification.");
         }
+
+        let config = {
+            headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                Authorization: "Bearer " + notification.izapiaApiKey,
+            },
+        };
+        config = this.getAxiosConfigWithProxy(config);
+
+        const baseUrl = (notification.izapiaApiUrl || "https://api.izapia.com").replace(/\/+$/, "");
+        const sid = notification.izapiaSessionId;
+        const useInteractive = notification.izapiaEnableInteractive && monitorJSON && monitorJSON.id;
+
+        const buttons = useInteractive
+            ? [
+                  monitorJSON.active
+                      ? { id: `pause:${monitorJSON.id}`, kind: "quick_reply", label: "Pausar monitor" }
+                      : { id: `resume:${monitorJSON.id}`, kind: "quick_reply", label: "Retomar monitor" },
+                  { id: `ack:${monitorJSON.id}`, kind: "quick_reply", label: "OK, ciente" },
+              ]
+            : null;
+
+        let sent = 0;
+        let lastError = null;
+
+        for (const to of recipients) {
+            try {
+                if (useInteractive) {
+                    const url = `${baseUrl}/api/v1/sessions/${sid}/messages/interactive`;
+                    const response = await axios.post(url, { to, body: msg, buttons }, config);
+                    await this.recordPendingAction(response, notification, monitorJSON);
+                } else {
+                    const url = `${baseUrl}/api/v1/sessions/${sid}/messages/text`;
+                    await axios.post(url, { to, text: msg }, config);
+                }
+                sent++;
+            } catch (error) {
+                lastError = error;
+            }
+        }
+
+        if (sent === 0) {
+            this.throwGeneralAxiosError(lastError);
+        }
+
+        const failed = recipients.length - sent;
+        return failed > 0
+            ? `Sent to ${sent}/${recipients.length} recipients (${failed} failed).`
+            : "Sent Successfully.";
     }
 }
 
