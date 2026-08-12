@@ -432,6 +432,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@import "../assets/vars.scss";
+
 .builder-toolbar {
     display: flex;
     justify-content: space-between;
@@ -478,10 +480,16 @@ export default {
     height: 100%;
     display: flex;
     flex-direction: column;
-    background-color: var(--bs-body-bg, #fff);
-    border: 1px solid var(--bs-border-color, #dee2e6);
+    background-color: #fff;
+    border: 1px solid #dee2e6;
     border-radius: 8px;
     overflow: hidden;
+
+    .dark & {
+        background-color: $dark-bg2;
+        border-color: $dark-border-color;
+        color: $dark-font-color;
+    }
 }
 
 .panel-head {
@@ -490,8 +498,12 @@ export default {
     gap: 6px;
     padding: 4px 8px;
     font-size: 0.8rem;
-    font-weight: 600;
-    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+    font-weight: bold;
+    border-bottom: 1px solid #dee2e6;
+
+    .dark & {
+        border-bottom-color: $dark-border-color;
+    }
 }
 
 .panel-drag-handle {

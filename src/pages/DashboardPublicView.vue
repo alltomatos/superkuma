@@ -66,6 +66,7 @@ export default {
             panels: [],
             heartbeatList: {},
             notFound: false,
+            refreshTimer: null,
         };
     },
     computed: {
@@ -80,9 +81,16 @@ export default {
     mounted() {
         this.load();
     },
+    beforeUnmount() {
+        this.stopAutoRefresh();
+    },
     methods: {
         /**
-         * Fetch the published dashboard's data from the public REST endpoint.
+         * Fetch the published dashboard's data from the public REST endpoint,
+         * then (re)schedule the next fetch per the dashboard's own
+         * refreshInterval -- this is a static one-shot page otherwise, which
+         * defeats the point of a wallboard/TV display nobody is reloading by
+         * hand.
          * @returns {void}
          */
         load() {
@@ -93,10 +101,37 @@ export default {
                     this.dashboard = res.data.dashboard;
                     this.panels = res.data.panels;
                     this.heartbeatList = res.data.heartbeatList;
+                    this.$root.dashboardTheme = this.dashboard.theme || "auto";
+                    this.scheduleAutoRefresh();
                 })
                 .catch(() => {
                     this.notFound = true;
                 });
+        },
+
+        /**
+         * (Re)starts the auto-refresh timer at the dashboard's configured
+         * refreshInterval (seconds), clamped to a sane minimum so a
+         * misconfigured 0/negative value can't hammer the server.
+         * @returns {void}
+         */
+        scheduleAutoRefresh() {
+            this.stopAutoRefresh();
+            const intervalSecs = Math.max(5, this.dashboard.refreshInterval || 60);
+            this.refreshTimer = setInterval(() => {
+                this.load();
+            }, intervalSecs * 1000);
+        },
+
+        /**
+         * Stops the auto-refresh timer, if running.
+         * @returns {void}
+         */
+        stopAutoRefresh() {
+            if (this.refreshTimer) {
+                clearInterval(this.refreshTimer);
+                this.refreshTimer = null;
+            }
         },
 
         /**
@@ -185,6 +220,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@import "../assets/vars.scss";
+
 .dashboard-public-view {
     max-width: 1200px;
     margin: 0 auto;
@@ -199,17 +236,27 @@ export default {
     height: 100%;
     display: flex;
     flex-direction: column;
-    background-color: var(--bs-body-bg, #fff);
-    border: 1px solid var(--bs-border-color, #dee2e6);
+    background-color: #fff;
+    border: 1px solid #dee2e6;
     border-radius: 8px;
     overflow: hidden;
+
+    .dark & {
+        background-color: $dark-bg2;
+        border-color: $dark-border-color;
+        color: $dark-font-color;
+    }
 }
 
 .panel-head {
     padding: 4px 8px;
     font-size: 0.8rem;
-    font-weight: 600;
-    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+    font-weight: bold;
+    border-bottom: 1px solid #dee2e6;
+
+    .dark & {
+        border-bottom-color: $dark-border-color;
+    }
 }
 
 .panel-body {
