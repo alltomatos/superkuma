@@ -359,10 +359,15 @@ export default {
 
         /**
          * Reacts to picking a session from the "connect existing" dropdown.
+         * Persists the choice immediately -- otherwise navigating away
+         * without pressing "Save" silently discards the connection.
          * @returns {void}
          */
         onSessionPicked() {
             this.refreshCurrentSession();
+            if (this.notification.izapiaSessionId) {
+                this.save();
+            }
         },
 
         /**
@@ -433,6 +438,7 @@ export default {
                                 this.currentSession = res.session;
                                 this.pairedJustNow = true;
                                 this.stopPolling();
+                                this.save();
                             } else if (elapsed >= 120000) {
                                 this.stopPolling();
                             }
