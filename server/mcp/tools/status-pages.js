@@ -77,12 +77,42 @@ function registerStatusPageTools(server, client, config) {
         name: "save_status_page",
         title: "Save status page layout",
         description:
-            "Configure a status page's title/description and its groups of monitors. 'groups' fully REPLACES the current layout (like editing groups in the dashboard and hitting Save) -- always pass every group you want to keep, in the order you want them shown. Existing groups not included are removed (their monitors are just unlisted from the page, not deleted). Requires the page to already exist (create_status_page first).",
+            "Configure a status page's title/description/appearance and its groups of monitors. 'groups' fully REPLACES the current layout (like editing groups in the dashboard and hitting Save) -- always pass every group you want to keep, in the order you want them shown. Existing groups not included are removed (their monitors are just unlisted from the page, not deleted). Every field besides slug/groups is optional and left unchanged when omitted. Requires the page to already exist (create_status_page first).",
         mutation: true,
         inputSchema: {
             slug: z.string().min(1).describe("Status page slug"),
             title: z.string().min(1).optional().describe("Status page title"),
             description: z.string().optional().describe("Status page description"),
+            customCSS: z
+                .string()
+                .optional()
+                .describe("Custom CSS injected into the public status page (same box as the dashboard's editor)"),
+            theme: z.enum(["auto", "light", "dark"]).optional().describe("Color theme"),
+            footerText: z.string().nullable().optional().describe("Custom footer text, null to clear"),
+            showPoweredBy: z.boolean().optional().describe("Show the \"Powered by SuperKuma\" footer badge"),
+            showTags: z.boolean().optional().describe("Show each monitor's tags on the page"),
+            showCertificateExpiry: z.boolean().optional().describe("Show TLS certificate expiry per monitor"),
+            showOnlyLastHeartbeat: z
+                .boolean()
+                .optional()
+                .describe("Show only the most recent heartbeat instead of the full history bar"),
+            autoRefreshInterval: z.number().int().positive().optional().describe("Auto-refresh interval in seconds"),
+            tabRotationEnabled: z
+                .boolean()
+                .optional()
+                .describe(
+                    "Wallboard/TV mode: show one group at a time, auto-advancing to the next -- instead of all groups at once"
+                ),
+            tabRotationInterval: z
+                .number()
+                .int()
+                .min(3)
+                .optional()
+                .describe("Seconds each group stays on screen before rotating to the next (only used when tabRotationEnabled)"),
+            soundAlertsEnabled: z
+                .boolean()
+                .optional()
+                .describe("Play a sound and show a toast in the browser when a monitor on this page goes down"),
             groups: z
                 .array(
                     z.object({
@@ -101,11 +131,27 @@ function registerStatusPageTools(server, client, config) {
             }
             const cfg = current.config;
 
-            const mergedConfig = {
-                ...cfg,
-                title: args.title !== undefined ? args.title : cfg.title,
-                description: args.description !== undefined ? args.description : cfg.description,
-            };
+            const OPTIONAL_FIELDS = [
+                "title",
+                "description",
+                "customCSS",
+                "theme",
+                "footerText",
+                "showPoweredBy",
+                "showTags",
+                "showCertificateExpiry",
+                "showOnlyLastHeartbeat",
+                "autoRefreshInterval",
+                "tabRotationEnabled",
+                "tabRotationInterval",
+                "soundAlertsEnabled",
+            ];
+            const mergedConfig = { ...cfg };
+            for (const field of OPTIONAL_FIELDS) {
+                if (args[field] !== undefined) {
+                    mergedConfig[field] = args[field];
+                }
+            }
 
             const publicGroupList = args.groups.map((g) => ({
                 name: g.name,
