@@ -205,7 +205,7 @@
                         type="button"
                         class="btn btn-primary"
                         :disabled="!canProceedWizard"
-                        @click="wizardStep++"
+                        @click="advanceToStep(wizardStep + 1)"
                     >
                         {{ $t("izapiaWizardNext") }}
                     </button>
@@ -411,6 +411,23 @@ export default {
         },
 
         /**
+         * Moves the wizard to the given step, saving progress immediately
+         * (so an abandoned wizard isn't silently lost) and, when landing on
+         * the channels step with a session already connected, kicking off
+         * the group fetch automatically instead of waiting for a manual
+         * "Load groups" click.
+         * @param {number} step Target step (1-4).
+         * @returns {void}
+         */
+        advanceToStep(step) {
+            this.wizardStep = step;
+            this.save();
+            if (step === 3 && this.notification.izapiaSessionId && this.groups.length === 0) {
+                this.loadGroups();
+            }
+        },
+
+        /**
          * Fetch the tenant's tag list for the "auto-attach" dropdown.
          * @returns {void}
          */
@@ -497,7 +514,7 @@ export default {
             this.notification.izapiaApiKey = picked.izapiaApiKey;
             this.notification.izapiaSessionId = picked.izapiaSessionId;
             this.refreshCurrentSession();
-            this.wizardStep = 3;
+            this.advanceToStep(3);
         },
 
         /**
