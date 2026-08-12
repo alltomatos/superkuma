@@ -185,6 +185,15 @@
                     <button type="button" class="btn btn-outline-secondary" :disabled="testing" @click="test">
                         {{ $t("Test") }}
                     </button>
+                    <button
+                        v-if="id"
+                        type="button"
+                        class="btn btn-outline-danger ms-auto"
+                        :disabled="deleting"
+                        @click="$refs.confirmDelete.show()"
+                    >
+                        {{ $t("Delete") }}
+                    </button>
                 </div>
             </div>
 
@@ -199,12 +208,17 @@
                 </div>
             </div>
         </div>
+
+        <Confirm ref="confirmDelete" btn-style="btn-danger" :yes-text="$t('Yes')" :no-text="$t('No')" @yes="deleteNotification">
+            {{ $t("deleteNotificationMsg") }}
+        </Confirm>
     </div>
 </template>
 
 <script>
 import HiddenInput from "../components/HiddenInput.vue";
 import IzapiaPhonePreview from "../components/notifications/IzapiaPhonePreview.vue";
+import Confirm from "../components/Confirm.vue";
 
 const DEFAULT_TEMPLATE = "[{status}] {monitorName}\n{msg}";
 
@@ -212,6 +226,7 @@ export default {
     components: {
         HiddenInput,
         IzapiaPhonePreview,
+        Confirm,
     },
 
     data() {
@@ -254,6 +269,7 @@ export default {
 
             saving: false,
             testing: false,
+            deleting: false,
         };
     },
 
@@ -359,10 +375,15 @@ export default {
 
         /**
          * Reacts to picking a session from the "connect existing" dropdown.
+         * Persists the choice immediately -- otherwise navigating away
+         * without pressing "Save" silently discards the connection.
          * @returns {void}
          */
         onSessionPicked() {
             this.refreshCurrentSession();
+            if (this.notification.izapiaSessionId) {
+                this.save();
+            }
         },
 
         /**
@@ -433,6 +454,7 @@ export default {
                                 this.currentSession = res.session;
                                 this.pairedJustNow = true;
                                 this.stopPolling();
+                                this.save();
                             } else if (elapsed >= 120000) {
                                 this.stopPolling();
                             }
@@ -517,6 +539,21 @@ export default {
             this.$root.getSocket().emit("testNotification", this.notification, (res) => {
                 this.testing = false;
                 this.$root.toastRes(res);
+            });
+        },
+
+        /**
+         * Deletes this notification and returns to the notification list.
+         * @returns {void}
+         */
+        deleteNotification() {
+            this.deleting = true;
+            this.$root.getSocket().emit("deleteNotification", this.id, (res) => {
+                this.deleting = false;
+                this.$root.toastRes(res);
+                if (res.ok) {
+                    this.$router.push("/settings/notifications");
+                }
             });
         },
     },
