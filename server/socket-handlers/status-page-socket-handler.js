@@ -392,6 +392,15 @@ module.exports.statusPageSocketHandler = (socket) => {
                 throw new Error("Invalid analytics type");
             }
             statusPage.analytics_type = config.analyticsType;
+            statusPage.tab_rotation_enabled = config.tabRotationEnabled;
+            if (config.tabRotationInterval !== undefined && config.tabRotationInterval !== null) {
+                const interval = parseInt(config.tabRotationInterval, 10);
+                if (!Number.isFinite(interval) || interval < 3) {
+                    throw new Error("Tab rotation interval must be at least 3 seconds");
+                }
+                statusPage.tab_rotation_interval = interval;
+            }
+            statusPage.sound_alerts_enabled = config.soundAlertsEnabled;
 
             await R.store(statusPage);
 

@@ -121,6 +121,48 @@
                     </label>
                 </div>
 
+                <!-- Wallboard / TV mode: rotate through groups one at a time -->
+                <div class="my-3 form-check form-switch">
+                    <input
+                        id="tab-rotation-enabled"
+                        v-model="config.tabRotationEnabled"
+                        class="form-check-input"
+                        type="checkbox"
+                        data-testid="tab-rotation-checkbox"
+                    />
+                    <label class="form-check-label" for="tab-rotation-enabled">
+                        {{ $t("statusPageTabRotation") }}
+                    </label>
+                    <div class="form-text">{{ $t("statusPageTabRotationHelp") }}</div>
+                </div>
+
+                <div v-if="config.tabRotationEnabled" class="my-3">
+                    <label for="tab-rotation-interval" class="form-label">{{ $t("statusPageTabRotationInterval") }}</label>
+                    <input
+                        id="tab-rotation-interval"
+                        v-model="config.tabRotationInterval"
+                        type="number"
+                        class="form-control"
+                        :min="3"
+                        data-testid="tab-rotation-interval-input"
+                    />
+                </div>
+
+                <!-- Sound + toast alert when a monitor goes down -->
+                <div class="my-3 form-check form-switch">
+                    <input
+                        id="sound-alerts-enabled"
+                        v-model="config.soundAlertsEnabled"
+                        class="form-check-input"
+                        type="checkbox"
+                        data-testid="sound-alerts-checkbox"
+                    />
+                    <label class="form-check-label" for="sound-alerts-enabled">
+                        {{ $t("statusPageSoundAlerts") }}
+                    </label>
+                    <div class="form-text">{{ $t("statusPageSoundAlertsHelp") }}</div>
+                </div>
+
                 <!-- Domain Name List -->
                 <div class="my-3">
                     <label class="form-label">
@@ -496,11 +538,26 @@
                     👀 {{ $t("statusPageNothing") }}
                 </div>
 
+                <!-- Wallboard tab bar: click a group to jump to it, active one is highlighted -->
+                <div v-if="rotationActive" class="status-page-tabs mb-3" data-testid="rotation-tabs">
+                    <button
+                        v-for="(group, index) in $root.publicGroupList"
+                        :key="group.id ?? index"
+                        type="button"
+                        class="status-page-tab"
+                        :class="{ active: index === activeGroupIndex }"
+                        @click="goToGroup(index)"
+                    >
+                        {{ group.name }}
+                    </button>
+                </div>
+
                 <PublicGroupList
                     :edit-mode="enableEditMode"
                     :show-tags="config.showTags"
                     :show-certificate-expiry="config.showCertificateExpiry"
                     :show-only-last-heartbeat="config.showOnlyLastHeartbeat"
+                    :active-group-index="rotationActive ? activeGroupIndex : -1"
                 />
             </div>
 
@@ -728,9 +785,22 @@ export default {
             leavePageMsg,
             incidentHistoryNextCursor: null,
             incidentHistoryHasMore: false,
+            activeGroupIndex: 0,
+            rotationTimer: null,
+            previousDownMonitorIds: new Set(),
+            audioCtx: null,
         };
     },
     computed: {
+        /**
+         * Whether wallboard/TV mode is actually driving the page right now --
+         * off while editing (the editor needs every group visible/draggable)
+         * or when there's nothing to rotate between.
+         * @returns {boolean} True if group rotation should be active.
+         */
+        rotationActive() {
+            return !this.enableEditMode && !!this.config.tabRotationEnabled && this.$root.publicGroupList.length > 1;
+        },
         logoURL() {
             if (this.imgDataUrl.startsWith("data:")) {
                 return this.imgDataUrl;
@@ -937,6 +1007,21 @@ export default {
         },
 
         /**
+         * Starts/stops the wallboard rotation timer as its conditions change
+         * (toggled in the editor, entering/leaving edit mode, or the group
+         * count crossing the >1 threshold).
+         * @param {boolean} active Whether rotation should be running.
+         * @returns {void}
+         */
+        rotationActive(active) {
+            if (active) {
+                this.startRotation();
+            } else {
+                this.stopRotation();
+            }
+        },
+
+        /**
          * Selected a monitor and add to the list.
          * @param {object} monitor Monitor to add
          * @returns {void}
@@ -1059,6 +1144,9 @@ export default {
             this.edit();
         }
     },
+    beforeUnmount() {
+        this.stopRotation();
+    },
     methods: {
         /**
          * Get status page data
@@ -1098,6 +1186,8 @@ export default {
 
                     this.$root.heartbeatList = heartbeatList;
                     this.$root.uptimeList = uptimeList;
+
+                    this.checkForNewDownMonitors(heartbeatList);
 
                     const heartbeatIds = Object.keys(heartbeatList);
                     const downMonitors = heartbeatIds.reduce((downMonitorsAmount, currentId) => {
@@ -1143,6 +1233,126 @@ export default {
                     this.updateCountdownText = countdown.format("mm:ss");
                 }
             }, 1000);
+        },
+
+        /**
+         * Starts (or restarts) the wallboard rotation timer, advancing
+         * activeGroupIndex to the next group every tabRotationInterval
+         * seconds, wrapping back to the first group at the end.
+         * @returns {void}
+         */
+        startRotation() {
+            this.stopRotation();
+            const intervalSecs = Math.max(3, this.config.tabRotationInterval || 15);
+            this.rotationTimer = setInterval(() => {
+                const groupCount = this.$root.publicGroupList.length;
+                if (groupCount === 0) {
+                    return;
+                }
+                this.activeGroupIndex = (this.activeGroupIndex + 1) % groupCount;
+            }, intervalSecs * 1000);
+        },
+
+        /**
+         * Stops the wallboard rotation timer, if running.
+         * @returns {void}
+         */
+        stopRotation() {
+            if (this.rotationTimer) {
+                clearInterval(this.rotationTimer);
+                this.rotationTimer = null;
+            }
+        },
+
+        /**
+         * Jumps rotation straight to the given group (tab click) and resets
+         * the timer so the newly-selected group gets a full interval on screen.
+         * @param {number} index Index into $root.publicGroupList.
+         * @returns {void}
+         */
+        goToGroup(index) {
+            this.activeGroupIndex = index;
+            if (this.rotationActive) {
+                this.startRotation();
+            }
+        },
+
+        /**
+         * Plays a short beep via the Web Audio API -- no external asset file
+         * needed. Browsers that block audio without a prior user gesture will
+         * simply no-op here (best-effort; the toast still shows regardless).
+         * @returns {void}
+         */
+        playAlertSound() {
+            try {
+                if (!this.audioCtx) {
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    this.audioCtx = new AudioContextClass();
+                }
+                if (this.audioCtx.state === "suspended") {
+                    this.audioCtx.resume();
+                }
+                const now = this.audioCtx.currentTime;
+                // Two short beeps read as an "alert" rather than a single flat tone.
+                [0, 0.25].forEach((offset) => {
+                    const oscillator = this.audioCtx.createOscillator();
+                    const gain = this.audioCtx.createGain();
+                    oscillator.type = "sine";
+                    oscillator.frequency.value = 880;
+                    gain.gain.setValueAtTime(0.0001, now + offset);
+                    gain.gain.exponentialRampToValueAtTime(0.3, now + offset + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.2);
+                    oscillator.connect(gain);
+                    gain.connect(this.audioCtx.destination);
+                    oscillator.start(now + offset);
+                    oscillator.stop(now + offset + 0.2);
+                });
+            } catch (e) {
+                // Web Audio unsupported/blocked -- the toast alone is still shown.
+            }
+        },
+
+        /**
+         * Compares the latest heartbeat snapshot against the previous one and
+         * fires a toast + sound for every monitor that just went down (0),
+         * so someone watching the wallboard notices without staring at it.
+         * Only active when soundAlertsEnabled is on and we're not editing.
+         * @param {object} heartbeatList Map of monitorId -> heartbeat array, as
+         * returned by /api/status-page/heartbeat/:slug.
+         * @returns {void}
+         */
+        checkForNewDownMonitors(heartbeatList) {
+            const currentDownIds = new Set();
+            for (const [monitorId, heartbeats] of Object.entries(heartbeatList)) {
+                const last = heartbeats.at(-1);
+                if (last && last.status === 0) {
+                    currentDownIds.add(monitorId);
+                }
+            }
+
+            if (this.config.soundAlertsEnabled && !this.enableEditMode) {
+                const monitorNames = new Map();
+                for (const group of this.$root.publicGroupList) {
+                    for (const monitor of group.monitorList) {
+                        monitorNames.set(String(monitor.id), monitor.name);
+                    }
+                }
+
+                let hasNewDown = false;
+                for (const id of currentDownIds) {
+                    if (!this.previousDownMonitorIds.has(id)) {
+                        hasNewDown = true;
+                        toast.error(this.$t("statusPageMonitorDownAlert", [monitorNames.get(id) || id]), {
+                            timeout: 10000,
+                        });
+                    }
+                }
+                if (hasNewDown) {
+                    this.playAlertSound();
+                }
+            }
+
+            this.previousDownMonitorIds = currentDownIds;
         },
 
         /**
@@ -1605,6 +1815,34 @@ export default {
 
     :deep(.bg-maintenance) {
         background-color: var(--sk-color-maintenance) !important;
+    }
+}
+
+.status-page-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.status-page-tab {
+    padding: 0.4rem 1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(128, 128, 128, 0.3);
+    background: transparent;
+    color: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+        background: rgba(128, 128, 128, 0.15);
+    }
+
+    &.active {
+        background: var(--sk-color-up, $primary);
+        border-color: transparent;
+        color: #fff;
+        font-weight: 600;
     }
 }
 

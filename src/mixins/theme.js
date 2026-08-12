@@ -7,6 +7,7 @@ export default {
             styleElapsedTime: localStorage.styleElapsedTime,
             statusPageTheme: "light",
             forceStatusPageTheme: false,
+            dashboardTheme: "light",
             path: "",
         };
     },
@@ -51,6 +52,11 @@ export default {
                     return this.system;
                 }
                 return this.statusPageTheme;
+            } else if (this.path.startsWith("/panel")) {
+                if (this.dashboardTheme === "auto") {
+                    return this.system;
+                }
+                return this.dashboardTheme;
             } else {
                 if (this.userTheme === "auto") {
                     return this.system;

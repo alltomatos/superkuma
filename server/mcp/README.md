@@ -187,7 +187,7 @@ the API key in the `Authorization` header.
 | `list_status_pages`  | read        | Summaries (id, slug, title, published).                             |
 | `get_status_page`    | read        | Full config of one status page by slug.                             |
 | `create_status_page` | write       | Create a status page (title + slug).                                |
-| `save_status_page`   | write       | Set title/description and organize monitors into groups (sections). |
+| `save_status_page`   | write       | Set title/description/appearance (custom CSS, theme, footer, etc.) and organize monitors into groups (sections). |
 | `post_incident`      | write       | Post/pin an incident on a status page.                              |
 | `resolve_incident`   | write       | Unpin/resolve the pinned incident.                                  |
 | `delete_status_page` | destructive | Delete a status page (needs delete gate + `confirm`).               |
