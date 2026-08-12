@@ -120,6 +120,7 @@
                                 {{ loadingGroups ? $t("Loading...") : $t("izapiaLoadGroups") }}
                             </button>
                         </div>
+                        <div v-if="groupsError" class="form-text text-danger">{{ groupsError }}</div>
                     </div>
 
                     <div class="mb-3">
@@ -236,6 +237,7 @@ export default {
             tags: [],
             groups: [],
             loadingGroups: false,
+            groupsError: null,
 
             sessions: [],
             loadingSessions: false,
@@ -304,6 +306,7 @@ export default {
          * @returns {void}
          */
         loadGroups() {
+            this.groupsError = null;
             this.loadingGroups = true;
             this.$root.getSocket().emit(
                 "izapiaListGroups",
@@ -316,6 +319,8 @@ export default {
                     this.loadingGroups = false;
                     if (res.ok) {
                         this.groups = res.groups;
+                    } else {
+                        this.groupsError = res.msg;
                     }
                 }
             );
