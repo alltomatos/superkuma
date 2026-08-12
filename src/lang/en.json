@@ -1375,6 +1375,7 @@
     "izapiaSignupCta": "Sign up on IZapia",
     "izapiaNoAccountYet": "Don't have an IZapia account yet?",
     "izapiaConnectionStep": "2. Connection",
+    "izapiaConnectButton": "Connect",
     "izapiaConnectExisting": "Connect with existing connection",
     "izapiaCreateNewConnection": "Create new connection",
     "izapiaExistingConnections": "Existing connections",
