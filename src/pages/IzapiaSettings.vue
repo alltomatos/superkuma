@@ -13,12 +13,21 @@
                         v-model="notification.izapiaApiKey"
                         autocomplete="new-password"
                     ></HiddenInput>
-                    <div class="form-text">
+                    <div class="form-text mb-2">
                         {{ $t("izapiaNoAccountYet") }}
                         <a href="https://app.izapia.com/register" target="_blank" rel="noopener">
                             {{ $t("izapiaSignupCta") }}
                         </a>
                     </div>
+                    <button
+                        type="button"
+                        class="btn btn-primary"
+                        :disabled="!notification.izapiaApiKey || loadingSessions"
+                        @click="connectExisting"
+                    >
+                        {{ loadingSessions ? $t("Loading...") : $t("izapiaConnectButton") }}
+                    </button>
+                    <div v-if="sessionsError" class="form-text text-danger">{{ sessionsError }}</div>
                 </div>
 
                 <!-- Step 2: Connection -->
@@ -38,25 +47,6 @@
                         </button>
                     </div>
 
-                    <div class="d-flex gap-2 flex-wrap mb-3">
-                        <button
-                            type="button"
-                            class="btn btn-outline-primary"
-                            :disabled="!notification.izapiaApiKey || loadingSessions"
-                            @click="connectExisting"
-                        >
-                            {{ $t("izapiaConnectExisting") }}
-                        </button>
-                        <button
-                            type="button"
-                            class="btn btn-primary"
-                            :disabled="!notification.izapiaApiKey || creatingSession"
-                            @click="createNewConnection"
-                        >
-                            {{ $t("izapiaCreateNewConnection") }}
-                        </button>
-                    </div>
-
                     <div v-if="showSessionPicker" class="mb-3">
                         <label class="form-label">{{ $t("izapiaSelectConnection") }}</label>
                         <select v-model="notification.izapiaSessionId" class="form-select" @change="onSessionPicked">
@@ -69,8 +59,17 @@
                         </select>
                     </div>
 
-                    <div v-if="sessionsError || qrError" class="form-text text-danger">
-                        {{ sessionsError || qrError }}
+                    <button
+                        type="button"
+                        class="btn btn-outline-primary"
+                        :disabled="!notification.izapiaApiKey || creatingSession"
+                        @click="createNewConnection"
+                    >
+                        {{ $t("izapiaCreateNewConnection") }}
+                    </button>
+
+                    <div v-if="qrError" class="form-text text-danger">
+                        {{ qrError }}
                     </div>
 
                     <div v-if="qrImage" class="izapia-qr-box mb-3">
@@ -120,6 +119,7 @@
                                 {{ loadingGroups ? $t("Loading...") : $t("izapiaLoadGroups") }}
                             </button>
                         </div>
+                        <div v-if="groupsError" class="form-text text-danger">{{ groupsError }}</div>
                     </div>
 
                     <div class="mb-3">
@@ -236,6 +236,7 @@ export default {
             tags: [],
             groups: [],
             loadingGroups: false,
+            groupsError: null,
 
             sessions: [],
             loadingSessions: false,
@@ -304,6 +305,7 @@ export default {
          * @returns {void}
          */
         loadGroups() {
+            this.groupsError = null;
             this.loadingGroups = true;
             this.$root.getSocket().emit(
                 "izapiaListGroups",
@@ -316,6 +318,8 @@ export default {
                     this.loadingGroups = false;
                     if (res.ok) {
                         this.groups = res.groups;
+                    } else {
+                        this.groupsError = res.msg;
                     }
                 }
             );
