@@ -460,6 +460,9 @@ class StatusPage extends BeanModel {
             showCertificateExpiry: !!this.show_certificate_expiry,
             showOnlyLastHeartbeat: !!this.show_only_last_heartbeat,
             rssTitle: this.rss_title,
+            tabRotationEnabled: !!this.tab_rotation_enabled,
+            tabRotationInterval: this.tab_rotation_interval,
+            soundAlertsEnabled: !!this.sound_alerts_enabled,
         };
     }
 
@@ -487,6 +490,9 @@ class StatusPage extends BeanModel {
             showCertificateExpiry: !!this.show_certificate_expiry,
             showOnlyLastHeartbeat: !!this.show_only_last_heartbeat,
             rssTitle: this.rss_title,
+            tabRotationEnabled: !!this.tab_rotation_enabled,
+            tabRotationInterval: this.tab_rotation_interval,
+            soundAlertsEnabled: !!this.sound_alerts_enabled,
         };
     }
 

@@ -2,7 +2,11 @@
     <!-- Group List -->
     <Draggable v-model="$root.publicGroupList" :disabled="!editMode" item-key="id" :animation="100">
         <template #item="group">
-            <div class="mb-5" data-testid="group">
+            <div
+                v-show="activeGroupIndex === -1 || activeGroupIndex === group.index"
+                class="mb-5"
+                data-testid="group"
+            >
                 <!-- Group Title -->
                 <h2 class="group-title">
                     <font-awesome-icon v-if="editMode && showGroupDrag" icon="arrows-alt-v" class="action drag me-3" />
@@ -171,6 +175,14 @@ export default {
         /** Should only the last heartbeat be shown? */
         showOnlyLastHeartbeat: {
             type: Boolean,
+        },
+        /**
+         * Index of the only group to show (wallboard rotation mode), or -1
+         * to show every group as normal.
+         */
+        activeGroupIndex: {
+            type: Number,
+            default: -1,
         },
     },
     data() {

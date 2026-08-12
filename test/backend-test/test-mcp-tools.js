@@ -509,6 +509,50 @@ describe("MCP tool behaviour", () => {
         ]);
     });
 
+    test("save_status_page applies customCSS and other appearance fields when provided", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        client.responses.getStatusPage = {
+            ok: true,
+            config: {
+                slug: "gnr",
+                title: "GNR",
+                description: "old desc",
+                icon: "/icon.png",
+                theme: "auto",
+                customCSS: "",
+                showPoweredBy: true,
+            },
+        };
+        registerAllTools(server, client, fullConfig);
+
+        const res = await server.call("save_status_page", {
+            slug: "gnr",
+            customCSS: ".container { max-width: 98%; }",
+            theme: "dark",
+            footerText: "Custom footer",
+            showPoweredBy: false,
+            showTags: true,
+            showCertificateExpiry: true,
+            showOnlyLastHeartbeat: true,
+            autoRefreshInterval: 60,
+            groups: [{ name: "Core", monitorIds: [1] }],
+        });
+
+        assert.strictEqual(res.isError, false);
+        const call = lastCall(client, "saveStatusPage");
+        const savedConfig = call.args[1];
+        assert.strictEqual(savedConfig.customCSS, ".container { max-width: 98%; }");
+        assert.strictEqual(savedConfig.theme, "dark");
+        assert.strictEqual(savedConfig.footerText, "Custom footer");
+        assert.strictEqual(savedConfig.showPoweredBy, false);
+        assert.strictEqual(savedConfig.showTags, true);
+        assert.strictEqual(savedConfig.showCertificateExpiry, true);
+        assert.strictEqual(savedConfig.showOnlyLastHeartbeat, true);
+        assert.strictEqual(savedConfig.autoRefreshInterval, 60);
+        assert.strictEqual(savedConfig.title, "GNR", "title left unset is preserved");
+    });
+
     test("save_status_page throws if the status page does not exist", async () => {
         const server = new FakeServer();
         const client = new FakeClient();
