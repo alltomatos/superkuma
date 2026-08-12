@@ -3,11 +3,30 @@
         <h1 class="mb-1">{{ $t("izapiaPageTitle") }}</h1>
         <p class="text-muted">{{ $t("izapiaPageSubtitle") }}</p>
 
+        <ol v-if="!id" class="izapia-wizard-steps">
+            <li v-for="step in 4" :key="step" :class="{ active: wizardStep === step, done: wizardStep > step }">
+                {{ $t(wizardStepLabelKey(step)) }}
+            </li>
+        </ol>
+
         <div class="row">
             <div class="col-12 col-xl-8">
-                <!-- Step 1: API Key -->
-                <div class="izapia-section">
+                <div v-if="showStep(1)" class="izapia-section">
+                    <label class="form-label">{{ $t("izapiaNotificationName") }}</label>
+                    <input v-model="notification.name" type="text" class="form-control mb-3" />
+
                     <h5 class="settings-subheading">{{ $t("izapiaApiKeyStep") }}</h5>
+
+                    <div v-if="reusableConnections.length > 0" class="mb-3">
+                        <label class="form-label">{{ $t("izapiaReuseConnection") }}</label>
+                        <select class="form-select" @change="onReuseConnectionPicked">
+                            <option value="">{{ $t("izapiaReuseConnectionPlaceholder") }}</option>
+                            <option v-for="item in reusableConnections" :key="item.id" :value="item.id">
+                                {{ item.label }}
+                            </option>
+                        </select>
+                    </div>
+
                     <HiddenInput
                         id="izapia-api-key"
                         v-model="notification.izapiaApiKey"
@@ -30,8 +49,7 @@
                     <div v-if="sessionsError" class="form-text text-danger">{{ sessionsError }}</div>
                 </div>
 
-                <!-- Step 2: Connection -->
-                <div class="izapia-section">
+                <div v-if="showStep(2)" class="izapia-section">
                     <h5 class="settings-subheading">{{ $t("izapiaConnectionStep") }}</h5>
 
                     <div v-if="sessionStatusDisplay" class="izapia-session-status mb-3">
@@ -83,36 +101,15 @@
                     </div>
                 </div>
 
-                <!-- Step 3: Recipient -->
-                <div class="izapia-section">
+                <div v-if="showStep(3)" class="izapia-section">
                     <h5 class="settings-subheading">{{ $t("izapiaRecipientStep") }}</h5>
 
                     <div class="mb-3">
-                        <label class="form-label">{{ $t("izapiaRecipientType") }}</label>
-                        <select v-model="notification.izapiaRecipientType" class="form-select">
-                            <option value="contact">{{ $t("izapiaRecipientTypeContact") }}</option>
-                            <option value="group">{{ $t("izapiaRecipientTypeGroup") }}</option>
-                        </select>
-                    </div>
-
-                    <div v-if="notification.izapiaRecipientType === 'group'" class="mb-3">
-                        <label class="form-label">{{ $t("izapiaGroupPicker") }}</label>
-                        <div class="d-flex gap-2">
-                            <select
-                                v-model="notification.izapiaRecipient"
-                                class="form-select"
-                                :disabled="groups.length === 0"
-                            >
-                                <option v-if="groups.length === 0" value="" disabled>
-                                    {{ $t("izapiaNoGroupsLoaded") }}
-                                </option>
-                                <option v-for="group in groups" :key="group.id" :value="group.id">
-                                    {{ group.name }}
-                                </option>
-                            </select>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <label class="form-label mb-0">{{ $t("izapiaGroupPicker") }}</label>
                             <button
                                 type="button"
-                                class="btn btn-outline-primary text-nowrap"
+                                class="btn btn-sm btn-outline-primary text-nowrap"
                                 :disabled="loadingGroups || !notification.izapiaSessionId"
                                 @click="loadGroups"
                             >
@@ -120,18 +117,40 @@
                             </button>
                         </div>
                         <div v-if="groupsError" class="form-text text-danger">{{ groupsError }}</div>
+                        <div v-if="groups.length === 0" class="form-text">{{ $t("izapiaNoGroupsLoaded") }}</div>
+                        <div v-for="group in groups" :key="group.id" class="form-check">
+                            <input
+                                :id="`izapia-group-${group.id}`"
+                                class="form-check-input"
+                                type="checkbox"
+                                :checked="notification.izapiaGroupIds.includes(group.id)"
+                                @change="toggleGroup(group.id)"
+                            />
+                            <label class="form-check-label" :for="`izapia-group-${group.id}`">{{ group.name }}</label>
+                        </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">{{ $t("izapiaRecipient") }}</label>
-                        <input v-model="notification.izapiaRecipient" type="text" class="form-control" />
-                        <div class="form-text">
-                            {{
-                                notification.izapiaRecipientType === "group"
-                                    ? $t("izapiaRecipientHelpGroup", ["123456789012345678"])
-                                    : $t("izapiaRecipientHelpContact", ["5511987654321"])
-                            }}
+                        <label class="form-label">{{ $t("izapiaContacts") }}</label>
+                        <div class="izapia-contact-chips mb-2">
+                            <span v-for="(contact, index) in notification.izapiaContacts" :key="contact" class="izapia-chip">
+                                {{ contact }}
+                                <a href="#" class="izapia-chip-remove" @click.prevent="removeContact(index)">&times;</a>
+                            </span>
                         </div>
+                        <div class="d-flex gap-2">
+                            <input
+                                v-model="newContact"
+                                type="text"
+                                class="form-control"
+                                :placeholder="$t('izapiaContactPlaceholder', ['5511987654321'])"
+                                @keydown.enter.prevent="addContact"
+                            />
+                            <button type="button" class="btn btn-outline-primary text-nowrap" @click="addContact">
+                                {{ $t("izapiaAddContact") }}
+                            </button>
+                        </div>
+                        <div class="form-text">{{ $t("izapiaContactsHelp") }}</div>
                     </div>
 
                     <div class="mb-3">
@@ -145,8 +164,7 @@
                     </div>
                 </div>
 
-                <!-- Step 4: Template -->
-                <div class="izapia-section">
+                <div v-if="showStep(4)" class="izapia-section">
                     <h5 class="settings-subheading">{{ $t("izapiaTemplateStep") }}</h5>
 
                     <div class="form-check form-switch mb-3">
@@ -178,7 +196,22 @@
                     </div>
                 </div>
 
-                <div class="izapia-section d-flex gap-2">
+                <div v-if="!id" class="izapia-section d-flex gap-2">
+                    <button v-if="wizardStep > 1" type="button" class="btn btn-outline-secondary" @click="wizardStep--">
+                        {{ $t("izapiaWizardBack") }}
+                    </button>
+                    <button
+                        v-if="wizardStep < 4"
+                        type="button"
+                        class="btn btn-primary"
+                        :disabled="!canProceedWizard"
+                        @click="wizardStep++"
+                    >
+                        {{ $t("izapiaWizardNext") }}
+                    </button>
+                </div>
+
+                <div v-if="id || wizardStep === 4" class="izapia-section d-flex gap-2">
                     <button type="button" class="btn btn-primary" :disabled="saving" @click="save">
                         {{ $t("Save") }}
                     </button>
@@ -221,6 +254,7 @@ import IzapiaPhonePreview from "../components/notifications/IzapiaPhonePreview.v
 import Confirm from "../components/Confirm.vue";
 
 const DEFAULT_TEMPLATE = "[{status}] {monitorName}\n{msg}";
+const WIZARD_STEP_LABEL_KEYS = ["izapiaApiKeyStep", "izapiaConnectionStep", "izapiaRecipientStep", "izapiaTemplateStep"];
 
 export default {
     components: {
@@ -232,14 +266,16 @@ export default {
     data() {
         return {
             id: null,
+            wizardStep: 1,
+            newContact: "",
             notification: {
                 name: "IZapia",
                 type: "izapia",
                 izapiaApiUrl: "https://api.izapia.com",
                 izapiaApiKey: "",
                 izapiaSessionId: "",
-                izapiaRecipientType: "contact",
-                izapiaRecipient: "",
+                izapiaGroupIds: [],
+                izapiaContacts: [],
                 izapiaAutoAttachTagId: null,
                 izapiaEnableInteractive: false,
                 izapiaWebhookSecret: "",
@@ -281,6 +317,44 @@ export default {
             const connected = this.currentSession.status === "connected";
             return connected ? this.$t("izapiaSessionStatusConnected") : this.$t("izapiaSessionStatusDisconnected");
         },
+
+        /**
+         * Other already-configured iZapia notifications, offered as a
+         * shortcut to reuse their API key + connected session instead of
+         * entering/pairing one from scratch. The API key is already sent to
+         * the browser in cleartext for every notification in the list
+         * (same exposure as editing any of them individually), so this is
+         * purely a client-side convenience, no new backend surface.
+         * @returns {{id: number, label: string, izapiaApiKey: string, izapiaSessionId: string}[]} Reusable connections.
+         */
+        reusableConnections() {
+            return this.$root.notificationList
+                .filter((n) => n.id !== this.id)
+                .map((n) => {
+                    try {
+                        const cfg = JSON.parse(n.config);
+                        return cfg.type === "izapia" && cfg.izapiaApiKey && cfg.izapiaSessionId
+                            ? { id: n.id, label: `${n.name} (${cfg.izapiaSessionId})`, ...cfg }
+                            : null;
+                    } catch (e) {
+                        return null;
+                    }
+                })
+                .filter(Boolean);
+        },
+
+        canProceedWizard() {
+            if (this.wizardStep === 1) {
+                return !!this.notification.izapiaApiKey;
+            }
+            if (this.wizardStep === 2) {
+                return !!this.notification.izapiaSessionId;
+            }
+            if (this.wizardStep === 3) {
+                return this.notification.izapiaGroupIds.length > 0 || this.notification.izapiaContacts.length > 0;
+            }
+            return true;
+        },
     },
 
     mounted() {
@@ -290,7 +364,19 @@ export default {
         if (this.id) {
             const existing = this.$root.notificationList.find((n) => n.id === this.id);
             if (existing) {
-                this.notification = { ...this.notification, ...JSON.parse(existing.config), applyExisting: false };
+                const cfg = JSON.parse(existing.config);
+                // Migrate notifications saved before multi-recipient support
+                // (single izapiaRecipient/izapiaRecipientType) into the new
+                // array fields, transparently -- the next Save writes the
+                // new shape.
+                if (!cfg.izapiaGroupIds && !cfg.izapiaContacts && cfg.izapiaRecipient) {
+                    if (cfg.izapiaRecipientType === "group") {
+                        cfg.izapiaGroupIds = [cfg.izapiaRecipient];
+                    } else {
+                        cfg.izapiaContacts = [cfg.izapiaRecipient];
+                    }
+                }
+                this.notification = { ...this.notification, ...cfg, applyExisting: false };
             }
         }
 
@@ -304,6 +390,26 @@ export default {
     },
 
     methods: {
+        /**
+         * Whether wizard step `n`'s section should render -- always true
+         * when editing an existing notification (everything shown at
+         * once), or only for the current step while creating a new one.
+         * @param {number} n Step number (1-4).
+         * @returns {boolean} True if the section for step n should render.
+         */
+        showStep(n) {
+            return !!this.id || this.wizardStep === n;
+        },
+
+        /**
+         * i18n key for a wizard step's progress-indicator label.
+         * @param {number} step Step number (1-4).
+         * @returns {string} Translation key.
+         */
+        wizardStepLabelKey(step) {
+            return WIZARD_STEP_LABEL_KEYS[step - 1];
+        },
+
         /**
          * Fetch the tenant's tag list for the "auto-attach" dropdown.
          * @returns {void}
@@ -339,6 +445,59 @@ export default {
                     }
                 }
             );
+        },
+
+        /**
+         * Toggles a group's membership in the selected-recipients list.
+         * @param {string} groupId The WhatsApp group id.
+         * @returns {void}
+         */
+        toggleGroup(groupId) {
+            const idx = this.notification.izapiaGroupIds.indexOf(groupId);
+            if (idx === -1) {
+                this.notification.izapiaGroupIds.push(groupId);
+            } else {
+                this.notification.izapiaGroupIds.splice(idx, 1);
+            }
+        },
+
+        /**
+         * Adds the pending contact input to the recipients list.
+         * @returns {void}
+         */
+        addContact() {
+            const value = this.newContact.trim();
+            if (value && !this.notification.izapiaContacts.includes(value)) {
+                this.notification.izapiaContacts.push(value);
+            }
+            this.newContact = "";
+        },
+
+        /**
+         * Removes a contact from the recipients list by index.
+         * @param {number} index Index into notification.izapiaContacts.
+         * @returns {void}
+         */
+        removeContact(index) {
+            this.notification.izapiaContacts.splice(index, 1);
+        },
+
+        /**
+         * Prefills the API key + already-connected session from another
+         * saved iZapia notification, then jumps straight to the channels
+         * step since the connection is already known-good.
+         * @param {Event} event The select's native change event.
+         * @returns {void}
+         */
+        onReuseConnectionPicked(event) {
+            const picked = this.reusableConnections.find((item) => String(item.id) === event.target.value);
+            if (!picked) {
+                return;
+            }
+            this.notification.izapiaApiKey = picked.izapiaApiKey;
+            this.notification.izapiaSessionId = picked.izapiaSessionId;
+            this.refreshCurrentSession();
+            this.wizardStep = 3;
         },
 
         /**
@@ -595,5 +754,65 @@ export default {
 .izapia-preview-section {
     position: sticky;
     top: 1rem;
+}
+
+.izapia-wizard-steps {
+    display: flex;
+    gap: 0.5rem;
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0 1.5rem;
+
+    li {
+        flex: 1;
+        text-align: center;
+        padding: 0.4rem 0.5rem;
+        border-radius: 0.5rem;
+        font-size: 0.8rem;
+        background: rgba(0, 0, 0, 0.04);
+        color: rgba(0, 0, 0, 0.5);
+
+        .dark & {
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        &.done {
+            background: rgba(37, 211, 102, 0.15);
+            color: #128c7e;
+        }
+
+        &.active {
+            background: #25d366;
+            color: #fff;
+            font-weight: 600;
+        }
+    }
+}
+
+.izapia-contact-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.izapia-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 1rem;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.85rem;
+
+    .dark & {
+        background: rgba(255, 255, 255, 0.1);
+    }
+}
+
+.izapia-chip-remove {
+    color: inherit;
+    text-decoration: none;
+    font-weight: bold;
 }
 </style>
