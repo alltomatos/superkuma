@@ -71,6 +71,82 @@ describe("Izapia.renderMessage()", () => {
     });
 });
 
+describe("Izapia.renderMessage() with {statusEmoji}", () => {
+    const provider = new Izapia();
+    const monitorJSON = { name: "API Principal" };
+
+    test("maps each status to its emoji", () => {
+        const notification = { izapiaTemplateBody: "{statusEmoji} {status}" };
+        assert.strictEqual(
+            provider.renderMessage(notification, "x", monitorJSON, { status: 0 }),
+            "🔴 Down"
+        );
+        assert.strictEqual(provider.renderMessage(notification, "x", monitorJSON, { status: 1 }), "✅ Up");
+    });
+});
+
+describe("Izapia.buildButtons()", () => {
+    const provider = new Izapia();
+    const activeMonitor = { id: 42, active: true };
+    const inactiveMonitor = { id: 42, active: false };
+    const defaultLabels = { pause: "Pausar monitor", resume: "Retomar monitor", ack: "OK, ciente" };
+
+    test("includes pause + ack by default, choosing pause/resume by monitor.active", () => {
+        assert.deepStrictEqual(provider.buildButtons({}, activeMonitor, defaultLabels), [
+            { id: "pause:42", kind: "quick_reply", label: "Pausar monitor" },
+            { id: "ack:42", kind: "quick_reply", label: "OK, ciente" },
+        ]);
+        assert.deepStrictEqual(provider.buildButtons({}, inactiveMonitor, defaultLabels), [
+            { id: "resume:42", kind: "quick_reply", label: "Retomar monitor" },
+            { id: "ack:42", kind: "quick_reply", label: "OK, ciente" },
+        ]);
+    });
+
+    test("omits the pause/resume button when toggled off", () => {
+        const notification = { izapiaShowPauseResumeButton: false };
+        assert.deepStrictEqual(provider.buildButtons(notification, activeMonitor, defaultLabels), [
+            { id: "ack:42", kind: "quick_reply", label: "OK, ciente" },
+        ]);
+    });
+
+    test("omits the ack button when toggled off", () => {
+        const notification = { izapiaShowAckButton: false };
+        assert.deepStrictEqual(provider.buildButtons(notification, activeMonitor, defaultLabels), [
+            { id: "pause:42", kind: "quick_reply", label: "Pausar monitor" },
+        ]);
+    });
+
+    test("returns an empty array when both are toggled off", () => {
+        const notification = { izapiaShowPauseResumeButton: false, izapiaShowAckButton: false };
+        assert.deepStrictEqual(provider.buildButtons(notification, activeMonitor, defaultLabels), []);
+    });
+
+    test("uses custom labels when resolved from the notification config", () => {
+        const labels = { pause: "⏸️ Pausar", resume: "▶️ Retomar", ack: "👍 Ciente" };
+        assert.deepStrictEqual(provider.buildButtons({}, activeMonitor, labels), [
+            { id: "pause:42", kind: "quick_reply", label: "⏸️ Pausar" },
+            { id: "ack:42", kind: "quick_reply", label: "👍 Ciente" },
+        ]);
+    });
+});
+
+describe("Izapia.resolveButtonLabels()", () => {
+    test("falls back to defaults when nothing is customized", () => {
+        assert.deepStrictEqual(Izapia.resolveButtonLabels({}), {
+            pause: "Pausar monitor",
+            resume: "Retomar monitor",
+            ack: "OK, ciente",
+        });
+    });
+
+    test("uses each customized label independently", () => {
+        assert.deepStrictEqual(
+            Izapia.resolveButtonLabels({ izapiaPauseLabel: "⏸️ Pausar", izapiaAckLabel: "👍 Ciente" }),
+            { pause: "⏸️ Pausar", resume: "Retomar monitor", ack: "👍 Ciente" }
+        );
+    });
+});
+
 describe("izapia-callback-helpers.verifySignature()", () => {
     const secret = "test-secret";
     const rawBody = Buffer.from(JSON.stringify({ sid: "abc" }));

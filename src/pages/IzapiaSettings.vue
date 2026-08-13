@@ -227,9 +227,102 @@
                         ></HiddenInput>
                     </div>
 
+                    <!-- Interactive button customization -->
+                    <div v-if="notification.izapiaEnableInteractive" class="izapia-button-config mb-3">
+                        <label class="form-label mb-2">{{ $t("izapiaButtonsConfig") }}</label>
+
+                        <div class="izapia-button-row mb-2">
+                            <div class="form-check form-switch mb-1">
+                                <input
+                                    id="izapia-show-pause-resume"
+                                    v-model="notification.izapiaShowPauseResumeButton"
+                                    class="form-check-input"
+                                    type="checkbox"
+                                />
+                                <label for="izapia-show-pause-resume" class="form-check-label">
+                                    {{ $t("izapiaPauseResumeButton") }}
+                                </label>
+                            </div>
+                            <div v-if="notification.izapiaShowPauseResumeButton" class="d-flex gap-2">
+                                <input
+                                    v-model="notification.izapiaPauseLabel"
+                                    type="text"
+                                    class="form-control"
+                                    :placeholder="'Pausar monitor'"
+                                />
+                                <input
+                                    v-model="notification.izapiaResumeLabel"
+                                    type="text"
+                                    class="form-control"
+                                    :placeholder="'Retomar monitor'"
+                                />
+                            </div>
+                        </div>
+
+                        <div class="izapia-button-row">
+                            <div class="form-check form-switch mb-1">
+                                <input
+                                    id="izapia-show-ack"
+                                    v-model="notification.izapiaShowAckButton"
+                                    class="form-check-input"
+                                    type="checkbox"
+                                />
+                                <label for="izapia-show-ack" class="form-check-label">
+                                    {{ $t("izapiaAckButton") }}
+                                </label>
+                            </div>
+                            <input
+                                v-if="notification.izapiaShowAckButton"
+                                v-model="notification.izapiaAckLabel"
+                                type="text"
+                                class="form-control"
+                                :placeholder="'OK, ciente'"
+                            />
+                        </div>
+                        <div class="form-text">{{ $t("izapiaButtonsConfigHelp") }}</div>
+                    </div>
+
                     <div class="mb-3">
-                        <label class="form-label">{{ $t("izapiaTemplateBody") }}</label>
-                        <textarea v-model="notification.izapiaTemplateBody" class="form-control" rows="4"></textarea>
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <label class="form-label mb-0">{{ $t("izapiaTemplateBody") }}</label>
+                            <div class="d-flex gap-2">
+                                <select
+                                    v-if="savedTemplateNames.length > 0"
+                                    class="form-select form-select-sm"
+                                    style="width: auto"
+                                    @change="loadSavedTemplate($event)"
+                                >
+                                    <option value="">{{ $t("izapiaLoadSavedTemplate") }}</option>
+                                    <option v-for="name in savedTemplateNames" :key="name" :value="name">
+                                        {{ name }}
+                                    </option>
+                                </select>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-primary text-nowrap"
+                                    @click="saveCurrentTemplate"
+                                >
+                                    {{ $t("izapiaSaveTemplateAs") }}
+                                </button>
+                            </div>
+                        </div>
+                        <textarea
+                            ref="templateTextarea"
+                            v-model="notification.izapiaTemplateBody"
+                            class="form-control mt-2"
+                            rows="4"
+                        ></textarea>
+                        <div class="izapia-placeholder-chips mt-2">
+                            <button
+                                v-for="ph in availablePlaceholders"
+                                :key="ph"
+                                type="button"
+                                class="izapia-placeholder-chip"
+                                @click="insertPlaceholder(ph)"
+                            >
+                                {{ ph }}
+                            </button>
+                        </div>
                         <div class="form-text">
                             {{ $t("izapiaTemplateBodyHelp", ["{monitorName}", "{status}", "{msg}"]) }}
                         </div>
@@ -277,6 +370,10 @@
                     <IzapiaPhonePreview
                         :template="notification.izapiaTemplateBody"
                         :interactive="notification.izapiaEnableInteractive"
+                        :show-pause-resume-button="notification.izapiaShowPauseResumeButton"
+                        :show-ack-button="notification.izapiaShowAckButton"
+                        :custom-pause-label="notification.izapiaPauseLabel"
+                        :custom-ack-label="notification.izapiaAckLabel"
                     />
                 </div>
             </div>
@@ -331,10 +428,17 @@ export default {
                 izapiaAutoAttachTagId: null,
                 izapiaEnableInteractive: false,
                 izapiaWebhookSecret: "",
+                izapiaShowPauseResumeButton: true,
+                izapiaPauseLabel: "",
+                izapiaResumeLabel: "",
+                izapiaShowAckButton: true,
+                izapiaAckLabel: "",
                 izapiaTemplateBody: DEFAULT_TEMPLATE,
                 isDefault: false,
                 applyExisting: false,
             },
+
+            savedTemplateNames: [],
 
             tags: [],
             groups: [],
@@ -362,6 +466,15 @@ export default {
     },
 
     computed: {
+        /**
+         * Every placeholder the alert-message template understands, shown as
+         * click-to-insert chips next to the textarea.
+         * @returns {string[]} Placeholder tokens, e.g. "{monitorName}".
+         */
+        availablePlaceholders() {
+            return ["{monitorName}", "{status}", "{statusEmoji}", "{time}", "{msg}"];
+        },
+
         sessionStatusDisplay() {
             if (!this.currentSession) {
                 return null;
@@ -429,6 +542,7 @@ export default {
     mounted() {
         this.id = this.$route.params.id ? parseInt(this.$route.params.id, 10) : null;
         this.loadTags();
+        this.loadSavedTemplateNames();
 
         if (this.id) {
             const existing = this.$root.notificationList.find((n) => n.id === this.id);
@@ -481,6 +595,87 @@ export default {
          */
         wizardStepLabelKey(step) {
             return WIZARD_STEP_LABEL_KEYS[step - 1];
+        },
+
+        /**
+         * Inserts a placeholder token at the textarea's current cursor
+         * position (replacing any selection), then restores focus so the
+         * user can keep typing right after it.
+         * @param {string} placeholder Token to insert, e.g. "{statusEmoji}".
+         * @returns {void}
+         */
+        insertPlaceholder(placeholder) {
+            const textarea = this.$refs.templateTextarea;
+            const body = this.notification.izapiaTemplateBody || "";
+            if (!textarea) {
+                this.notification.izapiaTemplateBody = body + placeholder;
+                return;
+            }
+            const start = textarea.selectionStart ?? body.length;
+            const end = textarea.selectionEnd ?? body.length;
+            this.notification.izapiaTemplateBody = body.slice(0, start) + placeholder + body.slice(end);
+            this.$nextTick(() => {
+                textarea.focus();
+                const caret = start + placeholder.length;
+                textarea.setSelectionRange(caret, caret);
+            });
+        },
+
+        /**
+         * Loads the list of saved template names from localStorage (shared
+         * across every iZapia notification in this browser, so a template
+         * built for one alert can be reused on another).
+         * @returns {void}
+         */
+        loadSavedTemplateNames() {
+            this.savedTemplateNames = Object.keys(this.readSavedTemplates()).sort();
+        },
+
+        /**
+         * Reads the saved-templates map from localStorage.
+         * @returns {{[key: string]: string}} Map of template name to body.
+         */
+        readSavedTemplates() {
+            try {
+                return JSON.parse(localStorage.getItem("izapiaSavedTemplates") || "{}");
+            } catch (e) {
+                return {};
+            }
+        },
+
+        /**
+         * Prompts for a name and saves the current template body under it,
+         * available to load again from any iZapia notification in this browser.
+         * @returns {void}
+         */
+        saveCurrentTemplate() {
+            const name = window.prompt(this.$t("izapiaSaveTemplatePrompt"));
+            if (!name || !name.trim()) {
+                return;
+            }
+            const templates = this.readSavedTemplates();
+            templates[name.trim()] = this.notification.izapiaTemplateBody || "";
+            localStorage.setItem("izapiaSavedTemplates", JSON.stringify(templates));
+            this.loadSavedTemplateNames();
+            this.$root.toastRes({ ok: true, msg: this.$t("izapiaTemplateSaved", [name.trim()]) });
+        },
+
+        /**
+         * Loads a saved template's body into the current notification,
+         * replacing whatever is in the textarea.
+         * @param {Event} event The select's native change event.
+         * @returns {void}
+         */
+        loadSavedTemplate(event) {
+            const name = event.target.value;
+            if (!name) {
+                return;
+            }
+            const templates = this.readSavedTemplates();
+            if (templates[name] !== undefined) {
+                this.notification.izapiaTemplateBody = templates[name];
+            }
+            event.target.value = "";
         },
 
         /**
@@ -955,5 +1150,49 @@ export default {
     color: inherit;
     text-decoration: none;
     font-weight: bold;
+}
+
+.izapia-placeholder-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.izapia-placeholder-chip {
+    background: rgba(37, 211, 102, 0.12);
+    border: 1px solid rgba(37, 211, 102, 0.4);
+    border-radius: 1rem;
+    padding: 0.15rem 0.6rem;
+    font-size: 0.8rem;
+    font-family: monospace;
+    color: #128c7e;
+    cursor: pointer;
+
+    .dark & {
+        color: #25d366;
+        background: rgba(37, 211, 102, 0.18);
+    }
+
+    &:hover {
+        background: rgba(37, 211, 102, 0.25);
+    }
+}
+
+.izapia-button-config {
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    background: rgba(0, 0, 0, 0.03);
+
+    .dark & {
+        background: rgba(255, 255, 255, 0.06);
+    }
+}
+
+.izapia-button-row {
+    &:not(:last-child) {
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+    }
 }
 </style>
