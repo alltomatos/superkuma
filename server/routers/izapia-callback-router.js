@@ -5,6 +5,7 @@ const { log } = require("../../src/util");
 const { SuperKumaServer } = require("../superkuma-server");
 const { verifySignature, extractButtonReplyId, extractQuotedReply } = require("../izapia-callback-helpers");
 const { izapiaWebhookRateLimiter } = require("../rate-limiter");
+const { resolveButtonLabels } = require("../notification-providers/izapia");
 
 /**
  * Receives interactive-message webhook deliveries from IZAPIA (button clicks
@@ -38,21 +39,25 @@ const { izapiaWebhookRateLimiter } = require("../rate-limiter");
  */
 
 /**
- * Maps a button's label text to its action, tolerant of the exact strings
- * server/notification-providers/izapia.js sends ("Pausar monitor", "Retomar
- * monitor", "OK, ciente").
+ * Maps a button's label text to its action, matched against that
+ * notification's OWN effective labels -- izapia.js's resolveButtonLabels()
+ * falls back to the same defaults ("Pausar monitor", "Retomar monitor",
+ * "OK, ciente") this used to hardcode, so a never-customized notification
+ * still matches exactly as before; a customized one matches its own text.
  * @param {string} text Reply text (the tapped button's label).
+ * @param {object} notificationConfig The matched notification's config.
  * @returns {?string} "pause" | "resume" | "ack", or null if unrecognized.
  */
-function actionFromLabel(text) {
+function actionFromLabel(text, notificationConfig) {
     const normalized = (text || "").trim().toLowerCase();
-    if (normalized.includes("pausar")) {
+    const labels = resolveButtonLabels(notificationConfig || {});
+    if (normalized.includes(labels.pause.trim().toLowerCase())) {
         return "pause";
     }
-    if (normalized.includes("retomar")) {
+    if (normalized.includes(labels.resume.trim().toLowerCase())) {
         return "resume";
     }
-    if (normalized.includes("ciente")) {
+    if (normalized.includes(labels.ack.trim().toLowerCase())) {
         return "ack";
     }
     return null;
@@ -123,7 +128,7 @@ router.post("/api/izapia/callback", rawBodyParser, async (request, response) => 
                 [quoted.quotedMessageId, matchedNotification.id]
             );
             if (pendingActionRow) {
-                action = actionFromLabel(quoted.text);
+                action = actionFromLabel(quoted.text, matchedNotification.config);
                 monitorID = pendingActionRow.monitor_id;
             }
         }
