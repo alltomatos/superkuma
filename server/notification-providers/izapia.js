@@ -18,6 +18,27 @@ function extractMessageId(response) {
 }
 
 const STATUS_TEXT = { 0: "Down", 1: "Up", 2: "Pending", 3: "Maintenance" };
+const STATUS_EMOJI = { 0: "🔴", 1: "✅", 2: "🟡", 3: "🔧" };
+
+const DEFAULT_PAUSE_LABEL = "Pausar monitor";
+const DEFAULT_RESUME_LABEL = "Retomar monitor";
+const DEFAULT_ACK_LABEL = "OK, ciente";
+
+/**
+ * Resolves the effective interactive-button labels for a notification,
+ * falling back to the shipped defaults for any field the user hasn't
+ * customized (izapia-callback-router.js needs these same fallbacks to match
+ * a tapped button's reply text back to an action).
+ * @param {object} notification The IZAPIA notification config.
+ * @returns {{pause: string, resume: string, ack: string}} Effective labels.
+ */
+function resolveButtonLabels(notification) {
+    return {
+        pause: notification.izapiaPauseLabel || DEFAULT_PAUSE_LABEL,
+        resume: notification.izapiaResumeLabel || DEFAULT_RESUME_LABEL,
+        ack: notification.izapiaAckLabel || DEFAULT_ACK_LABEL,
+    };
+}
 
 class Izapia extends NotificationProvider {
     name = "izapia";
@@ -43,6 +64,7 @@ class Izapia extends NotificationProvider {
         const replacements = {
             "{monitorName}": monitorJSON.name || "",
             "{status}": STATUS_TEXT[heartbeatJSON.status] ?? "Unknown",
+            "{statusEmoji}": STATUS_EMOJI[heartbeatJSON.status] ?? "",
             "{time}": heartbeatJSON.localDateTime || heartbeatJSON.time || "",
             "{msg}": heartbeatJSON.msg || "",
         };
@@ -334,6 +356,29 @@ class Izapia extends NotificationProvider {
     }
 
     /**
+     * Builds the interactive quick-reply buttons for an outbound message,
+     * honoring each button's show/hide toggle and custom label.
+     * @param {object} notification The IZAPIA notification config.
+     * @param {object} monitorJSON Monitor details (for the pause/resume toggle + button ids).
+     * @param {{pause: string, resume: string, ack: string}} labels Effective button labels.
+     * @returns {object[]} Quick-reply button definitions, possibly empty.
+     */
+    buildButtons(notification, monitorJSON, labels) {
+        const buttons = [];
+        if (notification.izapiaShowPauseResumeButton !== false) {
+            buttons.push(
+                monitorJSON.active
+                    ? { id: `pause:${monitorJSON.id}`, kind: "quick_reply", label: labels.pause }
+                    : { id: `resume:${monitorJSON.id}`, kind: "quick_reply", label: labels.resume }
+            );
+        }
+        if (notification.izapiaShowAckButton !== false) {
+            buttons.push({ id: `ack:${monitorJSON.id}`, kind: "quick_reply", label: labels.ack });
+        }
+        return buttons;
+    }
+
+    /**
      * @inheritdoc
      */
     async send(notification, msg, monitorJSON = null, heartbeatJSON = null) {
@@ -353,17 +398,14 @@ class Izapia extends NotificationProvider {
 
         const baseUrl = (notification.izapiaApiUrl || "https://api.izapia.com").replace(/\/+$/, "");
         const sid = notification.izapiaSessionId;
-        const useInteractive = notification.izapiaEnableInteractive && monitorJSON && monitorJSON.id;
         const text = this.renderMessage(notification, msg, monitorJSON, heartbeatJSON);
-
-        const buttons = useInteractive
-            ? [
-                  monitorJSON.active
-                      ? { id: `pause:${monitorJSON.id}`, kind: "quick_reply", label: "Pausar monitor" }
-                      : { id: `resume:${monitorJSON.id}`, kind: "quick_reply", label: "Retomar monitor" },
-                  { id: `ack:${monitorJSON.id}`, kind: "quick_reply", label: "OK, ciente" },
-              ]
-            : null;
+        const buttonLabels = resolveButtonLabels(notification);
+        const wantsInteractive = notification.izapiaEnableInteractive && monitorJSON && monitorJSON.id;
+        const buttons = wantsInteractive ? this.buildButtons(notification, monitorJSON, buttonLabels) : [];
+        // Both buttons can be individually toggled off -- if that leaves none,
+        // send a plain text message instead of an "interactive" one with an
+        // empty button list.
+        const useInteractive = wantsInteractive && buttons.length > 0;
 
         let sent = 0;
         let lastError = null;
@@ -397,3 +439,4 @@ class Izapia extends NotificationProvider {
 
 module.exports = Izapia;
 module.exports.extractMessageId = extractMessageId;
+module.exports.resolveButtonLabels = resolveButtonLabels;

@@ -12,8 +12,10 @@
                     <div class="izapia-bubble-time">10:24</div>
                 </div>
                 <div v-if="interactive" class="izapia-buttons">
-                    <button type="button" class="izapia-button" disabled>{{ pauseLabel }}</button>
-                    <button type="button" class="izapia-button" disabled>{{ ackLabel }}</button>
+                    <button v-if="showPauseResumeButton" type="button" class="izapia-button" disabled>
+                        {{ pauseLabel }}
+                    </button>
+                    <button v-if="showAckButton" type="button" class="izapia-button" disabled>{{ ackLabel }}</button>
                 </div>
             </div>
         </div>
@@ -31,6 +33,22 @@ export default {
             type: Boolean,
             default: false,
         },
+        showPauseResumeButton: {
+            type: Boolean,
+            default: true,
+        },
+        showAckButton: {
+            type: Boolean,
+            default: true,
+        },
+        customPauseLabel: {
+            type: String,
+            default: "",
+        },
+        customAckLabel: {
+            type: String,
+            default: "",
+        },
     },
 
     computed: {
@@ -38,6 +56,7 @@ export default {
             const sample = {
                 "{monitorName}": "API Principal",
                 "{status}": "Down",
+                "{statusEmoji}": "🔴",
                 "{time}": "10:24",
                 "{msg}": "Connection refused",
             };
@@ -49,11 +68,11 @@ export default {
         },
 
         pauseLabel() {
-            return this.$t("izapiaPauseButtonLabel");
+            return this.customPauseLabel || this.$t("izapiaPauseButtonLabel");
         },
 
         ackLabel() {
-            return this.$t("izapiaAckButtonLabel");
+            return this.customAckLabel || this.$t("izapiaAckButtonLabel");
         },
     },
 };
