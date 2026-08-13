@@ -14,6 +14,7 @@
                 :margin="[10, 10]"
                 :is-draggable="false"
                 :is-resizable="false"
+                :vertical-compact="false"
             >
                 <GridItem
                     v-for="item in layout"

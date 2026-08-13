@@ -17,8 +17,41 @@ function extractMessageId(response) {
     return typeof id === "string" && id.length > 0 ? id : null;
 }
 
+const STATUS_TEXT = { 0: "Down", 1: "Up", 2: "Pending", 3: "Maintenance" };
+
 class Izapia extends NotificationProvider {
     name = "izapia";
+
+    /**
+     * Renders the notification's custom message template (izapiaTemplateBody),
+     * substituting {monitorName}/{status}/{time}/{msg} -- same placeholders
+     * and sample values as IzapiaPhonePreview.vue's editor preview. Falls back
+     * to the generic `msg` SuperKuma already built (e.g. for testNotification,
+     * which has no monitor/heartbeat context) when there's no template or no
+     * monitor/heartbeat to render it against.
+     * @param {object} notification The IZAPIA notification config.
+     * @param {string} msg The generic "[monitor] [status] msg" fallback text.
+     * @param {?object} monitorJSON Monitor details, if this is a real up/down alert.
+     * @param {?object} heartbeatJSON Heartbeat details, if this is a real up/down alert.
+     * @returns {string} The text to actually send.
+     */
+    renderMessage(notification, msg, monitorJSON, heartbeatJSON) {
+        const template = notification.izapiaTemplateBody;
+        if (!template || !monitorJSON || !heartbeatJSON) {
+            return msg;
+        }
+        const replacements = {
+            "{monitorName}": monitorJSON.name || "",
+            "{status}": STATUS_TEXT[heartbeatJSON.status] ?? "Unknown",
+            "{time}": heartbeatJSON.localDateTime || heartbeatJSON.time || "",
+            "{msg}": heartbeatJSON.msg || "",
+        };
+        let text = template;
+        for (const [placeholder, value] of Object.entries(replacements)) {
+            text = text.split(placeholder).join(value);
+        }
+        return text;
+    }
 
     /**
      * Normalizes a recipient into a WhatsApp JID based on its type.
@@ -321,6 +354,7 @@ class Izapia extends NotificationProvider {
         const baseUrl = (notification.izapiaApiUrl || "https://api.izapia.com").replace(/\/+$/, "");
         const sid = notification.izapiaSessionId;
         const useInteractive = notification.izapiaEnableInteractive && monitorJSON && monitorJSON.id;
+        const text = this.renderMessage(notification, msg, monitorJSON, heartbeatJSON);
 
         const buttons = useInteractive
             ? [
@@ -338,11 +372,11 @@ class Izapia extends NotificationProvider {
             try {
                 if (useInteractive) {
                     const url = `${baseUrl}/api/v1/sessions/${sid}/messages/interactive`;
-                    const response = await axios.post(url, { to, body: msg, buttons }, config);
+                    const response = await axios.post(url, { to, body: text, buttons }, config);
                     await this.recordPendingAction(response, notification, monitorJSON);
                 } else {
                     const url = `${baseUrl}/api/v1/sessions/${sid}/messages/text`;
-                    await axios.post(url, { to, text: msg }, config);
+                    await axios.post(url, { to, text }, config);
                 }
                 sent++;
             } catch (error) {
