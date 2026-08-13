@@ -41,6 +41,36 @@ describe("Izapia.resolveJid()", () => {
     });
 });
 
+describe("Izapia.renderMessage()", () => {
+    const provider = new Izapia();
+    const monitorJSON = { name: "API Principal" };
+    const heartbeatJSON = { status: 0, msg: "Connection refused", localDateTime: "2026-08-12 22:23:15" };
+
+    test("substitutes {monitorName}/{status}/{time}/{msg} from a custom template", () => {
+        const notification = { izapiaTemplateBody: "Situação: [{status}]\nAtivo: {monitorName}\nMensagem: {msg}" };
+        const text = provider.renderMessage(notification, "fallback", monitorJSON, heartbeatJSON);
+        assert.strictEqual(text, "Situação: [Down]\nAtivo: API Principal\nMensagem: Connection refused");
+    });
+
+    test("falls back to the generic msg when there is no template", () => {
+        const text = provider.renderMessage({}, "fallback msg", monitorJSON, heartbeatJSON);
+        assert.strictEqual(text, "fallback msg");
+    });
+
+    test("falls back to the generic msg when there is no monitor/heartbeat context (e.g. testNotification)", () => {
+        const notification = { izapiaTemplateBody: "Ativo: {monitorName}" };
+        assert.strictEqual(provider.renderMessage(notification, "IZapia Testing", null, null), "IZapia Testing");
+    });
+
+    test("maps every status code to its template text", () => {
+        const notification = { izapiaTemplateBody: "{status}" };
+        assert.strictEqual(provider.renderMessage(notification, "x", monitorJSON, { status: 0 }), "Down");
+        assert.strictEqual(provider.renderMessage(notification, "x", monitorJSON, { status: 1 }), "Up");
+        assert.strictEqual(provider.renderMessage(notification, "x", monitorJSON, { status: 2 }), "Pending");
+        assert.strictEqual(provider.renderMessage(notification, "x", monitorJSON, { status: 3 }), "Maintenance");
+    });
+});
+
 describe("izapia-callback-helpers.verifySignature()", () => {
     const secret = "test-secret";
     const rawBody = Buffer.from(JSON.stringify({ sid: "abc" }));

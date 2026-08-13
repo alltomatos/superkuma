@@ -39,7 +39,7 @@
             :margin="[10, 10]"
             :is-draggable="true"
             :is-resizable="true"
-            :vertical-compact="true"
+            :vertical-compact="false"
             :use-css-transforms="true"
             @layout-updated="onLayoutUpdated"
         >
