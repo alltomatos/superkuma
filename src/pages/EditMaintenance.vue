@@ -65,6 +65,31 @@
                                 </VueMultiselect>
                             </div>
 
+                            <!-- Affected Tags -->
+                            <h2 class="mt-5">{{ $t("Affected Tags") }}</h2>
+
+                            <div class="my-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="form-text">{{ $t("affectedTagsDescription") }}</div>
+                                </div>
+
+                                <VueMultiselect
+                                    id="affected_tags"
+                                    v-model="selectedTags"
+                                    :options="tagOptions"
+                                    track-by="id"
+                                    label="name"
+                                    :multiple="true"
+                                    :close-on-select="false"
+                                    :clear-on-select="false"
+                                    :preserve-search="true"
+                                    :placeholder="$t('Pick Affected Tags...')"
+                                    :preselect-first="false"
+                                    :max-height="600"
+                                    :taggable="false"
+                                ></VueMultiselect>
+                            </div>
+
                             <!-- Status pages to display maintenance info on -->
                             <h2 class="mt-5">{{ $t("Status Pages") }}</h2>
                             {{ $t("affectedStatusPages") }}
@@ -463,6 +488,8 @@ export default {
             maintenance: {},
             affectedMonitors: [],
             affectedMonitorsOptions: [],
+            selectedTags: [],
+            tagOptions: [],
             showOnAllPages: false,
             selectedStatusPages: [],
             dark: this.$root.theme === "dark",
@@ -594,7 +621,7 @@ export default {
          * @returns {boolean} True if maintenance has monitors
          */
         hasMonitors() {
-            return this.affectedMonitors.length > 0;
+            return this.affectedMonitors.length > 0 || this.selectedTags.length > 0;
         },
 
         /**
@@ -668,6 +695,14 @@ export default {
             }
             this.init();
         });
+
+        this.$root.getSocket().emit("getTags", (res) => {
+            if (res.ok) {
+                this.tagOptions = res.tags;
+            } else {
+                this.$root.toastError(res.msg);
+            }
+        });
     },
     methods: {
         /**
@@ -676,6 +711,7 @@ export default {
          */
         init() {
             this.affectedMonitors = [];
+            this.selectedTags = [];
             this.selectedStatusPages = [];
 
             if (this.isAdd) {
@@ -731,6 +767,20 @@ export default {
                                     this.affectedMonitors.push(
                                         this.affectedMonitorsOptions.find((item) => item.id === monitor.id)
                                     );
+                                });
+                            } else {
+                                this.$root.toastError(res.msg);
+                            }
+                        });
+
+                        this.$root.getSocket().emit("getMaintenanceTag", this.$route.params.id, (res) => {
+                            if (res.ok) {
+                                Object.values(res.tags).map((tag) => {
+                                    this.selectedTags.push({
+                                        id: tag.id,
+                                        name: tag.name,
+                                        color: tag.color,
+                                    });
                                 });
                             } else {
                                 this.$root.toastError(res.msg);
@@ -831,11 +881,13 @@ export default {
                 this.$root.addMaintenance(this.maintenance, async (res) => {
                     if (res.ok) {
                         await this.addMonitorMaintenance(res.maintenanceID, async () => {
-                            await this.addMaintenanceStatusPage(res.maintenanceID, () => {
-                                this.$root.toastRes(res);
-                                this.processing = false;
-                                this.$root.getMaintenanceList();
-                                this.$router.push("/maintenance");
+                            await this.addMaintenanceTag(res.maintenanceID, async () => {
+                                await this.addMaintenanceStatusPage(res.maintenanceID, () => {
+                                    this.$root.toastRes(res);
+                                    this.processing = false;
+                                    this.$root.getMaintenanceList();
+                                    this.$router.push("/maintenance");
+                                });
                             });
                         });
                     } else {
@@ -847,11 +899,13 @@ export default {
                 this.$root.getSocket().emit("editMaintenance", this.maintenance, async (res) => {
                     if (res.ok) {
                         await this.addMonitorMaintenance(res.maintenanceID, async () => {
-                            await this.addMaintenanceStatusPage(res.maintenanceID, () => {
-                                this.processing = false;
-                                this.$root.toastRes(res);
-                                this.init();
-                                this.$router.push("/maintenance");
+                            await this.addMaintenanceTag(res.maintenanceID, async () => {
+                                await this.addMaintenanceStatusPage(res.maintenanceID, () => {
+                                    this.processing = false;
+                                    this.$root.toastRes(res);
+                                    this.init();
+                                    this.$router.push("/maintenance");
+                                });
                             });
                         });
                     } else {
@@ -870,6 +924,24 @@ export default {
          */
         async addMonitorMaintenance(maintenanceID, callback) {
             await this.$root.addMonitorMaintenance(maintenanceID, this.affectedMonitors, async (res) => {
+                if (!res.ok) {
+                    this.$root.toastError(res.msg);
+                } else {
+                    this.$root.getMonitorList();
+                }
+
+                callback();
+            });
+        },
+
+        /**
+         * Add tags to maintenance
+         * @param {number} maintenanceID ID of maintenance to modify
+         * @param {socketCB} callback Callback for socket response
+         * @returns {Promise<void>}
+         */
+        async addMaintenanceTag(maintenanceID, callback) {
+            await this.$root.addMaintenanceTag(maintenanceID, this.selectedTags, async (res) => {
                 if (!res.ok) {
                     this.$root.toastError(res.msg);
                 } else {

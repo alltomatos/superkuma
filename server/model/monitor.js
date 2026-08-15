@@ -1596,12 +1596,19 @@ class Monitor extends BeanModel {
      * @returns {Promise<boolean>} Is the monitor under maintenance
      */
     static async isUnderMaintenance(monitorID) {
+        // Resolved live against monitor_tag rather than materialized, so a
+        // monitor tagged (or untagged) after the maintenance window was
+        // created is covered (or dropped) automatically.
         const maintenanceIDList = await R.getCol(
             `
             SELECT maintenance_id FROM monitor_maintenance
             WHERE monitor_id = ?
+            UNION
+            SELECT maintenance_tag.maintenance_id FROM maintenance_tag
+            JOIN monitor_tag ON monitor_tag.tag_id = maintenance_tag.tag_id
+            WHERE monitor_tag.monitor_id = ?
         `,
-            [monitorID]
+            [monitorID, monitorID]
         );
 
         for (const maintenanceID of maintenanceIDList) {

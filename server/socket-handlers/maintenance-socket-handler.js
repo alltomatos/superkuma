@@ -149,6 +149,40 @@ module.exports.maintenanceSocketHandler = (socket) => {
         }
     });
 
+    // Add a new maintenance_tag
+    socket.on("addMaintenanceTag", async (maintenanceID, tags, callback) => {
+        try {
+            checkLogin(socket);
+
+            await requireResource(socket.actor, "maintenance:update", "maintenance", maintenanceID, teamIdLoader);
+
+            await R.exec("DELETE FROM maintenance_tag WHERE maintenance_id = ?", [maintenanceID]);
+
+            for await (const tag of tags) {
+                let bean = R.dispense("maintenance_tag");
+
+                bean.import({
+                    tag_id: tag.id,
+                    maintenance_id: maintenanceID,
+                });
+                await R.store(bean);
+            }
+
+            apicache.clear();
+
+            callback({
+                ok: true,
+                msg: "successAdded",
+                msgi18n: true,
+            });
+        } catch (e) {
+            callback({
+                ok: false,
+                msg: e.message,
+            });
+        }
+    });
+
     socket.on("getMaintenance", async (maintenanceID, callback) => {
         try {
             checkLogin(socket);
@@ -203,6 +237,32 @@ module.exports.maintenanceSocketHandler = (socket) => {
             callback({
                 ok: true,
                 monitors,
+            });
+        } catch (e) {
+            log.error("maintenance", e);
+            callback({
+                ok: false,
+                msg: e.message,
+            });
+        }
+    });
+
+    socket.on("getMaintenanceTag", async (maintenanceID, callback) => {
+        try {
+            checkLogin(socket);
+
+            await requireResource(socket.actor, "maintenance:read", "maintenance", maintenanceID, teamIdLoader);
+
+            log.debug("maintenance", `Get Tags for Maintenance: ${maintenanceID} User ID: ${socket.userID}`);
+
+            let tags = await R.getAll(
+                "SELECT tag.id, tag.name, tag.color FROM maintenance_tag mt JOIN tag ON mt.tag_id = tag.id WHERE mt.maintenance_id = ? ",
+                [maintenanceID]
+            );
+
+            callback({
+                ok: true,
+                tags,
             });
         } catch (e) {
             log.error("maintenance", e);

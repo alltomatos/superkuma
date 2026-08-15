@@ -980,6 +980,17 @@ export default {
         },
 
         /**
+         * Add tags to maintenance
+         * @param {number} maintenanceID Maintenance to modify
+         * @param {number[]} tags IDs of tags to add
+         * @param {socketCB} callback Callback for socket response
+         * @returns {void}
+         */
+        addMaintenanceTag(maintenanceID, tags, callback) {
+            socket.emit("addMaintenanceTag", maintenanceID, tags, callback);
+        },
+
+        /**
          * Get monitors affected by maintenance
          * @param {number} maintenanceID Maintenance to read
          * @param {socketCB} callback Callback for socket response
