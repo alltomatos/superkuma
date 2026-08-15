@@ -129,6 +129,87 @@
                                 <label class="form-check-label">{{ $t("Apply on all existing monitors") }}</label>
                             </div>
                         </div>
+
+                        <div class="mb-3 mt-4">
+                            <hr class="dropdown-divider mb-4" />
+
+                            <div class="form-check form-switch">
+                                <input
+                                    v-model="notification.alertScheduleEnabled"
+                                    class="form-check-input"
+                                    type="checkbox"
+                                />
+                                <label class="form-check-label">{{ $t("Alert Delivery Schedule") }}</label>
+                            </div>
+                            <div class="form-text">
+                                {{ $t("restrictAlertScheduleDescription") }}
+                            </div>
+
+                            <template v-if="notification.alertScheduleEnabled">
+                                <div class="my-3">
+                                    <label class="form-label">{{ $t("dayOfWeek") }}</label>
+                                    <div class="weekday-picker">
+                                        <div v-for="(weekday, index) in weekdays" :key="index">
+                                            <label class="form-check-label" :for="'alert-schedule-' + weekday.id">
+                                                {{ $t(weekday.langKey) }}
+                                            </label>
+                                            <div class="form-check-inline">
+                                                <input
+                                                    :id="'alert-schedule-' + weekday.id"
+                                                    v-model="notification.alertScheduleWeekdays"
+                                                    type="checkbox"
+                                                    :value="weekday.value"
+                                                    class="form-check-input"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="my-3">
+                                    <label class="form-label">{{ $t("alertScheduleTimeWindow") }}</label>
+                                    <div class="row">
+                                        <div class="col">
+                                            <input
+                                                v-model="notification.alertScheduleStartTime"
+                                                type="time"
+                                                class="form-control"
+                                                required
+                                            />
+                                        </div>
+                                        <div class="col">
+                                            <input
+                                                v-model="notification.alertScheduleEndTime"
+                                                type="time"
+                                                class="form-control"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="alert-schedule-timezone" class="form-label">
+                                        {{ $t("Timezone") }}
+                                    </label>
+                                    <select
+                                        id="alert-schedule-timezone"
+                                        v-model="notification.alertScheduleTimezone"
+                                        class="form-select"
+                                    >
+                                        <option value="SAME_AS_SERVER">{{ $t("sameAsServerTimezone") }}</option>
+                                        <option value="UTC">UTC</option>
+                                        <option
+                                            v-for="(timezone, index) in timezoneList"
+                                            :key="index"
+                                            :value="timezone.value"
+                                        >
+                                            {{ timezone.name }}
+                                        </option>
+                                    </select>
+                                </div>
+                            </template>
+                        </div>
                     </div>
 
                     <div class="modal-footer">
@@ -170,6 +251,7 @@ import { Modal } from "bootstrap";
 
 import Confirm from "./Confirm.vue";
 import NotificationFormList from "./notifications";
+import { timezoneList } from "../util-frontend";
 
 export default {
     components: {
@@ -192,6 +274,44 @@ export default {
                 isDefault: false,
                 // Do not set default value here, please scroll to show()
             },
+            timezoneList: timezoneList(),
+            weekdays: [
+                {
+                    id: "weekday1",
+                    langKey: "weekdayShortMon",
+                    value: 1,
+                },
+                {
+                    id: "weekday2",
+                    langKey: "weekdayShortTue",
+                    value: 2,
+                },
+                {
+                    id: "weekday3",
+                    langKey: "weekdayShortWed",
+                    value: 3,
+                },
+                {
+                    id: "weekday4",
+                    langKey: "weekdayShortThu",
+                    value: 4,
+                },
+                {
+                    id: "weekday5",
+                    langKey: "weekdayShortFri",
+                    value: 5,
+                },
+                {
+                    id: "weekday6",
+                    langKey: "weekdayShortSat",
+                    value: 6,
+                },
+                {
+                    id: "weekday0",
+                    langKey: "weekdayShortSun",
+                    value: 0,
+                },
+            ],
         };
     },
 
@@ -427,6 +547,14 @@ export default {
                         // applyExisting is one time only, but it got saved to database previously. Workaround fix, set it to false here to deal with the problem.
                         this.notification.applyExisting = false;
 
+                        // Backfill for notifications saved before the alert schedule existed.
+                        if (!Array.isArray(this.notification.alertScheduleWeekdays)) {
+                            this.notification.alertScheduleWeekdays = [];
+                        }
+                        this.notification.alertScheduleStartTime ??= "00:00";
+                        this.notification.alertScheduleEndTime ??= "23:59";
+                        this.notification.alertScheduleTimezone ??= "SAME_AS_SERVER";
+
                         break;
                     }
                 }
@@ -436,6 +564,11 @@ export default {
                     name: "",
                     type: "telegram",
                     isDefault: false,
+                    alertScheduleEnabled: false,
+                    alertScheduleWeekdays: [1, 2, 3, 4, 5, 6, 0],
+                    alertScheduleStartTime: "08:00",
+                    alertScheduleEndTime: "18:00",
+                    alertScheduleTimezone: "SAME_AS_SERVER",
                 };
             }
 
