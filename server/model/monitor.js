@@ -56,6 +56,7 @@ const { promisify } = require("node:util");
 const brotliCompress = promisify(zlib.brotliCompress);
 const DomainExpiry = require("./domain_expiry");
 const { forwardHeartbeatToMaster } = require("../federation/agent-forwarder");
+const { isWithinAlertSchedule } = require("../util-server/alert-schedule");
 
 const rootCertificates = rootCertificatesFingerprints();
 
@@ -1307,12 +1308,25 @@ class Monitor extends BeanModel {
 
             for (let notification of notificationList) {
                 try {
+                    const config = JSON.parse(notification.config);
+
+                    // Quiet hours: skip delivery for this notification if it falls
+                    // outside its configured alert delivery schedule, so
+                    // collaborators aren't paged outside their working hours.
+                    if (!isWithinAlertSchedule(config, heartbeatJSON["timezone"])) {
+                        log.debug(
+                            "monitor",
+                            `[${monitor.name}] Skipping notification "${notification.name}" - outside its alert delivery schedule`
+                        );
+                        continue;
+                    }
+
                     // `id` isn't part of the stored config JSON -- injected here so
                     // providers that need their own DB row id (e.g. izapia.js,
                     // recording which monitor a sent interactive message belongs
                     // to) can access it via notification.id.
                     await Notification.send(
-                        { ...JSON.parse(notification.config), id: notification.id },
+                        { ...config, id: notification.id },
                         msg,
                         monitor.toJSON(preloadData, false),
                         heartbeatJSON
