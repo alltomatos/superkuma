@@ -472,7 +472,15 @@ export default {
          * @returns {string[]} Placeholder tokens, e.g. "{monitorName}".
          */
         availablePlaceholders() {
-            return ["{monitorName}", "{status}", "{statusEmoji}", "{time}", "{msg}"];
+            return [
+                "{monitorName}",
+                "{status}",
+                "{statusEmoji}",
+                "{severityLabel}",
+                "{severityEmoji}",
+                "{time}",
+                "{msg}",
+            ];
         },
 
         sessionStatusDisplay() {

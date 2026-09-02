@@ -16,8 +16,46 @@ const dayjs = require("dayjs");
  * `expectedValue` = the condition (same mechanism as the SNMP monitor),
  * `bearer_token` / `basic_auth_*` = optional auth, `ignoreTls` = self-signed TLS.
  */
+// Matches a windows_exporter disk-free-space query (the shape every SuperKuma
+// disk monitor uses, e.g. `windows_logical_disk_free_bytes{instance="...",volume="T:"} / 1073741824`)
+// so we can look up the matching total-size metric for a friendlier alert message.
+const WINDOWS_DISK_FREE_QUERY = /windows_logical_disk_free_bytes(\{[^}]*\bvolume="([^"]+)"[^}]*\})/;
+
 class PrometheusMonitorType extends MonitorType {
     name = "prometheus";
+
+    /**
+     * For a windows_exporter disk-free-space query, fetches the matching total
+     * disk size so the alert message can read "livre X GB de Y GB total"
+     * instead of a bare threshold comparison. Best-effort: any failure here
+     * must not fail the check itself, since the free-space condition already
+     * evaluated successfully.
+     * @param {string} promql The PromQL query that was just evaluated.
+     * @param {object} requestOptions Base axios options (url/timeout/headers/auth) to reuse.
+     * @param {number} freeGb The free space already computed, in GB.
+     * @returns {Promise<?string>} "livre X GB de Y GB total" / "livre X GB" description, or null.
+     */
+    async describeDiskSpace(promql, requestOptions, freeGb) {
+        const match = WINDOWS_DISK_FREE_QUERY.exec(promql);
+        if (!match) {
+            return null;
+        }
+        const volume = match[2];
+        try {
+            const totalQuery = promql.replace("windows_logical_disk_free_bytes", "windows_logical_disk_size_bytes");
+            const res = await axios.request({ ...requestOptions, params: { query: totalQuery } });
+            if (!res.data || res.data.status !== "success") {
+                return `livre ${freeGb} GB (${volume})`;
+            }
+            const totalGb = this.extractValue(res.data.data);
+            if (typeof totalGb !== "number") {
+                return `livre ${freeGb} GB (${volume})`;
+            }
+            return `livre ${freeGb} GB de ${totalGb.toFixed(0)} GB total (${volume})`;
+        } catch (e) {
+            return `livre ${freeGb} GB (${volume})`;
+        }
+    }
 
     /**
      * Extract a single numeric value from a Prometheus /api/v1/query result.
@@ -106,12 +144,16 @@ class PrometheusMonitorType extends MonitorType {
             monitor.expectedValue
         );
 
+        const diskDescription =
+            typeof response === "number" ? await this.describeDiskSpace(promql, options, response.toFixed(2)) : null;
+        const suffix = diskDescription ? ` — ${diskDescription}` : "";
+
         if (status) {
             heartbeat.status = UP;
-            heartbeat.msg = `PromQL condition passes (${response} ${monitor.jsonPathOperator} ${monitor.expectedValue})`;
+            heartbeat.msg = `PromQL condition passes (${response} ${monitor.jsonPathOperator} ${monitor.expectedValue})${suffix}`;
         } else {
             throw new Error(
-                `PromQL condition does not pass (${response} ${monitor.jsonPathOperator} ${monitor.expectedValue})`
+                `PromQL condition does not pass (${response} ${monitor.jsonPathOperator} ${monitor.expectedValue})${suffix}`
             );
         }
     }

@@ -69,6 +69,16 @@ const commonMonitorShape = {
         .string()
         .optional()
         .describe("Value the query result is compared against, for the conditionOperator"),
+    warningValue: z
+        .number()
+        .nullable()
+        .optional()
+        .describe(
+            "Optional 'Alerta' threshold for prometheus/influxdb/snmp/json-query, evaluated with the same " +
+                "conditionOperator as expectedValue. When the value crosses this but still satisfies the " +
+                "expectedValue condition (the monitor stays Up), a warning-severity notification fires instead " +
+                "of a Down alert. Pass null to disable."
+        ),
     metricUnit: z
         .string()
         .optional()

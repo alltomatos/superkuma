@@ -966,18 +966,18 @@
                             <div
                                 v-if="
                                     monitor.type === 'json-query' ||
-                                        monitor.type === 'snmp' ||
-                                        monitor.type === 'prometheus' ||
-                                        monitor.type === 'influxdb' ||
-                                        monitor.type === 'otel'
+                                    monitor.type === 'snmp' ||
+                                    monitor.type === 'prometheus' ||
+                                    monitor.type === 'influxdb' ||
+                                    monitor.type === 'otel'
                                 "
                                 class="my-3"
                             >
                                 <div
                                     v-if="
                                         monitor.type !== 'prometheus' &&
-                                            monitor.type !== 'influxdb' &&
-                                            monitor.type !== 'otel'
+                                        monitor.type !== 'influxdb' &&
+                                        monitor.type !== 'otel'
                                     "
                                     class="my-2"
                                 >
@@ -1066,6 +1066,20 @@
                                         <option value="ms" />
                                     </datalist>
                                     <div class="form-text">{{ $t("metricUnitDescription") }}</div>
+                                </div>
+
+                                <!-- Warning threshold ("Alerta" band) -->
+                                <!-- Not for OTel: shares this block's layout but has its own metric-monitor plumbing (Heartbeat.METRIC_MONITOR_TYPES doesn't include it) -->
+                                <div v-if="monitor.type !== 'otel'" class="my-2">
+                                    <label for="warningValue" class="form-label">{{ $t("Warning Threshold") }}</label>
+                                    <input
+                                        id="warningValue"
+                                        v-model="monitor.warningValue"
+                                        type="number"
+                                        class="form-control"
+                                        step=".01"
+                                    />
+                                    <div class="form-text">{{ $t("warningThresholdDescription") }}</div>
                                 </div>
                             </div>
 
