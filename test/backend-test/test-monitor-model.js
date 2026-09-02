@@ -450,14 +450,15 @@ describe("Monitor model - characterization", () => {
             ]);
         });
 
-        test("type=prometheus additionally exposes jsonPathOperator/expectedValue/metricUnit (needed by the status page gauge widget)", async () => {
+        test("type=prometheus additionally exposes jsonPathOperator/expectedValue/warningValue/metricUnit (needed by the status page gauge widget)", async () => {
             const monitor = await createMonitor({
                 type: "prometheus",
                 name: "public prometheus monitor",
                 url: "http://prometheus:9090",
-                databaseQuery: "up{job=\"node\"}",
+                databaseQuery: 'up{job="node"}',
                 jsonPathOperator: ">",
                 expectedValue: "90",
+                warningValue: 95,
                 metricUnit: "%",
             });
             monitor.sendUrl = false;
@@ -473,10 +474,12 @@ describe("Monitor model - characterization", () => {
                 "name",
                 "sendUrl",
                 "type",
+                "warningValue",
             ]);
             assert.strictEqual(json.jsonPathOperator, ">");
             assert.strictEqual(json.expectedValue, "90");
             assert.strictEqual(json.metricUnit, "%");
+            assert.strictEqual(json.warningValue, 95);
             // The PromQL query itself is NOT exposed -- only the threshold.
             assert.strictEqual("databaseQuery" in json, false);
         });
@@ -499,10 +502,20 @@ describe("Monitor model - characterization", () => {
 
                 assert.deepStrictEqual(
                     keys,
-                    ["expectedValue", "id", "jsonPathOperator", "metricUnit", "name", "sendUrl", "type"],
+                    [
+                        "expectedValue",
+                        "id",
+                        "jsonPathOperator",
+                        "metricUnit",
+                        "name",
+                        "sendUrl",
+                        "type",
+                        "warningValue",
+                    ],
                     `unexpected public key set for ${type}`
                 );
                 assert.strictEqual(json.metricUnit, "GB");
+                assert.strictEqual(json.warningValue, null, "warning_value defaults to null when not configured");
                 // The jsonata query expression itself is NOT exposed.
                 assert.strictEqual("jsonPath" in json, false);
             }

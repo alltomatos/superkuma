@@ -202,6 +202,11 @@ module.exports.monitorSocketHandler = (socket, server, helpers) => {
             bean.retryInterval = monitor.retryInterval;
             bean.resendInterval = monitor.resendInterval;
             bean.alertSeverity = monitor.alertSeverity;
+            // "" (cleared number input) means "disabled", stored as NULL -- the
+            // warning_value column is nullable float, unlike expectedValue's
+            // free-text column, so an empty string must not reach the DB layer.
+            bean.warningValue =
+                monitor.warningValue === "" || monitor.warningValue === undefined ? null : monitor.warningValue;
             bean.anomalyEnabled = monitor.anomalyEnabled;
             bean.anomalyMetric = monitor.anomalyMetric;
             bean.anomalyWindow = monitor.anomalyWindow;
