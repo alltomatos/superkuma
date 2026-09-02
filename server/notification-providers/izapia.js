@@ -20,6 +20,33 @@ function extractMessageId(response) {
 const STATUS_TEXT = { 0: "Down", 1: "Up", 2: "Pending", 3: "Maintenance" };
 const STATUS_EMOJI = { 0: "🔴", 1: "✅", 2: "🟡", 3: "🔧" };
 
+/**
+ * Three-tier severity label per status, for the {severityLabel}/{severityEmoji}
+ * template placeholders -- a plain-language "Normal/Alerta/Crítico" reading
+ * instead of the raw Up/Down status text. `heartbeatJSON.alertBand === "warning"`
+ * (set by Monitor.evaluateWarningThreshold()) overrides the status-based label:
+ * the monitor is technically still UP, but inside the configured warning band.
+ */
+const SEVERITY_LABEL = { 0: "Crítico", 1: "Normal", 2: "Pendente", 3: "Manutenção" };
+const SEVERITY_EMOJI = { 0: "🔴", 1: "🟢", 2: "🟡", 3: "🔧" };
+
+/**
+ * Resolves the {severityLabel}/{severityEmoji} placeholder values for a beat,
+ * honoring the warning-band override over the raw up/down status.
+ * @param {?object} heartbeatJSON Heartbeat details ({status}, optional {alertBand}).
+ * @returns {{label: string, emoji: string}} The effective severity label/emoji.
+ */
+function resolveSeverity(heartbeatJSON) {
+    if (heartbeatJSON && heartbeatJSON.alertBand === "warning") {
+        return { label: "Alerta", emoji: "🟡" };
+    }
+    const status = heartbeatJSON ? heartbeatJSON.status : undefined;
+    return {
+        label: SEVERITY_LABEL[status] ?? "Desconhecido",
+        emoji: SEVERITY_EMOJI[status] ?? "",
+    };
+}
+
 const DEFAULT_PAUSE_LABEL = "Pausar monitor";
 const DEFAULT_RESUME_LABEL = "Retomar monitor";
 const DEFAULT_ACK_LABEL = "OK, ciente";
@@ -61,10 +88,13 @@ class Izapia extends NotificationProvider {
         if (!template || !monitorJSON || !heartbeatJSON) {
             return msg;
         }
+        const severity = resolveSeverity(heartbeatJSON);
         const replacements = {
             "{monitorName}": monitorJSON.name || "",
             "{status}": STATUS_TEXT[heartbeatJSON.status] ?? "Unknown",
             "{statusEmoji}": STATUS_EMOJI[heartbeatJSON.status] ?? "",
+            "{severityLabel}": severity.label,
+            "{severityEmoji}": severity.emoji,
             "{time}": heartbeatJSON.localDateTime || heartbeatJSON.time || "",
             "{msg}": heartbeatJSON.msg || "",
         };

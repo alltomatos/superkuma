@@ -225,6 +225,8 @@
     "Maximum": "Máximo",
     "Unit": "Unidade",
     "metricUnitDescription": "Unidade mostrada ao lado do valor, do gauge e do gráfico (ex: %, GB, MB). Não altera a query, mas \"%\" coloca o gauge e o gráfico numa escala fixa de 0 a 100 — defina para casar com o que seu PromQL retorna.",
+    "Warning Threshold": "Limite de Alerta",
+    "warningThresholdDescription": "Banda \"Alerta\" opcional, avaliada com a mesma condição acima. Quando o valor cruza esse limite mas ainda satisfaz a condição do Valor Esperado (o monitor continua Up), é enviada uma notificação de severidade alerta em vez de um alerta de Down. Deixe vazio para desativar.",
     "Value": "Valor",
     "Avg. Value": "Valor médio",
     "Done": "Feito",

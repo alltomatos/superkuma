@@ -102,6 +102,7 @@ const DIRECT_FIELDS = [
     "dns_resolve_server",
     "active",
     "expectedValue",
+    "warningValue",
     "metricUnit",
     "influxdbDatabase",
 ];

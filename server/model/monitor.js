@@ -25,6 +25,7 @@ const {
     PING_PER_REQUEST_TIMEOUT_DEFAULT,
     RESPONSE_BODY_LENGTH_DEFAULT,
     RESPONSE_BODY_LENGTH_MAX,
+    evaluateJsonQuery,
 } = require("../../src/util");
 const {
     ping,
@@ -55,6 +56,7 @@ const zlib = require("node:zlib");
 const { promisify } = require("node:util");
 const brotliCompress = promisify(zlib.brotliCompress);
 const DomainExpiry = require("./domain_expiry");
+const Heartbeat = require("./heartbeat");
 const { forwardHeartbeatToMaster } = require("../federation/agent-forwarder");
 
 const rootCertificates = rootCertificatesFingerprints();
@@ -109,6 +111,7 @@ class Monitor extends BeanModel {
             obj.jsonPathOperator = this.jsonPathOperator;
             obj.expectedValue = this.expectedValue;
             obj.metricUnit = this.metricUnit;
+            obj.warningValue = this.warningValue;
         }
 
         return obj;
@@ -160,6 +163,7 @@ class Monitor extends BeanModel {
             retryOnlyOnStatusCodeFailure: Boolean(this.retry_only_on_status_code_failure),
             resendInterval: this.resendInterval,
             alertSeverity: this.alert_severity,
+            warningValue: this.warning_value,
             anomalyEnabled: this.anomaly_enabled,
             anomalyMetric: this.anomaly_metric,
             anomalyWindow: this.anomaly_window,
@@ -832,6 +836,14 @@ class Monitor extends BeanModel {
             // it so the current beat's ping is already the in-progress bucket's head
             // (see test/backend-test/test-uptime-calculator-anomaly-window.js).
             await Monitor.evaluateAnomaly(this, bean, uptimeCalculator);
+
+            // Evaluate the "Alerta" warning band (extension of ADR-0014), also
+            // decoupled from up/down accounting -- a monitor stays UP while
+            // inside the warning band, it just also gets a warning-severity
+            // notification. Order relative to evaluateAnomaly doesn't matter
+            // (independent alert_event rows), placed right after it since both
+            // are side-channel evaluations of this same beat.
+            await Monitor.evaluateWarningThreshold(this, bean);
 
             // Send to frontend
             log.debug("monitor", `[${this.name}] Send to socket`);
@@ -1515,6 +1527,119 @@ class Monitor extends BeanModel {
             }
         } catch (error) {
             log.error("monitor", `[${monitor.name}] evaluateAnomaly failed: ${error.message}`);
+            log.debug("monitor", error);
+        }
+    }
+
+    /**
+     * Evaluate this beat against the monitor's optional "Alerta" warning
+     * threshold and, if it is inside that band, persist an alert_event row
+     * and notify -- entirely decoupled from bean.status/up/down accounting,
+     * the same invariant evaluateAnomaly() follows: a warning is never a
+     * DOWN, so it never contaminates uptime/SLA. A guaranteed no-op unless
+     * monitor.warning_value is set -- every existing monitor defaults to
+     * `null` (TASK: add-monitor-warning-threshold migration), so this is
+     * dark-launch, byte-identical-to-legacy behavior until a monitor opts in.
+     *
+     * Only meaningful for metric monitors whose heartbeat carries an
+     * extractable numeric value (prometheus/influxdb/snmp/json-query, see
+     * Heartbeat.METRIC_MONITOR_TYPES) -- other types have no `warning_value`
+     * UI to set one in the first place.
+     *
+     * Deliberately swallows every error internally, mirroring evaluateAnomaly:
+     * a bug here (bad operator, transient DB error on the insert) must never
+     * take down the core heartbeat/notification pipeline.
+     * @param {Monitor} monitor The monitor being evaluated.
+     * @param {import("./heartbeat")} bean This beat's heartbeat bean. Read
+     * only (status/msg) -- never mutated, so up/down counters are untouched.
+     * @returns {Promise<void>}
+     */
+    static async evaluateWarningThreshold(monitor, bean) {
+        try {
+            if (monitor.warning_value === null || monitor.warning_value === undefined || monitor.warning_value === "") {
+                return;
+            }
+
+            // Only makes sense on a real, just-measured UP ping -- a DOWN beat
+            // already fired the critical alert, and PENDING/MAINTENANCE have no
+            // fresh value to evaluate.
+            if (bean.status !== UP) {
+                return;
+            }
+
+            if (!Heartbeat.METRIC_MONITOR_TYPES.includes(monitor.type)) {
+                return;
+            }
+
+            const value = Heartbeat.extractPublicMetricValue(bean.msg);
+            if (value === null) {
+                return;
+            }
+
+            // Same operator as the critical condition (monitor.expectedValue) --
+            // if the value still satisfies it against warning_value, we're
+            // comfortably inside the safe zone and there's nothing to raise.
+            const { status: withinSafeZone } = await evaluateJsonQuery(
+                value,
+                "$",
+                monitor.jsonPathOperator,
+                monitor.warning_value
+            );
+            if (withinSafeZone) {
+                return;
+            }
+
+            // Anti-noise cooldown, same 15-minute window as evaluateAnomaly.
+            const warningCooldownMs = 15 * 60 * 1000;
+            const lastEvent = await R.getRow(
+                "SELECT time FROM alert_event WHERE monitor_id = ? AND type = ? ORDER BY time DESC LIMIT 1",
+                [monitor.id, "warning_threshold"]
+            );
+            if (lastEvent && lastEvent.time && dayjs.utc().diff(dayjs.utc(lastEvent.time)) < warningCooldownMs) {
+                return;
+            }
+
+            await R.knex("alert_event").insert({
+                monitor_id: monitor.id,
+                type: "warning_threshold",
+                value,
+                expected: monitor.warning_value,
+                score: 0,
+                severity: "warning",
+                time: R.isoDateTimeMillis(dayjs.utc()),
+            });
+
+            const notificationList = await Monitor.getRoutedNotificationList(monitor, "warning");
+            if (notificationList.length === 0) {
+                return;
+            }
+
+            const unit = monitor.metric_unit ? ` ${monitor.metric_unit}` : "";
+            const msg = `[${monitor.name}] [⚠️ Alerta] ${bean.msg} (limite de alerta: ${monitor.jsonPathOperator} ${monitor.warning_value}${unit})`;
+            const monitorData = [{ id: monitor.id, active: monitor.active, name: monitor.name }];
+            const preloadData = await Monitor.preparePreloadData(monitorData);
+            const heartbeatJSON = await bean.toJSONAsync({ decodeResponse: false });
+            // Lets notification templates (e.g. izapia's {severityLabel}) show
+            // "Alerta" instead of the misleading "Up" this beat's raw status
+            // would otherwise imply -- the monitor IS up, it's just inside the
+            // warning band.
+            heartbeatJSON.alertBand = "warning";
+
+            for (let notification of notificationList) {
+                try {
+                    await Notification.send(
+                        { ...JSON.parse(notification.config), id: notification.id },
+                        msg,
+                        monitor.toJSON(preloadData, false),
+                        heartbeatJSON
+                    );
+                } catch (e) {
+                    log.error("monitor", "Cannot send warning-threshold notification to " + notification.name);
+                    log.error("monitor", e);
+                }
+            }
+        } catch (error) {
+            log.error("monitor", `[${monitor.name}] evaluateWarningThreshold failed: ${error.message}`);
             log.debug("monitor", error);
         }
     }

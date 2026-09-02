@@ -57,6 +57,8 @@ export default {
                 "{monitorName}": "API Principal",
                 "{status}": "Down",
                 "{statusEmoji}": "🔴",
+                "{severityLabel}": "Crítico",
+                "{severityEmoji}": "🔴",
                 "{time}": "10:24",
                 "{msg}": "Connection refused",
             };
