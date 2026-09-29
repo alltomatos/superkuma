@@ -25,8 +25,14 @@
                     :h="item.h"
                     :i="item.i"
                 >
-                    <div class="panel-card">
-                        <div class="panel-head">{{ panelTitle(item.i) }}</div>
+                    <div
+                        class="panel-card"
+                        :class="{
+                            'card-section-header': isSectionHeader(item.i),
+                            'card-alarm-pulse': hasAlarm(item.i),
+                        }"
+                    >
+                        <div v-if="!isSectionHeader(item.i)" class="panel-head">{{ panelTitle(item.i) }}</div>
                         <div class="panel-body">
                             <component :is="panelComponent(item.i)" v-bind="panelProps(item.i)" />
                         </div>
@@ -43,6 +49,8 @@
 import axios from "axios";
 import { GridLayout, GridItem } from "grid-layout-plus";
 import StatusTilePanel from "../components/panels/StatusTilePanel.vue";
+import HeartbeatBarPanel from "../components/panels/HeartbeatBarPanel.vue";
+import SectionHeaderPanel from "../components/panels/SectionHeaderPanel.vue";
 import StatPanel from "../components/panels/StatPanel.vue";
 import SpeedometerPanel from "../components/panels/SpeedometerPanel.vue";
 import { defineAsyncComponent } from "vue";
@@ -60,7 +68,16 @@ const MetricGaugeWidget = defineAsyncComponent(() => import("../components/Metri
  * panel is simply skipped in the public render (see visiblePanels).
  */
 export default {
-    components: { GridLayout, GridItem, StatusTilePanel, StatPanel, SpeedometerPanel, MetricGaugeWidget },
+    components: {
+        GridLayout,
+        GridItem,
+        StatusTilePanel,
+        HeartbeatBarPanel,
+        SectionHeaderPanel,
+        StatPanel,
+        SpeedometerPanel,
+        MetricGaugeWidget,
+    },
     data() {
         return {
             dashboard: null,
@@ -72,7 +89,7 @@ export default {
     },
     computed: {
         visiblePanels() {
-            const supported = ["status_tile", "metric_gauge", "stat", "speedometer"];
+            const supported = ["status_tile", "heartbeat_bar", "section_header", "metric_gauge", "stat", "speedometer"];
             return this.panels.filter((p) => supported.includes(p.kind));
         },
         layout() {
@@ -161,8 +178,39 @@ export default {
          */
         panelComponent(id) {
             const p = this.panelById(id);
-            const kinds = { metric_gauge: "MetricGaugeWidget", stat: "StatPanel", speedometer: "SpeedometerPanel" };
+            const kinds = {
+                status_tile: "StatusTilePanel",
+                heartbeat_bar: "HeartbeatBarPanel",
+                section_header: "SectionHeaderPanel",
+                metric_gauge: "MetricGaugeWidget",
+                stat: "StatPanel",
+                speedometer: "SpeedometerPanel",
+            };
             return (p && kinds[p.kind]) || "StatusTilePanel";
+        },
+
+        /**
+         * Checks if the panel is a section_header.
+         * @param {number} id The panel id.
+         * @returns {boolean} True if section header.
+         */
+        isSectionHeader(id) {
+            const p = this.panelById(id);
+            return p && p.kind === "section_header";
+        },
+
+        /**
+         * Checks if the panel has an active alarm/down status.
+         * @param {number} id The panel id.
+         * @returns {boolean} True if down.
+         */
+        hasAlarm(id) {
+            const p = this.panelById(id);
+            if (!p || p.kind === "section_header") {
+                return false;
+            }
+            const beat = this.latestBeat(p.monitorId);
+            return beat && Number(beat.status) === 0;
         },
 
         /**
@@ -189,6 +237,21 @@ export default {
             }
             if (p.kind === "status_tile") {
                 return { monitorId: p.monitorId, monitorName: p.monitorName, publicStatus: this.publicStatus(p) };
+            }
+            if (p.kind === "heartbeat_bar") {
+                return {
+                    monitorId: p.monitorId,
+                    monitorName: p.monitorName,
+                    publicStatus: this.publicStatus(p),
+                    heartbeatList: this.heartbeatList[p.monitorId] || [],
+                };
+            }
+            if (p.kind === "section_header") {
+                return {
+                    monitorId: p.monitorId,
+                    monitorName: p.monitorName,
+                    title: p.title,
+                };
             }
             const beat = this.latestBeat(p.monitorId);
             const value = beat && beat.metricValue !== undefined ? beat.metricValue : 0;
@@ -224,13 +287,21 @@ export default {
 @import "../assets/vars.scss";
 
 .dashboard-public-view {
-    max-width: 1200px;
+    width: 100%;
+    max-width: 98%;
     margin: 0 auto;
-    padding: 24px 16px;
+    padding: 16px 20px;
+    box-sizing: border-box;
 }
 
 .public-header {
-    margin-bottom: 20px;
+    margin-bottom: 16px;
+
+    h1 {
+        font-size: 1.6rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
 }
 
 .panel-card {
@@ -241,29 +312,63 @@ export default {
     border: 1px solid #dee2e6;
     border-radius: 8px;
     overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition:
+        box-shadow 0.2s ease,
+        border-color 0.2s ease;
 
     .dark & {
         background-color: $dark-bg2;
         border-color: $dark-border-color;
         color: $dark-font-color;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    }
+
+    &.card-section-header {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    &.card-alarm-pulse {
+        border-color: #dc3545 !important;
+        box-shadow: 0 0 12px rgba(220, 53, 69, 0.6) !important;
+        animation: pulse-danger 1.5s infinite alternate;
+    }
+}
+
+@keyframes pulse-danger {
+    from {
+        box-shadow: 0 0 4px rgba(220, 53, 69, 0.4);
+    }
+
+    to {
+        box-shadow: 0 0 16px rgba(220, 53, 69, 0.85);
     }
 }
 
 .panel-head {
-    padding: 4px 8px;
-    font-size: 0.8rem;
-    font-weight: bold;
-    border-bottom: 1px solid #dee2e6;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-align: center;
+    background: rgba(15, 118, 110, 0.22);
+    color: #14b8a6;
+    border-bottom: 1px solid rgba(20, 184, 166, 0.25);
+    letter-spacing: 0.02em;
 
     .dark & {
-        border-bottom-color: $dark-border-color;
+        background: rgba(15, 118, 110, 0.28);
+        color: #2dd4bf;
+        border-bottom-color: rgba(45, 212, 191, 0.2);
     }
 }
 
 .panel-body {
     flex: 1;
-    padding: 6px;
+    padding: 6px 10px;
     overflow: hidden;
+    box-sizing: border-box;
 }
 
 .public-footer {
