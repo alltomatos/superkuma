@@ -243,7 +243,7 @@ export default {
                     monitorId: p.monitorId,
                     monitorName: p.monitorName,
                     publicStatus: this.publicStatus(p),
-                    heartbeatList: this.heartbeatList[p.monitorId] || [],
+                    heartbeatList: this.heartbeatList[p.monitorId] ?? [],
                 };
             }
             if (p.kind === "section_header") {

@@ -57,11 +57,14 @@ export default {
             return this.monitorName || this.$root.monitorList?.[this.monitorId]?.name || "";
         },
         beats() {
-            if (this.heartbeatList && this.heartbeatList.length > 0) {
+            if (Array.isArray(this.heartbeatList) && this.heartbeatList.length > 0) {
                 return this.heartbeatList;
             }
-            if (this.$root.heartbeatList?.[this.monitorId]) {
+            if (this.$root.heartbeatList?.[this.monitorId] && this.$root.heartbeatList[this.monitorId].length > 0) {
                 return this.$root.heartbeatList[this.monitorId];
+            }
+            if (Array.isArray(this.heartbeatList)) {
+                return this.heartbeatList;
             }
             return [];
         },
@@ -253,6 +256,8 @@ export default {
     gap: 2px;
     width: 100%;
     height: 18px;
+    min-height: 18px;
+    margin-top: 4px;
 }
 
 .beat-pill {
