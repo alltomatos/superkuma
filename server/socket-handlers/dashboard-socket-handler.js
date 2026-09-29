@@ -9,7 +9,17 @@ const { validate } = require("../validation");
 
 // Panel kinds (app-level enum, stored in dashboard_widget.kind). ADR-0016
 // shipped the first three; ADR-0017 adds the richer Grafana-style panels.
-const WIDGET_KINDS = ["status_tile", "metric_gauge", "group_summary", "stat", "speedometer", "trend", "pie"];
+const WIDGET_KINDS = [
+    "status_tile",
+    "heartbeat_bar",
+    "section_header",
+    "metric_gauge",
+    "group_summary",
+    "stat",
+    "speedometer",
+    "trend",
+    "pie",
+];
 
 const slugSchema = z
     .string()

@@ -1,7 +1,17 @@
 const { z } = require("zod");
 const { registerTool } = require("./helpers");
 
-const WIDGET_KINDS = ["status_tile", "metric_gauge", "group_summary", "stat", "speedometer", "trend", "pie"];
+const WIDGET_KINDS = [
+    "status_tile",
+    "heartbeat_bar",
+    "section_header",
+    "metric_gauge",
+    "group_summary",
+    "stat",
+    "speedometer",
+    "trend",
+    "pie",
+];
 
 /**
  * Register team-dashboard MCP tools (ADR-0016/ADR-0017): read tools always;
@@ -92,7 +102,8 @@ function registerDashboardTools(server, client, config) {
             "Replace a dashboard's full panel list (like editing it in the dashboard builder and hitting Save) -- " +
             "always pass every panel you want to keep, positioned on a 12-column grid. Each panel references an " +
             "existing monitor id from the SAME team (use list_monitors with teamId to find them) and a kind: " +
-            "'status_tile' (up/down dot), 'metric_gauge' (arc gauge for numeric monitors like prometheus/influxdb/snmp), " +
+            "'status_tile' (up/down dot), 'heartbeat_bar' (uptime strip + history), 'section_header' (full-width group divider), " +
+            "'metric_gauge' (arc gauge for numeric monitors like prometheus/influxdb/snmp), " +
             "'stat' (single large number), 'speedometer' (needle gauge, e.g. for NIC throughput -- config.max sets the ceiling), " +
             "'trend' (line chart of recent history, config.periodHours sets the window, default 6), 'pie' (up/down/pending " +
             "breakdown of a 'group'-type monitor's children), or 'group_summary' (the same breakdown as text counts). " +
