@@ -86,6 +86,8 @@
                                 <label class="form-label" for="newPanelKind">{{ $t("Widget Type") }}</label>
                                 <select id="newPanelKind" v-model="newPanel.kind" class="form-select">
                                     <option value="status_tile">{{ $t("Status") }}</option>
+                                    <option value="heartbeat_bar">{{ $t("Heartbeat Bar") }}</option>
+                                    <option value="section_header">{{ $t("Section Header") }}</option>
                                     <option value="metric_gauge">{{ $t("Metric Gauge") }}</option>
                                     <option value="stat">{{ $t("Stat") }}</option>
                                     <option value="speedometer">{{ $t("Speedometer") }}</option>
@@ -131,6 +133,8 @@ import { Modal } from "bootstrap";
 import { GridLayout, GridItem } from "grid-layout-plus";
 import GroupSummaryWidget from "../components/GroupSummaryWidget.vue";
 import StatusTilePanel from "../components/panels/StatusTilePanel.vue";
+import HeartbeatBarPanel from "../components/panels/HeartbeatBarPanel.vue";
+import SectionHeaderPanel from "../components/panels/SectionHeaderPanel.vue";
 import StatPanel from "../components/panels/StatPanel.vue";
 import SpeedometerPanel from "../components/panels/SpeedometerPanel.vue";
 import TrendPanel from "../components/panels/TrendPanel.vue";
@@ -155,6 +159,8 @@ export default {
         GridItem,
         GroupSummaryWidget,
         StatusTilePanel,
+        HeartbeatBarPanel,
+        SectionHeaderPanel,
         StatPanel,
         SpeedometerPanel,
         TrendPanel,
@@ -281,6 +287,9 @@ export default {
         panelComponent(id) {
             const w = this.widgetById(id);
             const kinds = {
+                status_tile: "StatusTilePanel",
+                heartbeat_bar: "HeartbeatBarPanel",
+                section_header: "SectionHeaderPanel",
                 metric_gauge: "MetricGaugeWidget",
                 group_summary: "GroupSummaryWidget",
                 stat: "StatPanel",
@@ -308,6 +317,12 @@ export default {
             }
             if (w.kind === "status_tile") {
                 return { monitorId: w.monitorId, monitorName: w.monitorName };
+            }
+            if (w.kind === "heartbeat_bar") {
+                return { monitorId: w.monitorId, monitorName: w.monitorName };
+            }
+            if (w.kind === "section_header") {
+                return { monitorId: w.monitorId, monitorName: w.monitorName, title: w.title };
             }
             if (w.kind === "trend") {
                 return {
@@ -484,25 +499,34 @@ export default {
     border: 1px solid #dee2e6;
     border-radius: 8px;
     overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 
     .dark & {
         background-color: $dark-bg2;
         border-color: $dark-border-color;
         color: $dark-font-color;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
     }
 }
 
 .panel-head {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
-    padding: 4px 8px;
-    font-size: 0.8rem;
-    font-weight: bold;
-    border-bottom: 1px solid #dee2e6;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-align: center;
+    background: rgba(15, 118, 110, 0.22);
+    color: #14b8a6;
+    border-bottom: 1px solid rgba(20, 184, 166, 0.25);
+    letter-spacing: 0.02em;
 
     .dark & {
-        border-bottom-color: $dark-border-color;
+        background: rgba(15, 118, 110, 0.28);
+        color: #2dd4bf;
+        border-bottom-color: rgba(45, 212, 191, 0.2);
     }
 }
 
@@ -531,7 +555,8 @@ export default {
 
 .panel-body {
     flex: 1;
-    padding: 6px;
+    padding: 8px 10px;
     overflow: hidden;
+    box-sizing: border-box;
 }
 </style>
