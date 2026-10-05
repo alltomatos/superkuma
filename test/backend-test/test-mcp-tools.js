@@ -553,6 +553,71 @@ describe("MCP tool behaviour", () => {
         assert.strictEqual(savedConfig.title, "GNR", "title left unset is preserved");
     });
 
+    test("save_status_page applies themeVars, icon and domainNameList into config and socket payload", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        client.responses.getStatusPage = {
+            ok: true,
+            config: {
+                slug: "proh",
+                title: "Prohospital",
+                icon: "/old-logo.png",
+                customCSS: "/* base custom css */",
+                domainNameList: [],
+            },
+        };
+        registerAllTools(server, client, fullConfig);
+
+        const res = await server.call("save_status_page", {
+            slug: "proh",
+            themeVars: {
+                colorUp: "#10b981",
+                colorDown: "#ef4444",
+                cardRadius: "12px",
+                cardShadow: "none",
+            },
+            icon: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+            domainNameList: ["status.prohospital.com.br"],
+            groups: [{ name: "Core", monitorIds: [10] }],
+        });
+
+        assert.strictEqual(res.isError, false);
+        const call = lastCall(client, "saveStatusPage");
+        assert.strictEqual(call.args[0], "proh");
+        const savedConfig = call.args[1];
+        assert.ok(savedConfig.customCSS.includes("--sk-color-up: #10b981;"));
+        assert.ok(savedConfig.customCSS.includes("--sk-color-down: #ef4444;"));
+        assert.ok(savedConfig.customCSS.includes("--sk-card-radius: 12px;"));
+        assert.deepStrictEqual(savedConfig.domainNameList, ["status.prohospital.com.br"]);
+        assert.strictEqual(
+            call.args[2],
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+        );
+    });
+
+    test("get_status_page parses embedded theme variables and domainNameList", async () => {
+        const server = new FakeServer();
+        const client = new FakeClient();
+        client.responses.getStatusPage = {
+            ok: true,
+            config: {
+                slug: "proh",
+                title: "Prohospital",
+                customCSS:
+                    "/* superkuma-theme:start:custom */\n.status-page-root {\n    --sk-color-up: #10b981;\n    --sk-card-radius: 14px;\n}\n/* superkuma-theme:end */",
+                domainNameList: ["status.prohospital.com.br"],
+            },
+        };
+        registerAllTools(server, client, fullConfig);
+
+        const res = await server.call("get_status_page", { slug: "proh" });
+        assert.strictEqual(res.isError, false);
+        assert.strictEqual(res.data.parsedThemeId, "custom");
+        assert.strictEqual(res.data.parsedThemeVars.colorUp, "#10b981");
+        assert.strictEqual(res.data.parsedThemeVars.cardRadius, "14px");
+        assert.deepStrictEqual(res.data.domainNameList, ["status.prohospital.com.br"]);
+    });
+
     test("save_status_page throws if the status page does not exist", async () => {
         const server = new FakeServer();
         const client = new FakeClient();
