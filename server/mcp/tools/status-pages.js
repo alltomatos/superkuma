@@ -1,5 +1,6 @@
 const { z } = require("zod");
 const { registerTool } = require("./helpers");
+const { applyThemeBlock, readThemeBlock } = require("../status-page-theme");
 
 /**
  * Reduce a status page object to a compact summary for list views.
@@ -43,13 +44,20 @@ function registerStatusPageTools(server, client, config) {
     registerTool(server, config, {
         name: "get_status_page",
         title: "Get status page",
-        description: "Fetch a status page's full configuration by slug.",
+        description: "Fetch a status page's full configuration, custom theme variables, and domain names by slug.",
         inputSchema: {
             slug: z.string().min(1).describe("Status page slug"),
         },
         handler: async (args) => {
             const res = await client.request("getStatusPage", args.slug);
-            return res.config;
+            const cfg = res.config || {};
+            const themeBlock = readThemeBlock(cfg.customCSS);
+            return {
+                ...cfg,
+                parsedThemeVars: themeBlock ? themeBlock.vars : null,
+                parsedThemeId: themeBlock ? themeBlock.id : null,
+                domainNameList: cfg.domainNameList || [],
+            };
         },
     });
 
@@ -88,8 +96,36 @@ function registerStatusPageTools(server, client, config) {
                 .optional()
                 .describe("Custom CSS injected into the public status page (same box as the dashboard's editor)"),
             theme: z.enum(["auto", "light", "dark"]).optional().describe("Color theme"),
+            themeVars: z
+                .object({
+                    colorUp: z.string().optional().describe("Color for UP state (e.g. '#28a745' or '#10b981')"),
+                    colorDown: z.string().optional().describe("Color for DOWN state (e.g. '#dc3545')"),
+                    colorPending: z.string().optional().describe("Color for PENDING state (e.g. '#ffc107')"),
+                    colorMaintenance: z.string().optional().describe("Color for MAINTENANCE state (e.g. '#17a2b8')"),
+                    cardRadius: z.string().optional().describe("Card corner radius (e.g. '10px' or '16px')"),
+                    cardShadow: z
+                        .string()
+                        .optional()
+                        .describe("Card shadow CSS value (e.g. 'none' or '0 15px 70px rgba(0,0,0,0.1)')"),
+                    cardPadding: z.string().optional().describe("Card padding (e.g. '10px' or '16px')"),
+                    fontSizeBase: z.string().optional().describe("Base font size (e.g. '1rem' or '1.1rem')"),
+                    gap: z.string().optional().describe("Gap between elements (e.g. '1.5rem')"),
+                    columns: z.string().optional().describe("Number of columns (e.g. '1' or '2')"),
+                    bg: z.string().optional().describe("Background color/gradient"),
+                    textColor: z.string().optional().describe("Text color"),
+                })
+                .optional()
+                .describe("Structured theme variables for colors, radius, shadow and layout"),
+            icon: z
+                .string()
+                .optional()
+                .describe("Status page logo/icon: PNG data URL ('data:image/png;base64,...') or relative path/URL"),
+            domainNameList: z
+                .array(z.string())
+                .optional()
+                .describe("Custom domain names / CNAMEs pointing to this status page"),
             footerText: z.string().nullable().optional().describe("Custom footer text, null to clear"),
-            showPoweredBy: z.boolean().optional().describe("Show the \"Powered by SuperKuma\" footer badge"),
+            showPoweredBy: z.boolean().optional().describe('Show the "Powered by SuperKuma" footer badge'),
             showTags: z.boolean().optional().describe("Show each monitor's tags on the page"),
             showCertificateExpiry: z.boolean().optional().describe("Show TLS certificate expiry per monitor"),
             showOnlyLastHeartbeat: z
@@ -108,7 +144,9 @@ function registerStatusPageTools(server, client, config) {
                 .int()
                 .min(3)
                 .optional()
-                .describe("Seconds each group stays on screen before rotating to the next (only used when tabRotationEnabled)"),
+                .describe(
+                    "Seconds each group stays on screen before rotating to the next (only used when tabRotationEnabled)"
+                ),
             soundAlertsEnabled: z
                 .boolean()
                 .optional()
@@ -145,6 +183,7 @@ function registerStatusPageTools(server, client, config) {
                 "tabRotationEnabled",
                 "tabRotationInterval",
                 "soundAlertsEnabled",
+                "domainNameList",
             ];
             const mergedConfig = { ...cfg };
             for (const field of OPTIONAL_FIELDS) {
@@ -153,14 +192,19 @@ function registerStatusPageTools(server, client, config) {
                 }
             }
 
+            // If themeVars are provided, apply them via the marked theme block into customCSS
+            if (args.themeVars && Object.keys(args.themeVars).length > 0) {
+                const currentCss = mergedConfig.customCSS || "";
+                mergedConfig.customCSS = applyThemeBlock(currentCss, "custom", args.themeVars);
+            }
+
             const publicGroupList = args.groups.map((g) => ({
                 name: g.name,
                 monitorList: g.monitorIds.map((id) => ({ id })),
             }));
 
-            // Preserve the existing logo: saveStatusPage treats a non-"data:" imgDataUrl as a
-            // pass-through URL, so re-submitting the current icon leaves it unchanged.
-            const imgDataUrl = cfg.icon || "";
+            // Handle icon: either custom provided in args (URL or data:image/png;base64) or existing
+            const imgDataUrl = args.icon !== undefined ? args.icon : cfg.icon || "";
 
             await client.request("saveStatusPage", args.slug, mergedConfig, imgDataUrl, publicGroupList);
 
